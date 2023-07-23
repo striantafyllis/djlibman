@@ -21,7 +21,7 @@ DEFAULT_SPREADSHEET_PAGE = 'Main Library'
 
 google_service = None
 
-col_name_to_TrackInfo_field = {
+col_name_to_Track_field = {
     'ID': 'id',
     'Artists': 'artists',
     'Title': 'title',
@@ -54,7 +54,7 @@ class TrackInfo:
     bpm: float
     key: str
     date_added: str
-    subjective_attributes: dict
+    attributes: dict
     track: rekordbox.Track = None
     dirty_fields: list[str]
 
@@ -73,7 +73,7 @@ class TrackInfo:
         return
 
     def __str__(self):
-        return 'TrackInfo row=%d artists=%s title=%s' % (self.row, self.artists, self.title)
+        return 'TrackInfo row=%d id=%s artists=%s title=%s' % (self.row_num, self.id, self.artists, self.title)
 
 
 class Sheet:
@@ -81,8 +81,8 @@ class Sheet:
     page: str
     header: list[str]
     tracks: list[TrackInfo]
-    col_num_to_TrackInfo_field: dict[int, str]
-    TrackInfo_field_to_col_num: dict[str, int]
+    col_num_to_Track_field: dict[int, str]
+    Track_field_to_col_num: dict[str, int]
 
     def __init__(self, id, page, header):
         self.id = id
@@ -91,19 +91,19 @@ class Sheet:
 
         self.tracks = []
 
-        self.col_num_to_TrackInfo_field = {}
-        self.TrackInfo_field_to_col_num = {}
+        self.col_num_to_Track_field = {}
+        self.Track_field_to_col_num = {}
 
         for col_num in range(len(header)):
             col_name = header[col_num]
-            TrackInfo_field = col_name_to_TrackInfo_field.get(col_name)
-            if col_name is not None:
-                self.col_num_to_TrackInfo_field[col_num] = TrackInfo_field
-                self.TrackInfo_field_to_col_num[TrackInfo_field] = col_num
+            Track_field = col_name_to_Track_field.get(col_name)
+            if Track_field is not None:
+                self.col_num_to_Track_field[col_num] = Track_field
+                self.Track_field_to_col_num[Track_field] = col_num
 
         missing_cols = []
-        for col_name, TrackInfo_field in col_name_to_TrackInfo_field.items():
-            if TrackInfo_field not in self.col_num_to_TrackInfo_field.values():
+        for col_name, Track_field in col_name_to_Track_field.items():
+            if Track_field not in self.col_num_to_Track_field.values():
                 missing_cols.append(col_name)
 
         if missing_cols != []:
@@ -114,7 +114,7 @@ class Sheet:
 
         for track in self.tracks:
             for dirty_field in track.dirty_fields:
-                col_num = self.TrackInfo_field_to_col_num[dirty_field]
+                col_num = self.Track_field_to_col_num[dirty_field]
                 data.append({
                     'range': '%s!%s%d' % (self.page, col_num_to_name(col_num), track.row_num),
                     'values': [[getattr(track, dirty_field)]]
@@ -208,11 +208,11 @@ def parse_sheet(spreadsheet_id = DEFAULT_SPREADSHEET_ID, page = DEFAULT_SPREADSH
         for col_num in range(len(row)):
             value = row[col_num]
 
-            TrackInfo_field = sheet.col_num_to_TrackInfo_field.get(col_num)
-            if TrackInfo_field is not None:
-                if TrackInfo_field == 'artists':
+            Track_field = sheet.col_num_to_Track_field.get(col_num)
+            if Track_field is not None:
+                if Track_field == 'artists':
                     value = re.split(r' *[,&] *', value)
-                setattr(track_info, TrackInfo_field, value)
+                setattr(track_info, Track_field, value)
             else:
                 track_info.attributes[header[col_num]] = value
 
@@ -252,7 +252,7 @@ def test_write():
     result = google_service.spreadsheets().values().batchUpdate(
         spreadsheetId = DEFAULT_SPREADSHEET_ID,
         body = {
-            'valueInputOption': 'RAW',
+            'valueInputOption': 'USER_ENTERED',
             'data': data
         }
     ).execute()

@@ -8,11 +8,13 @@ import urllib.parse
 from collections import defaultdict
 
 
-default_rekordbox_xml = '/Users/spyros/Music/personal/playlists/rekordbox.xml'
+default_playlist_dir = '/Users/spyros/Music/'
+default_rekordbox_xml = default_playlist_dir + 'rekordbox.xml'
 
 @dataclass
 class Track:
     id: int
+    artist_orig: str
     artists: list[str]
     title: str
     duration: int
@@ -106,13 +108,14 @@ def parse_rekordbox_collection_track(node: ET.Element):
 
     return Track(
         id = expect_int(node, 'TrackID'),
+        artist_orig = expect_str(node, 'Artist'),
         artists = re.split(r' *[,&] *', expect_str(node, 'Artist')),
         title= expect_str(node, 'Name'),
         duration = expect_int(node, 'TotalTime'),
         bpm = expect_float(node, 'AverageBpm'),
         date_added = expect_str(node, 'DateAdded'),
         bit_rate = expect_int(node, 'BitRate'),
-        location = expect_str(node, 'Location'),
+        location = expect_filename(node, 'Location'),
         key = expect_str(node, 'Tonality')
     )
 

@@ -7,19 +7,21 @@ import xml.etree.ElementTree as ET
 import urllib.parse
 from collections import defaultdict
 
+
 default_rekordbox_xml = '/Users/spyros/Music/personal/playlists/rekordbox.xml'
 
 @dataclass
 class Track:
     id: int
-    title: str
     artists: list[str]
+    title: str
     duration: int
     bpm: float
     date_added: str
     bit_rate: int
     location: str
-    tonality: str
+    key: str
+    track_info = None
 
     def __str__(self):
         return "Track id: %d artists: '%s' title: '%s'" % (
@@ -104,14 +106,14 @@ def parse_rekordbox_collection_track(node: ET.Element):
 
     return Track(
         id = expect_int(node, 'TrackID'),
-        title= expect_str(node, 'Name'),
         artists = re.split(r' *[,&] *', expect_str(node, 'Artist')),
+        title= expect_str(node, 'Name'),
         duration = expect_int(node, 'TotalTime'),
         bpm = expect_float(node, 'AverageBpm'),
         date_added = expect_str(node, 'DateAdded'),
         bit_rate = expect_int(node, 'BitRate'),
         location = expect_str(node, 'Location'),
-        tonality = expect_str(node, 'Tonality')
+        key = expect_str(node, 'Tonality')
     )
 
 def parse_playlists(node: ET.Element, collection: Collection):
@@ -203,8 +205,7 @@ def parse_library(library_file=default_rekordbox_xml):
 
 def main():
     collection, playlists = parse_library()
-    return
+    return 0
 
 if __name__ == '__main__':
-    main()
-    sys.exit(0)
+    sys.exit(main())

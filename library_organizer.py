@@ -216,7 +216,7 @@ def tokenize(text):
         # - identifiers
         # - integers
         # - single-quoted strings
-        m = re.match(r"=|<>|<=|>=|<|>|&|\||[A-Za-z_][A-Za-z_0-9]*|[1-9][0-9]*|'[^']*'", text)
+        m = re.match(r"\(|\)|=|<>|<=|>=|<|>|&|\||[A-Za-z_][A-Za-z_0-9]*|[1-9][0-9]*|'[^']*'", text)
         if m:
             tokens.append(m.group(0))
             text = text[m.end():]
@@ -233,7 +233,7 @@ def convert_field_name(sheet, token):
 
     # otherwise, try to find it in the TrackInfo attributes
     if token in sheet.header:
-        return "track.track_info.attributes['%s']" % token
+        return "track.track_info.attributes.get('%s')" % token
 
     raise Exception("Unrecognizable field: '%s'" % token)
 
@@ -256,11 +256,13 @@ def eval_query(
         elif token == '|':
             tokens[i] = 'or'
             expect_field_name = True
+        elif token == '(' or token == ')':
+            expect_field_name = True
         elif re.match(r'[0-9]+|[=<>]+', token):
             expect_field_name = False
         elif re.match(r'[A-Za-z_][A-Za-z_0-9]*', token):
             # identifier; has to be a field name
-            if token == 'and' or token == 'or':
+            if token == 'and' or token == 'or' or token == 'not':
                 # boolean operator
                 expect_field_name = True
             elif not expect_field_name:

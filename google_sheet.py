@@ -19,10 +19,15 @@ DEFAULT_SPREADSHEET_ID = '11vIt1o-WB63XxdtSCfH8eOJ0vScCHJ-xzL0MphNqAIc'
 
 DEFAULT_SPREADSHEET_PAGE = 'Main Library'
 
+TEST_SPREADSHEET_ID = '1pvJC8ThHEHHnz8-BRiS34pIDcq3j62Asj52cxP4Mwdk'
+
+TEST_SPREADSHEET_PAGE = 'Sheet1'
+
 google_service = None
 
 col_name_to_Track_field = {
-    'ID': 'id',
+    'Rekordbox ID': 'rekordbox_id',
+    'Spotify URI': 'spotify_uri',
     'Artists': 'artists',
     'Title': 'title',
     'BPM': 'bpm',
@@ -31,7 +36,7 @@ col_name_to_Track_field = {
 }
 
 
-def col_num_to_name(col_num):
+def col_num_to_alpha(col_num):
     if col_num < 26:
         return chr(ord('A') + col_num)
     else:
@@ -48,7 +53,8 @@ def col_num_to_name(col_num):
 
 class TrackInfo:
     row_num: int
-    id: int
+    rekordbox_id: int
+    spotify_uri: str
     artists: list[str]
     title: str
     bpm: float
@@ -58,10 +64,9 @@ class TrackInfo:
     track: rekordbox.Track = None
     dirty_fields: list[str]
 
-    def __init__(self,
-                 row_num: int):
-        self.row_num = row_num
-        self.id = None
+    def __init__(self):
+        self.row_num = None
+        self.rekordbox_id = None
         self.artists = None
         self.title = None
         self.bpm = None
@@ -73,7 +78,7 @@ class TrackInfo:
         return
 
     def __str__(self):
-        return 'TrackInfo row=%d id=%s artists=%s title=%s' % (self.row_num, self.id, self.artists, self.title)
+        return 'TrackInfo row=%d id=%s artists=%s title=%s' % (self.row_num, self.rekordbox_id, self.artists, self.title)
 
 
 class Sheet:
@@ -81,6 +86,7 @@ class Sheet:
     page: str
     header: list[str]
     tracks: list[TrackInfo]
+    next_row: int
     col_num_to_Track_field: dict[int, str]
     Track_field_to_col_num: dict[str, int]
 
@@ -90,6 +96,8 @@ class Sheet:
         self.header = header
 
         self.tracks = []
+
+        self.next_row = 2
 
         self.col_num_to_Track_field = {}
         self.Track_field_to_col_num = {}
@@ -109,15 +117,27 @@ class Sheet:
         if missing_cols != []:
             raise Exception('Sheet %s:%s has missing columns: %s' % (self.id, self.page, missing_cols))
 
+    def add_track(self, track: TrackInfo):
+        self.tracks.append(track)
+        if track.row_num is not None:
+            self.next_row = max(self.next_row, track.row_num+1)
+        else:
+            track.row_num = self.next_row
+            self.next_row += 1
+            # TODO set all fields dirty
+
     def write_back(self):
         data = []
 
         for track in self.tracks:
             for dirty_field in track.dirty_fields:
                 col_num = self.Track_field_to_col_num[dirty_field]
+                value = getattr(track, dirty_field)
+                if isinstance(value, list):
+                    value = ', '.join(value)
                 data.append({
-                    'range': '%s!%s%d' % (self.page, col_num_to_name(col_num), track.row_num),
-                    'values': [[getattr(track, dirty_field)]]
+                    'range': '%s!%s%d' % (self.page, col_num_to_alpha(col_num), track.row_num),
+                    'values': [[value]]
                 })
 
             track.dirty_fields = []
@@ -125,12 +145,14 @@ class Sheet:
         if data == []:
             return 0
 
-        result = google_service.spreadsheets().values().batchUpdate(
-            spreadsheetId=DEFAULT_SPREADSHEET_ID,
-            body={
-                'valueInputOption': 'RAW',
+        body = {
+                'valueInputOption': 'USER_ENTERED',
                 'data': data
             }
+
+        result = google_service.spreadsheets().values().batchUpdate(
+            spreadsheetId=DEFAULT_SPREADSHEET_ID,
+            body=body
         ).execute()
 
         return result['totalUpdatedCells']
@@ -142,8 +164,10 @@ def init_service():
     if google_service is not None:
         return
 
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    if os.path.exists('google_cached_token.json'):
+        creds = Credentials.from_authorized_user_file('google_cached_token.json', SCOPES)
+    else:
+        creds = None
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -153,7 +177,7 @@ def init_service():
                 '/Users/spyros/google_credentials_music_library_management.json', SCOPES)
             creds = flow.run_local_server(port=0)
         # Save the credentials for the next run
-        with open('token.json', 'w') as token:
+        with open('google_cached_token.json', 'w') as token:
             token.write(creds.to_json())
 
     google_service = build('sheets', 'v4', credentials=creds)
@@ -200,8 +224,9 @@ def parse_sheet(spreadsheet_id = DEFAULT_SPREADSHEET_ID, page = DEFAULT_SPREADSH
     num_errors = 0
 
     for row_num in range(1, num_rows):
-        track_info = TrackInfo(row_num+1)
-        sheet.tracks.append(track_info)
+        track_info = TrackInfo()
+        track_info.row_num = row_num+1
+        sheet.add_track(track_info)
 
         row = values[row_num]
 
@@ -236,21 +261,21 @@ def test_write():
 
     data = [
         {
-            'range': DEFAULT_SPREADSHEET_PAGE + '!A2',
+            'range': TEST_SPREADSHEET_PAGE + '!A2',
             'values': [[6]]
         },
         {
-            'range': DEFAULT_SPREADSHEET_PAGE + '!A3',
+            'range': TEST_SPREADSHEET_PAGE + '!A3',
             'values': [[12]]
         },
         {
-            'range': DEFAULT_SPREADSHEET_PAGE + '!A4',
-            'values': [[18]]
+            'range': TEST_SPREADSHEET_PAGE + '!A4',
+            'values': [['2023-08-23']]
         }
     ]
 
     result = google_service.spreadsheets().values().batchUpdate(
-        spreadsheetId = DEFAULT_SPREADSHEET_ID,
+        spreadsheetId = TEST_SPREADSHEET_ID,
         body = {
             'valueInputOption': 'USER_ENTERED',
             'data': data

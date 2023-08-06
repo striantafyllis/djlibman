@@ -8,6 +8,7 @@ import os.path
 
 import rekordbox
 import google_sheet
+import spotify_library
 
 class RekordboxState:
     def __init__(self,
@@ -51,6 +52,8 @@ def rekordbox_stats(rekordbox_state: RekordboxState):
     else:
         print('  Other/non-house tracks: %d' % len(rekordbox_state.other.tracks))
 
+    time.sleep(0.1)
+
 def rekordbox_sanity_checks(rekordbox_state):
     # check that each track is in at most one of the 4 main lists
     num_errors = 0
@@ -73,7 +76,7 @@ def rekordbox_sanity_checks(rekordbox_state):
             num_errors += 1
 
     if num_errors > 0:
-        sys.stderr.write('** Fix the above %d errors manually! ***\n' % num_errors)
+        sys.stderr.write('*** Fix the above %d errors manually! ***\n' % num_errors)
         sys.exit(1)
 
     return
@@ -84,6 +87,7 @@ def sheet_stats(sheet: google_sheet.Sheet):
         sheet.page,
         len(sheet.tracks)
     ))
+    time.sleep(0.1)
     return
 
 
@@ -95,12 +99,12 @@ def cross_reference_rekordbox_to_google_sheet(
     num_missing_ids = 0
 
     for track_info in sheet.tracks:
-        if track_info.id is not None:
-            track = rekordbox_state.collection.tracks_by_id.get(track_info.id)
+        if track_info.rekordbox_id is not None:
+            track = rekordbox_state.collection.tracks_by_id.get(track_info.rekordbox_id)
 
             if track is None:
                 sys.stderr.write('Sheet row %d: track ID %d not found in Rekordbox\n' % (
-                    track_info.row_num, track_info.id))
+                    track_info.row_num, track_info.rekordbox_id))
                 num_errors += 1
         else:
             # try to match by artists and title
@@ -114,8 +118,9 @@ def cross_reference_rekordbox_to_google_sheet(
                     track_info.row_num, track_info.artists, track_info.title))
                 num_errors += 1
             else:
-                track_info.id = track.id
-                track_info.dirty_fields.append('id')
+                track_info.rekordbox_id = track.id
+                track_info.dirty_fields.append('rekordbox_id')
+        TEST_SPREADSHEET_ID = '1pvJC8ThHEHHnz8-BRiS34pIDcq3j62Asj52cxP4Mwdk'
 
         if track is not None:
             if track.track_info is not None:
@@ -144,7 +149,7 @@ def cross_reference_rekordbox_to_google_sheet(
         if reply.upper() == 'Y' or reply.upper() == 'YES':
             updated_cells = sheet.write_back()
             sys.stderr.write('*** Wrote %d missing IDs; verify manually! ***\n' % updated_cells)
-            sys.exit(1)
+            # sys.exit(1)
         else:
             sys.stderr.write('*** Fix missing IDs first! ***\n')
             sys.exit(1)
@@ -157,6 +162,7 @@ def sheet_vs_rekordbox_sanity_checks(
         rekordbox_state: RekordboxState):
 
     num_errors = 0
+    num_tracks_missing_from_google_sheet = 0
 
     for track_info in sheet.tracks:
         if track_info.track not in rekordbox_state.main_library:
@@ -165,12 +171,34 @@ def sheet_vs_rekordbox_sanity_checks(
 
     for track in rekordbox_state.main_library.tracks:
         if track.track_info is None:
-            sys.stderr.write('%s is in Rekordbox Main Library but not in the Google sheet\n' % track)
-            num_errors += 1
+            sys.stderr.write('%s is in Rekordbox Main Library but not in the Google sheet; adding.\n' % track)
+            track_info = google_sheet.TrackInfo()
+            for field in sheet.Track_field_to_col_num.keys():
+                setattr(track_info, field, getattr(track, field))
+            track_info.dirty_fields = list(sheet.Track_field_to_col_num.keys())
+            sheet.add_track(track_info)
+            track.track_info = track_info
+            num_tracks_missing_from_google_sheet += 1
 
     if num_errors > 0:
         sys.stderr.write('*** Fix the above %d errors manually! ***\n' % num_errors)
-        sys.exit(1)
+        # sys.exit(1)
+
+    if num_tracks_missing_from_google_sheet > 0:
+        sys.stderr.write('%d tracks missing from Google sheet!\n' % num_tracks_missing_from_google_sheet)
+        sys.stderr.write('Add missing tracks? (y/n) >')
+        sys.stderr.flush()
+
+        reply = sys.stdin.readline().strip()
+
+        if reply.upper() == 'Y' or reply.upper() == 'YES':
+            updated_cells = sheet.write_back()
+            sys.stderr.write('*** Added %d missing tracks (%d cells); verify manually! ***\n' % (
+                num_tracks_missing_from_google_sheet, updated_cells))
+            # sys.exit(1)
+        else:
+            sys.stderr.write('*** Fix missing tracks first! ***\n')
+            sys.exit(1)
 
     num_mismatched_fields = 0
 
@@ -197,7 +225,7 @@ def sheet_vs_rekordbox_sanity_checks(
         if reply.upper() == 'Y' or reply.upper() == 'YES':
             updated_cells = sheet.write_back()
             sys.stderr.write('*** Corrected %d mismatched fields; verify manually! ***\n' % updated_cells)
-            sys.exit(1)
+            # sys.exit(1)
         else:
             sys.stderr.write('*** Fix mismatched fields first! ***\n')
             sys.exit(1)
@@ -212,11 +240,12 @@ def tokenize(text):
         text = text[m.end():]
 
         # match:
-        # - operators - =, <, >, <=, >=
+        # - operators - ==, <, >, <=, >=
         # - identifiers
         # - integers
         # - single-quoted strings
-        m = re.match(r"\(|\)|=|<>|<=|>=|<|>|&|\||[A-Za-z_][A-Za-z_0-9]*|[1-9][0-9]*|'[^']*'", text)
+        # - double-quoted strings
+        m = re.match(r"\(|\)|==|!=|<=|>=|<|>|&|\||[A-Za-z_][A-Za-z_0-9]*|[1-9][0-9]*|'[^']*'|\"[^\"]*\"", text)
         if m:
             tokens.append(m.group(0))
             text = text[m.end():]
@@ -245,36 +274,24 @@ def eval_query(
     tokens = tokenize(query_text)
     # print('Tokens: %s' % tokens)
 
-    expect_field_name = True
     for i in range(len(tokens)):
         token = tokens[i]
 
         # convert boolean operators
         if token == '&':
             tokens[i] = 'and'
-            expect_field_name = True
         elif token == '|':
             tokens[i] = 'or'
-            expect_field_name = True
-        elif token == '(' or token == ')':
-            expect_field_name = True
-        elif re.match(r'[0-9]+|[=<>]+', token):
-            expect_field_name = False
         elif re.match(r'[A-Za-z_][A-Za-z_0-9]*', token):
-            # identifier; has to be a field name
+            # identifier
             if token == 'and' or token == 'or' or token == 'not':
                 # boolean operator
-                expect_field_name = True
-            elif not expect_field_name:
-                raise Exception("Syntax error: unexpected field name '%s'" % token)
+                pass
             else:
                 tokens[i] = convert_field_name(sheet, token)
-                expect_field_name = False
-        elif token[0] == "'":
-            # quoted string; can be either a field name or a constant
-            if expect_field_name:
-                tokens[i] = convert_field_name(sheet, token[1:-1])
-            expect_field_name = False
+        elif token[0] == '"':
+            # double-quoted string; field name
+            tokens[i] = convert_field_name(sheet, token[1:-1])
 
     python_expr = ' '.join(tokens)
 
@@ -284,12 +301,14 @@ def eval_query(
 
     result = []
     for track in rekordbox_state.main_library.tracks:
+        # TODO this should not be necessary if sanity checks have passed
+        if track.track_info is None:
+            continue
         eval_result = eval(compiled_python_expr)
         if eval_result:
             result.append(track)
 
     return result
-
 
 def write_m3u_playlist(playlist_filename, tracklist):
     if not playlist_filename.endswith('.m3u8'):
@@ -310,6 +329,64 @@ def write_m3u_playlist(playlist_filename, tracklist):
     playlist_file.close()
 
     print("Wrote file '%s' (%d tracks)" % (playlist_filename, len(tracklist)))
+
+
+def handle_playlist_cmd(playlist_cmd, playlist_dir, tracklist):
+    m = re.match('PLAYLIST\s+([A-Z].*)', playlist_cmd, re.IGNORECASE)
+    if not m:
+        raise Exception('Malformed PLAYLIST command')
+    playlist_name = m.group(1)
+    playlist_filename = os.path.join(playlist_dir, playlist_name)
+
+    if tracklist is None:
+        raise Exception('No previous playlist')
+
+    write_m3u_playlist(playlist_filename, tracklist)
+    tracklist = None
+
+def handle_spotify_cmd(spotify_cmd, rekordbox_state, tracklist):
+    tokens = tokenize(spotify_cmd)
+
+    assert len(tokens) >= 1 and tokens[0].upper() == 'SPOTIFY'
+
+    tokens = tokens[1:]
+
+    if len(tokens) == 0:
+        raise Exception('No spotify command')
+
+    if tokens[0].upper() in ['FIND', 'SEARCH']:
+        handle_spotify_search(tokens[1:], rekordbox_state, tracklist)
+        return
+
+    raise Exception("Unknown spotify command: ''" % ' '.join(tokens))
+
+def handle_spotify_search(tokens,
+                          rekordbox_state : RekordboxState,
+                          tracklist: list(rekordbox.Track)):
+    if len(tokens) == 0 or len(tokens) == 1 and tokens[0].upper() in ['ALL', 'LIBRARY']:
+        search_tracklist = rekordbox_state.main_library
+    elif len(tokens) == 1 and tokens[0].upper() == 'QUERY':
+        search_tracklist = tracklist
+
+    search_trackinfo_list = [
+        track.track_info
+        for track in search_tracklist
+        if track.track_info is not None
+           and track.track_info.spotify_uri is None
+    ]
+
+    if len(search_trackinfo_list) == 0:
+        sys.stderr.write('No tracks to search for!')
+
+    print('Searching for %d tracks ...' % len(search_trackinfo_list))
+
+    for track_info in search_trackinfo_list:
+        hits = spotify_library.search(track_info)
+
+    return
+
+
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -355,21 +432,13 @@ def main():
             continue
 
         try:
-            if query_text.upper() in ['Q', 'QUIT', 'EXIT']:
+            if re.match(r'q|quit|exit$', query_text, re.IGNORECASE):
                 break
 
-            if query_text.upper().startswith('PLAYLIST'):
-                m = re.match('PLAYLIST\s+([A-Z].*)', query_text, re.IGNORECASE)
-                if not m:
-                    raise Exception('Malformed PLAYLIST command')
-                playlist_name = m.group(1)
-                playlist_filename = os.path.join(playlist_dir, playlist_name)
-
-                if tracklist is None:
-                    raise Exception('No previous playlist')
-
-                write_m3u_playlist(playlist_filename, tracklist)
-                tracklist = None
+            if re.match(r'playlist\s+', query_text, re.IGNORECASE):
+                handle_playlist_cmd(query_text, playlist_dir, tracklist)
+            elif re.match(r'spotify\s+', query_text, re.IGNORECASE):
+                handle_spotify_cmd(query_text, rekordbox_state, tracklist)
             else:
                 tracklist = eval_query(rekordbox_state, sheet, query_text)
                 for track in tracklist:

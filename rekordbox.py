@@ -13,7 +13,7 @@ default_rekordbox_xml = default_playlist_dir + 'rekordbox.xml'
 
 @dataclass
 class Track:
-    id: int
+    rekordbox_id: int
     artist_orig: str
     artists: list[str]
     title: str
@@ -27,7 +27,7 @@ class Track:
 
     def __str__(self):
         return "Track id: %d artists: '%s' title: '%s'" % (
-            self.id,
+            self.rekordbox_id,
             ','.join(self.artists),
             self.title
         )
@@ -39,22 +39,22 @@ class Playlist:
     def __init__(self, name: str, tracks: list[Track]):
         self.name = name
         self.tracks = tracks
-        self.track_ids = frozenset([track.id for track in tracks])
+        self.track_ids = frozenset([track.rekordbox_id for track in tracks])
 
     def __contains__(self, track):
-        return track.id in self.track_ids
+        return track.rekordbox_id in self.track_ids
 
 
 class Collection:
     def __init__(self, **kwargs):
-        self.tracks_by_id = {}
+        self.tracks_by_rekordbox_id = {}
         self.tracks_by_artists_and_name = defaultdict(dict)
         return
 
     def add_track(self, track: Track) -> None:
-        if track.id in self.tracks_by_id:
-            raise Exception('Duplicate track ID: %d' % track.id)
-        self.tracks_by_id[track.id] = track
+        if track.rekordbox_id in self.tracks_by_rekordbox_id:
+            raise Exception('Duplicate track ID: %d' % track.rekordbox_id)
+        self.tracks_by_rekordbox_id[track.rekordbox_id] = track
 
         artists = frozenset(track.artists)
         if track.title in self.tracks_by_artists_and_name[artists]:
@@ -66,8 +66,8 @@ class Collection:
         return
 
     def all_tracks_by_id(self):
-        tracks = list(self.tracks_by_id.values())
-        tracks.sort(key = lambda t: t.id)
+        tracks = list(self.tracks_by_rekordbox_id.values())
+        tracks.sort(key = lambda t: t.rekordbox_id)
         return tracks
 
 
@@ -107,7 +107,7 @@ def parse_rekordbox_collection_track(node: ET.Element):
     assert node.tag == 'TRACK'
 
     return Track(
-        id = expect_int(node, 'TrackID'),
+        rekordbox_id= expect_int(node, 'TrackID'),
         artist_orig = expect_str(node, 'Artist'),
         artists = re.split(r' *[,&] *', expect_str(node, 'Artist')),
         title= expect_str(node, 'Name'),
@@ -161,7 +161,7 @@ def parse_playlist_node(node: ET.Element,
             assert child.tag == 'TRACK'
             track_id = int(child.attrib['Key'])
 
-            track = collection.tracks_by_id.get(track_id)
+            track = collection.tracks_by_rekordbox_id.get(track_id)
             if track is None:
                 raise Exception('Unknown track ID %d in playlist %s' % (track_id, full_name))
 

@@ -8,12 +8,15 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from google.auth.exceptions import RefreshError
 
 import rekordbox
 
 SCOPES = ['https://www.googleapis.com/auth/drive']
 
 CREDENTIALS_FILE = '/Users/spyros/google_credentials_music_library_management.json'
+
+CACHED_TOKEN_FILE = 'google_cached_token.json'
 
 DEFAULT_SPREADSHEET_ID = '11vIt1o-WB63XxdtSCfH8eOJ0vScCHJ-xzL0MphNqAIc'
 
@@ -28,6 +31,7 @@ google_service = None
 col_name_to_Track_field = {
     'Rekordbox ID': 'rekordbox_id',
     'Spotify URI': 'spotify_uri',
+    'YouTube URI': 'youtube_uri',
     'Artists': 'artists',
     'Title': 'title',
     'BPM': 'bpm',
@@ -52,9 +56,11 @@ def col_num_to_alpha(col_num):
 
 
 class TrackInfo:
+    sheet: object
     row_num: int
     rekordbox_id: int
     spotify_uri: str
+    youtube_uri: str
     artists: list[str]
     title: str
     bpm: float
@@ -64,8 +70,9 @@ class TrackInfo:
     track: rekordbox.Track = None
     dirty_fields: list[str]
 
-    def __init__(self):
-        self.row_num = None
+    def __init__(self, sheet, row_num=None):
+        self.sheet = sheet
+        self.row_num = row_num
         self.rekordbox_id = None
         self.artists = None
         self.title = None
@@ -75,10 +82,16 @@ class TrackInfo:
         self.attributes = {}
         self.track = None
         self.dirty_fields = []
+
+        sheet.add_track(self)
         return
 
     def __str__(self):
         return 'TrackInfo row=%d id=%s artists=%s title=%s' % (self.row_num, self.rekordbox_id, self.artists, self.title)
+
+    def write_back(self):
+        self.sheet.write_back([self])
+        return
 
 
 class Sheet:
@@ -124,12 +137,14 @@ class Sheet:
         else:
             track.row_num = self.next_row
             self.next_row += 1
-            # TODO set all fields dirty
 
-    def write_back(self):
+    def write_back(self, tracks=None):
+        if tracks is None:
+            tracks = self.tracks
+
         data = []
 
-        for track in self.tracks:
+        for track in tracks:
             for dirty_field in track.dirty_fields:
                 col_num = self.Track_field_to_col_num[dirty_field]
                 value = getattr(track, dirty_field)
@@ -164,20 +179,25 @@ def init_service():
     if google_service is not None:
         return
 
-    if os.path.exists('google_cached_token.json'):
-        creds = Credentials.from_authorized_user_file('google_cached_token.json', SCOPES)
+    if os.path.exists(CACHED_TOKEN_FILE):
+        creds = Credentials.from_authorized_user_file(CACHED_TOKEN_FILE, SCOPES)
     else:
         creds = None
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+            except RefreshError:
+                os.unlink(CACHED_TOKEN_FILE)
+                creds = None
+
+        if not creds or not creds.valid:
             flow = InstalledAppFlow.from_client_secrets_file(
                 '/Users/spyros/google_credentials_music_library_management.json', SCOPES)
             creds = flow.run_local_server(port=0)
         # Save the credentials for the next run
-        with open('google_cached_token.json', 'w') as token:
+        with open(CACHED_TOKEN_FILE, 'w') as token:
             token.write(creds.to_json())
 
     google_service = build('sheets', 'v4', credentials=creds)
@@ -224,9 +244,7 @@ def parse_sheet(spreadsheet_id = DEFAULT_SPREADSHEET_ID, page = DEFAULT_SPREADSH
     num_errors = 0
 
     for row_num in range(1, num_rows):
-        track_info = TrackInfo()
-        track_info.row_num = row_num+1
-        sheet.add_track(track_info)
+        track_info = TrackInfo(sheet, row_num+1)
 
         row = values[row_num]
 

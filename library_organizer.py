@@ -709,7 +709,7 @@ def handle_show_cmd(
             print("Tracks in playlist '%s':" % playlist_name)
 
             for idx, track in enumerate(tracklist):
-                print('    %d: %s \u2013 %s' % (
+                print('%d. %s \u2013 %s' % (
                     idx+1,
                     ', '.join(track.artists),
                     track.title

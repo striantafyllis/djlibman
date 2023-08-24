@@ -3,7 +3,6 @@
 Command-line interface functions, including parsing user input.
 """
 
-import sys
 import time
 import re
 import os.path
@@ -96,26 +95,25 @@ def eval_query(
     return result
 
 
-def handle_playlist_cmd(playlist_cmd: str,
-                        playlist_dir: str,
-                        tracklist: list[rekordbox.Track]):
-    m = re.match('PLAYLIST\s+([A-Z].*)', playlist_cmd, re.IGNORECASE)
-    if not m:
-        raise Exception('Malformed PLAYLIST command')
-    playlist_name = m.group(1)
+# PLAYLIST <name>
+def handle_write_playlist_cmd(playlist_name: str,
+                              playlist_dir: str,
+                              tracklist: list[rekordbox.Track]):
+    if playlist_name.startswith("'") or playlist_name.startswith('"'):
+        playlist_name = playlist_name[1:-1]
     playlist_filename = os.path.join(playlist_dir, playlist_name)
 
     if tracklist is None:
         raise Exception('No previous query')
 
     library_organizer.write_m3u_playlist(playlist_filename, tracklist)
-    tracklist = None
 
-def handle_streaming_service_cmd(streaming_cmd: str,
+# (SPOTIFY|YOUTUBE)
+#     FIND/SEARCH ([QUERY]|<Rekordbox playlist name>)
+#     CREATE PLAYLIST (FROM (QUERY|REKORDBOX? PLAYLIST <playlist name>))
+def handle_streaming_service_cmd(tokens: list[str],
                                  rekordbox_state: str,
                                  tracklist: list[rekordbox.Track]):
-    tokens = tokenize(streaming_cmd)
-
     assert len(tokens) >= 1 and tokens[0].upper() in ('SPOTIFY', 'YOUTUBE')
 
     service = library_organizer.get_streaming_service_by_name(tokens[0])
@@ -139,6 +137,7 @@ def handle_streaming_service_cmd(streaming_cmd: str,
 
     raise Exception("Unknown %s command: '%s'" % (service.name(), ' '.join(tokens)))
 
+# (SPOTIFY|YOUTUBE) FIND/SEARCH ([QUERY]|<Rekordbox playlist name>)
 def handle_streaming_search(service: StreamingService,
                             tokens: list[str],
                             rekordbox_state : library_organizer.RekordboxState,
@@ -151,8 +150,10 @@ def handle_streaming_search(service: StreamingService,
     else:
         if len(tokens) == 0:
             playlist_name = 'Main Library'
-        else:
-            playlist_name = ' '.join(tokens)
+        elif len(tokens) == 1:
+            playlist_name = tokens[0]
+            if playlist_name.startswith("'") or playlist_name.startswith(('"')):
+                playlist_name = playlist_name[1:-1]
 
         search_tracklist = rekordbox_state.playlists.get(playlist_name)
         if search_tracklist is None:
@@ -218,6 +219,7 @@ def handle_streaming_search(service: StreamingService,
 
     return
 
+# (SPOTIFY|YOUTUBE) CREATE PLAYLIST (FROM (QUERY|REKORDBOX? PLAYLIST <playlist name>))
 def handle_streaming_create_playlist(
         service: StreamingService,
         tokens: list[str],
@@ -374,14 +376,15 @@ def handle_streaming_create_playlist(
         service.name(),
         streaming_playlist_name))
 
+# SHOW
+#     REKORDBOX? PLAYLISTS
+#     (SPOTIFY|YOUTUBE) PLAYLISTS
+#     TRACKS IN
+#         (REKORDBOX? PLAYLIST)? <playlist name>
+#         (SPOTIFY|YOUTUBE) PLAYLIST <playlist name>
 def handle_show_cmd(
-        query_text: str,
+        tokens: list[str],
         rekordbox_state: library_organizer.RekordboxState) -> list[rekordbox.Track]:
-    tokens = tokenize(query_text)
-
-    assert len(tokens) >= 1 and tokens[0].upper() == 'SHOW'
-
-    tokens = tokens[1:]
 
     if len(tokens) == 0:
         raise Exception('No arguments to SHOW command')
@@ -465,7 +468,20 @@ def handle_show_cmd(
 
     raise Exception('Malformed SHOW command')
 
-
+# Supported commands:
+# - Q|X|QUIT|EXIT
+# - FAIL ON EXCEPTION
+# - WRITE M3U PLAYLIST <name>
+# - (SPOTIFY|YOUTUBE)
+#       (FIND|SEARCH) ([QUERY]|<Rekordbox playlist name>)
+#       CREATE PLAYLIST (FROM (QUERY|REKORDBOX? PLAYLIST <playlist name>))
+# - SHOW
+#       REKORDBOX? PLAYLISTS
+#       (SPOTIFY|YOUTUBE) PLAYLISTS
+#       TRACKS IN
+#           (REKORDBOX? PLAYLIST)? <playlist name>
+#           (SPOTIFY|YOUTUBE) PLAYLIST <playlist name>
+# - <query expression>
 def cli_loop(
         rekordbox_state: library_organizer.RekordboxState,
         sheet: google_sheet.Sheet,
@@ -485,27 +501,30 @@ def cli_loop(
 
         query_text = query_text.strip()
 
-        if query_text == '':
+        tokens = tokenize(query_text)
+
+        if len(tokens) == 0:
             continue
 
         try:
-            if re.match(r'q|x|quit|exit$', query_text, re.IGNORECASE):
+            if len(tokens) == 1 and tokens[0].upper() in ['Q', 'X', 'QUIT', 'EXIT']:
                 break
 
-            if re.match(r'fail\s+on\s+exception', query_text, re.IGNORECASE):
+            if len(tokens) == 3 and map(lambda x: x.upper(), tokens) == ['FAIL', 'ON', 'EXCEPTION']:
                 fail_on_exception = True
                 continue
 
-            if re.match(r'playlist\s+', query_text, re.IGNORECASE):
-                handle_playlist_cmd(query_text, playlist_dir, tracklist)
+            if len(tokens) == 4 and map(lambda x: x.upper(), tokens[:3]) == ['WRITE', 'M3U', 'PLAYLIST']:
+                handle_write_playlist_cmd(tokens[3], playlist_dir, tracklist)
+                tracklist = None
                 continue
 
-            if re.match(r'show\s+', query_text, re.IGNORECASE):
-                tracklist = handle_show_cmd(query_text, rekordbox_state)
+            if tokens[0].upper() == 'SHOW':
+                tracklist = handle_show_cmd(tokens[1:], rekordbox_state)
                 continue
 
-            if re.match(r'(spotify|youtube)\s+', query_text, re.IGNORECASE):
-                handle_streaming_service_cmd(query_text, rekordbox_state, tracklist)
+            if tokens[0].upper() in ['SPOTIFY', 'YOUTUBE']:
+                handle_streaming_service_cmd(tokens, rekordbox_state, tracklist)
                 continue
 
             tracklist = eval_query(rekordbox_state, sheet, query_text)

@@ -161,10 +161,10 @@ class SpotifyService(streaming_service.StreamingService):
 
 def main():
     service = SpotifyService()
-    # results = spotify.current_user_saved_tracks()
-    # for idx, item in enumerate(results['items']):
-    #     track = item['track']
-    #     print(idx, track['artists'][0]['name'], " – ", track['name'])
+    results = service.spotify.current_user_saved_tracks()
+    for idx, item in enumerate(results['items']):
+        track = item['track']
+        print(idx, track['artists'][0]['name'], " – ", track['name'])
 
     playlists = service.get_playlists()
 

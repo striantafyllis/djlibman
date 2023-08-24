@@ -1,7 +1,6 @@
 
 
 import spotipy
-import sys
 import os
 from spotipy.oauth2 import SpotifyOAuth
 

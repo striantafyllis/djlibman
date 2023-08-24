@@ -7,7 +7,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
+# from googleapiclient.errors import HttpError
 from google.auth.exceptions import RefreshError
 
 import rekordbox
@@ -18,7 +18,8 @@ CREDENTIALS_FILE = '/Users/spyros/google_credentials_music_library_management.js
 
 CACHED_TOKEN_FILE = 'google_cached_token.json'
 
-DEFAULT_SPREADSHEET_ID = '11vIt1o-WB63XxdtSCfH8eOJ0vScCHJ-xzL0MphNqAIc'
+DEFAULT_SPREADSHEET_ID = '1INf3kKkOQta6Im1mqMNFPxSQ1lRvFaMcQLrR1H2HP50'
+# DEFAULT_SPREADSHEET_ID = '1G2_P_pj05owEmVZul9_wWLUjF38stWx5c4DFcipu3L0'
 
 DEFAULT_SPREADSHEET_PAGE = 'Main Library'
 
@@ -68,12 +69,13 @@ class TrackInfo:
     date_added: str
     attributes: dict
     track: rekordbox.Track = None
-    dirty_fields: list[str]
+    dirty_fields: set[str]
 
     def __init__(self, sheet, row_num=None):
         self.sheet = sheet
         self.row_num = row_num
         self.rekordbox_id = None
+        self.spotify_uri = None
         self.artists = None
         self.title = None
         self.bpm = None
@@ -81,7 +83,7 @@ class TrackInfo:
         self.date_added = None
         self.attributes = {}
         self.track = None
-        self.dirty_fields = []
+        self.dirty_fields = set()
 
         sheet.add_track(self)
         return
@@ -102,6 +104,8 @@ class Sheet:
     next_row: int
     col_num_to_Track_field: dict[int, str]
     Track_field_to_col_num: dict[str, int]
+    col_num_to_attribute: dict[int, str]
+    attribute_to_col_num: dict[str, int]
 
     def __init__(self, id, page, header):
         self.id = id
@@ -114,6 +118,8 @@ class Sheet:
 
         self.col_num_to_Track_field = {}
         self.Track_field_to_col_num = {}
+        self.col_num_to_attribute = {}
+        self.attribute_to_col_num = {}
 
         for col_num in range(len(header)):
             col_name = header[col_num]
@@ -121,6 +127,9 @@ class Sheet:
             if Track_field is not None:
                 self.col_num_to_Track_field[col_num] = Track_field
                 self.Track_field_to_col_num[Track_field] = col_num
+            else:
+                self.col_num_to_attribute[col_num] = col_name
+                self.attribute_to_col_num[col_name] = col_num
 
         missing_cols = []
         for col_name, Track_field in col_name_to_Track_field.items():
@@ -146,10 +155,22 @@ class Sheet:
 
         for track in tracks:
             for dirty_field in track.dirty_fields:
-                col_num = self.Track_field_to_col_num[dirty_field]
-                value = getattr(track, dirty_field)
+                col_num = self.Track_field_to_col_num.get(dirty_field)
+                if col_num is not None:
+                    value = getattr(track, dirty_field)
+                else:
+                    col_num = self.attribute_to_col_num.get(dirty_field)
+                    if col_num is None:
+                        raise Exception("Unknown dirty field '%s'" % dirty_field)
+                    value = track.attributes[dirty_field]
                 if isinstance(value, list):
                     value = ', '.join(value)
+
+                if value is True:
+                    value = 'T'
+                elif value is False:
+                    value = 'F'
+
                 data.append({
                     'range': '%s!%s%d' % (self.page, col_num_to_alpha(col_num), track.row_num),
                     'values': [[value]]
@@ -234,8 +255,10 @@ def parse_sheet(spreadsheet_id = DEFAULT_SPREADSHEET_ID, page = DEFAULT_SPREADSH
                 continue
             if row[j] == '':
                 row[j] = None
-            elif row[j] == 'x':
+            elif row[j] == 'T':
                 row[j] = True
+            elif row[j] == 'F':
+                row[j] = False
             elif int_regex.match(row[j]):
                 row[j] = int(row[j])
             elif float_regex.match(row[j]):

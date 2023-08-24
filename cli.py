@@ -12,6 +12,7 @@ import rekordbox
 import google_sheet
 from streaming_service import StreamingService
 from utils import *
+import scripts
 
 
 def tokenize(text):
@@ -193,7 +194,7 @@ def handle_streaming_search(service: StreamingService,
 
             if reply == 'yes':
                 track_info.spotify_uri = track_uri
-                track_info.dirty_fields.append('spotify_uri')
+                track_info.dirty_fields.add('spotify_uri')
                 track_info.write_back()
                 print('         Wrote back Spotify URI %s' % track_uri)
                 break
@@ -213,7 +214,7 @@ def handle_streaming_search(service: StreamingService,
 
             if reply.upper() == 'yes':
                 track_info.spotify_uri = 'NOT FOUND'
-                track_info.dirty_fields.append('spotify_uri')
+                track_info.dirty_fields.add('spotify_uri')
                 track_info.write_back()
                 print("        Wrote back URI 'NOT FOUND'")
 
@@ -481,6 +482,7 @@ def handle_show_cmd(
 #       TRACKS IN
 #           (REKORDBOX? PLAYLIST)? <playlist name>
 #           (SPOTIFY|YOUTUBE) PLAYLIST <playlist name>
+# - SCRIPT <script_name>
 # - <query expression>
 def cli_loop(
         rekordbox_state: library_organizer.RekordboxState,
@@ -510,7 +512,11 @@ def cli_loop(
             if len(tokens) == 1 and tokens[0].upper() in ['Q', 'X', 'QUIT', 'EXIT']:
                 break
 
-            if len(tokens) == 3 and map(lambda x: x.upper(), tokens) == ['FAIL', 'ON', 'EXCEPTION']:
+            if len(tokens) == 3 and (
+                tokens[0].upper() == 'FAIL' and
+                tokens[1].upper() == 'ON' and
+                tokens[2].upper() == 'EXCEPTION'
+                ):
                 fail_on_exception = True
                 continue
 
@@ -525,6 +531,18 @@ def cli_loop(
 
             if tokens[0].upper() in ['SPOTIFY', 'YOUTUBE']:
                 handle_streaming_service_cmd(tokens, rekordbox_state, tracklist)
+                continue
+
+            if tokens[0].upper() == 'SCRIPT':
+                if len(tokens) != 2:
+                    raise Exception('Malformed SCRIPT command')
+
+                script_name = tokens[1]
+
+                if not script_name in dir(scripts):
+                    raise Exception('Unknown script %s' % script_name)
+
+                getattr(scripts, script_name)(rekordbox_state, sheet)
                 continue
 
             tracklist = eval_query(rekordbox_state, sheet, query_text)

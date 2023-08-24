@@ -120,7 +120,7 @@ def cross_reference_rekordbox_to_google_sheet(
                 num_errors += 1
             else:
                 track_info.rekordbox_id = track.rekordbox_id
-                track_info.dirty_fields.append('rekordbox_id')
+                track_info.dirty_fields.add('rekordbox_id')
 
         if track is not None:
             if track.track_info is not None:
@@ -177,7 +177,7 @@ def sheet_vs_rekordbox_sanity_checks(
             for field in sheet.Track_field_to_col_num.keys():
                 if field in dir(track):
                     setattr(track_info, field, getattr(track, field))
-                    track_info.dirty_fields.append(field)
+                    track_info.dirty_fields.add(field)
             track.track_info = track_info
             num_tracks_missing_from_google_sheet += 1
 
@@ -209,7 +209,7 @@ def sheet_vs_rekordbox_sanity_checks(
                 num_mismatched_fields += 1
 
                 setattr(track_info, field, rekordbox_value)
-                track_info.dirty_fields.append(field)
+                track_info.dirty_fields.add(field)
 
     if num_mismatched_fields > 0:
         print('%d mismatching fields in Google sheet!' % num_mismatched_fields)

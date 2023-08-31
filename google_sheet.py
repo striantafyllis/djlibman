@@ -176,7 +176,7 @@ class Sheet:
                     'values': [[value]]
                 })
 
-            track.dirty_fields = []
+            track.dirty_fields = set()
 
         if data == []:
             return 0

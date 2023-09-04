@@ -6,7 +6,7 @@ import sys
 from typing import Union
 from collections import defaultdict
 
-class Track:
+class Track(dict[str, Union[str, int, float, list[str]]]):
     """Generic representation of a track on some platform, Rekordbox, Google sheet,
        Spotify, YouTube, etc. A track will always have a title and a list of artists.
        There will also be a platform-dependent ID (a hash in Rekordbox, a URI in Spotify etc.)
@@ -15,14 +15,12 @@ class Track:
     id: Union[int, str]
     artists: frozenset[str]
     title: str
-    attributes: dict[str, Union[str, int, float, list[str]]]
-    foreign_keys: dict[str, Union[int, str]]
 
     def __init__(self, id, artists, title, attributes):
+        super(Track, self).__init__(attributes)
         self.id = id
         self.artists = artists
         self.title = title
-        self.attributes = attributes
 
     def __str__(self):
         return "Track id: %s artists: '%s' title: '%s'" % (
@@ -30,6 +28,7 @@ class Track:
             ','.join(self.artists),
             self.title
         )
+
 
 class Tracklist(list[Track]):
     def __init__(self, tracks: list[Track]=[]):
@@ -73,7 +72,6 @@ class Library(Tracklist):
     def __init__(self, name: str):
         super(Library, self).__init__()
         self.name = name
-        self.attributes = []
         self.attribute_types = {}
         self._tracks_by_id = {}
         self._tracks_by_artists_and_name = defaultdict(dict)
@@ -82,18 +80,26 @@ class Library(Tracklist):
 
     def append(self, track: Track):
         # Save the names and types of attributes
-        for attribute, value in track.attributes.items():
+        for attribute, value in track.items():
+            if value is None:
+                continue
             expected_type = self.attribute_types.get(attribute)
             if expected_type is None:
                 self.attribute_types[attribute] = type(value)
             elif not isinstance(value, expected_type):
-                raise Exception("Track %s attribute %s has value %s type %s; expected type %s" % (
-                    track,
-                    attribute,
-                    value,
-                    type(value).__name__,
-                    expected_type.__name__
-                ))
+                # make an exception for int vs. float
+                if expected_type == int and isinstance(value, float):
+                    self.attribute_types[attribute] = float
+                elif expected_type == float and isinstance(value, int):
+                    pass
+                else:
+                    raise Exception("Track %s attribute %s has value %s type %s; expected type %s" % (
+                        track,
+                        attribute,
+                        value,
+                        type(value).__name__,
+                        expected_type.__name__
+                    ))
 
         if track.id in self._tracks_by_id:
             raise Exception('Duplicate track ID in library %s: %s' % (self.name, track.id))

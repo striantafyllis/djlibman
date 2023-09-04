@@ -17,7 +17,7 @@ import library_organizer
 
 def query_playlists(
         rekordbox_state: library_organizer.RekordboxState,
-        sheet: google_sheet.Sheet,
+        sheet: google_sheet.GoogleSheet,
         *playlists
 ):
     playlists = [p.upper() for p in playlists]
@@ -48,44 +48,9 @@ def query_playlists(
 
 
 
-def populate_riffs(
-        rekordbox_state: library_organizer.RekordboxState,
-        sheet: google_sheet.Sheet
-):
-    riff_attributes = [
-        attribute for attribute in sheet.attribute_to_col_num.keys()
-        if attribute.endswith(' Solo')
-    ]
-
-    riff_attributes.sort(key=lambda x: sheet.attribute_to_col_num[x])
-
-    num_changed_fields = 0
-    for track in sheet.tracks:
-        if track.attributes.get('Riffs') is not None:
-            continue
-
-        riffs = []
-
-        for riff_attribute in riff_attributes:
-            if track.attributes.get(riff_attribute) is True:
-                riffs.append(riff_attribute[:-5])
-
-        if len(riffs) > 0:
-            track.attributes['Riffs'] = riffs
-            track.dirty_fields.add('Riffs')
-            num_changed_fields += 1
-
-    choice = get_user_choice('Filled in %d riffs; write?' % num_changed_fields)
-    if choice == 'yes':
-        sheet.write_back()
-        print('Wrote %d riffs' % num_changed_fields)
-
-    return
-
-
 def populate_instruments(
         rekordbox_state: library_organizer.RekordboxState,
-        sheet: google_sheet.Sheet
+        sheet: google_sheet.GoogleSheet
 ):
     num_changed_fields = 0
 
@@ -99,7 +64,6 @@ def populate_instruments(
 
         if len(instruments) > 0:
             track.attributes['Instruments'] = instruments
-            track.dirty_fields.add('Instruments')
             num_changed_fields += 1
 
     if num_changed_fields > 0:
@@ -110,13 +74,11 @@ def populate_instruments(
 
 def set_danceable(
         rekordbox_state: library_organizer.RekordboxState,
-        sheet: google_sheet.Sheet
+        sheet: google_sheet.GoogleSheet
 ):
     num_changed_fields = 0
     for track in sheet.tracks:
         track.attributes['Danceable'] = track.attributes['Motivates Dancing'] or track.attributes['Sustains Dancing']
-        if track.attributes['Danceable'] is not None:
-            track.dirty_fields.add('Danceable')
 
     sheet.write_back()
     return
@@ -124,7 +86,7 @@ def set_danceable(
 
 def merge_genres_and_flavors(
         rekordbox_state: library_organizer.RekordboxState,
-        sheet: google_sheet.Sheet
+        sheet: google_sheet.GoogleSheet
 ):
     num_changed_fields = 0
     for track in sheet.tracks:
@@ -149,7 +111,6 @@ def merge_genres_and_flavors(
         flavors = genres + flavors
 
         track.attributes['Flavors'] = flavors
-        track.dirty_fields.add('Flavors')
         num_changed_fields += 1
 
     if num_changed_fields > 0:
@@ -162,7 +123,7 @@ def merge_genres_and_flavors(
 
 def fill_in_flavors(
         rekordbox_state: library_organizer.RekordboxState,
-        sheet: google_sheet.Sheet
+        sheet: google_sheet.GoogleSheet
 ):
     flavor_attributes = [
         attribute for attribute in sheet.attribute_to_col_num.keys()
@@ -184,7 +145,7 @@ def fill_in_flavors(
 
         if len(flavors) > 0:
             track.attributes['Flavors'] = flavors
-            track.dirty_fields.add('Flavors')
+            track._dirty_attributes.add('Flavors')
             num_changed_fields += 1
 
     choice = get_user_choice('Filled in %d flavors; write?' % num_changed_fields)
@@ -197,7 +158,7 @@ def fill_in_flavors(
 
 def fill_in_genres(
         rekordbox_state: library_organizer.RekordboxState,
-        sheet: google_sheet.Sheet
+        sheet: google_sheet.GoogleSheet
 ):
     num_changed_fields = 0
     for track in sheet.tracks:
@@ -214,7 +175,7 @@ def fill_in_genres(
 
         if len(genres) > 0:
             track.attributes['Genres'] = genres
-            track.dirty_fields.add('Genres')
+            track._dirty_attributes.add('Genres')
             num_changed_fields += 1
 
     choice = get_user_choice('Filled in %d genres; write?' % num_changed_fields)
@@ -228,7 +189,7 @@ def fill_in_genres(
 
 def fix_boolean_attributes(
         rekordbox_state: library_organizer.RekordboxState,
-        sheet: google_sheet.Sheet
+        sheet: google_sheet.GoogleSheet
 ):
     """Turns old-style Boolean attributes ('x' or None) to new-style Boolean attributes (T or F)"""
 
@@ -242,7 +203,7 @@ def fix_boolean_attributes(
             if attribute not in boolean_attributes:
                 continue
             if value is True or value == 'x':
-                last_set_row = track.row_num
+                last_set_row = track.id
             elif value is not None:
                 boolean_attributes.remove(attribute)
 
@@ -259,12 +220,12 @@ def fix_boolean_attributes(
 
     num_changed_fields = 0
     for track in sheet.tracks:
-        if track.row_num > last_set_row:
+        if track.id > last_set_row:
             break
 
         for attribute in boolean_attributes:
             track.attributes[attribute] = 'T' if track.attributes[attribute] else 'F'
-            track.dirty_fields.add(attribute)
+            track._dirty_attributes.add(attribute)
             num_changed_fields += 1
 
     print('Writing back %d changed fields' % num_changed_fields)

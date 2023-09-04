@@ -20,23 +20,26 @@ def get_user_choice(prompt: str, options: list[str] = ['yes', 'no']):
         else:
             sys.stdout.write('Reply is ambiguous; try again.')
 
-def infer_type(str):
+def infer_type(value):
     """Converts a string to a typed value (int, float etc.) if possible"""
 
+    if not isinstance(value, str):
+        return value
+
     try:
-        return int(str)
+        return int(value)
     except ValueError:
         pass
 
     try:
-        return float(str)
+        return float(value)
     except ValueError:
         pass
 
     try:
-        return date.fromisoformat(str)
+        return date.fromisoformat(value)
     except ValueError:
         pass
 
-    return str
+    return value
 

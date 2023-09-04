@@ -10,7 +10,8 @@ from googleapiclient.discovery import build
 # from googleapiclient.errors import HttpError
 from google.auth.exceptions import RefreshError
 
-import rekordbox
+from data_model import *
+from utils import *
 
 SCOPES = ['https://www.googleapis.com/auth/drive']
 
@@ -29,16 +30,16 @@ TEST_SPREADSHEET_PAGE = 'Sheet1'
 
 google_service = None
 
-col_name_to_Track_field = {
-    'Rekordbox ID': 'rekordbox_id',
-    'Spotify URI': 'spotify_uri',
-    'YouTube URI': 'youtube_uri',
-    'Artists': 'artists',
-    'Title': 'title',
-    'BPM': 'bpm',
-    'Key': 'key',
-    'Date Added': 'date_added'
-}
+required_attributes = [
+    'Rekordbox ID',
+    'Spotify ID',
+    'YouTube ID',
+    'Artists',
+    'Title',
+    'BPM',
+    'Key',
+    'Date Added'
+]
 
 
 def col_num_to_alpha(col_num):
@@ -56,113 +57,118 @@ def col_num_to_alpha(col_num):
         return first_letter + second_letter
 
 
-class TrackInfo:
+class GoogleTrack(Track):
+    """In a Google track, the ID is the row in the Google sheet.
+       Also, we keep track of the attributes whose value has changed so we can write them back."""
     sheet: object
-    row_num: int
-    rekordbox_id: int
-    spotify_uri: str
-    youtube_uri: str
-    artists: list[str]
-    title: str
-    bpm: float
-    key: str
-    date_added: str
-    attributes: dict
-    track: rekordbox.RekordboxTrack = None
-    dirty_fields: set[str]
+    _dirty_attributes: set[str]
 
-    def __init__(self, sheet, row_num=None):
+    def __init__(self, sheet, id, artists, title, attributes):
+        super(GoogleTrack, self).__init__(id, artists, title, attributes)
         self.sheet = sheet
-        self.row_num = row_num
-        self.rekordbox_id = None
-        self.spotify_uri = None
-        self.artists = None
-        self.title = None
-        self.bpm = None
-        self.key = None
-        self.date_added = None
-        self.attributes = {}
-        self.track = None
-        self.dirty_fields = set()
-
-        sheet.add_track(self)
+        self._dirty_attributes = set()
         return
 
-    def __str__(self):
-        return 'TrackInfo row=%d id=%s artists=%s title=%s' % (self.row_num, self.rekordbox_id, self.artists, self.title)
+    def __setitem__(self, attribute, value):
+        previous_value = self.get(attribute)
+
+        super(GoogleTrack, self).__setitem__(attribute, value)
+        self._dirty_attributes.add(attribute)
+
+        # adjust the foreign key maps if necessary
+        platform = self.sheet.foreign_id_attribute_to_platform.get(attribute)
+        if platform is not None:
+            assert previous_value is None  # No need to handle this currently
+            self.sheet._update_foreign_id_map(self, platform, value)
+        return
 
     def write_back(self):
-        self.sheet.write_back([self])
-        return
+        return self.sheet.write_back(self)
 
-
-class Sheet:
+class GoogleSheet(Library):
     id: str
     page: str
     header: list[str]
-    tracks: list[TrackInfo]
-    next_row: int
-    col_num_to_Track_field: dict[int, str]
-    Track_field_to_col_num: dict[str, int]
     col_num_to_attribute: dict[int, str]
     attribute_to_col_num: dict[str, int]
+    foreign_id_attribute_to_platform: dict[str, str]
+    track_by_foreign_id: dict[str, dict[Union[int, str], GoogleTrack]]
 
     def __init__(self, id, page, header):
+        super(GoogleSheet, self).__init__('Google Main Library')
         self.id = id
         self.page = page
         self.header = header
 
-        self.tracks = []
-
-        self.next_row = 2
-
-        self.col_num_to_Track_field = {}
-        self.Track_field_to_col_num = {}
         self.col_num_to_attribute = {}
         self.attribute_to_col_num = {}
+        self.foreign_id_attribute_to_platform = {}
 
-        for col_num in range(len(header)):
-            col_name = header[col_num]
-            Track_field = col_name_to_Track_field.get(col_name)
-            if Track_field is not None:
-                self.col_num_to_Track_field[col_num] = Track_field
-                self.Track_field_to_col_num[Track_field] = col_num
-            else:
-                self.col_num_to_attribute[col_num] = col_name
-                self.attribute_to_col_num[col_name] = col_num
+        self.track_by_foreign_id = defaultdict(dict[Union[int, str], GoogleTrack])
+
+        for col_num, attribute in enumerate(header):
+            self.col_num_to_attribute[col_num] = attribute
+            self.attribute_to_col_num[attribute] = col_num
+
+            if re.match(r'[A-Za-z]+ ID', attribute):
+                platform = attribute[:-3]
+                self.foreign_id_attribute_to_platform[attribute] = platform
 
         missing_cols = []
-        for col_name, Track_field in col_name_to_Track_field.items():
-            if Track_field not in self.col_num_to_Track_field.values():
-                missing_cols.append(col_name)
+        for required_attribute in required_attributes:
+            if required_attribute not in self.col_num_to_attribute.values():
+                missing_cols.append(attribute)
 
         if missing_cols != []:
             raise Exception('Sheet %s:%s has missing columns: %s' % (self.id, self.page, missing_cols))
 
-    def add_track(self, track: TrackInfo):
-        self.tracks.append(track)
-        if track.row_num is not None:
-            self.next_row = max(self.next_row, track.row_num+1)
-        else:
-            track.row_num = self.next_row
-            self.next_row += 1
+    def append(self, track: GoogleTrack):
+        assert track.id == self.next_row()
+        super(GoogleSheet, self).append(track)
+
+        for foreign_id_attribute, platform in self.foreign_id_attribute_to_platform.items():
+            foreign_id = track.get(foreign_id_attribute)
+            self._update_foreign_id_map(track, platform, foreign_id)
+
+        return
+
+    def _update_foreign_id_map(self, track, platform, foreign_id):
+        if foreign_id is None or foreign_id == 'NOT FOUND':
+            return
+
+        track_by_foreign_id = self.track_by_foreign_id[platform]
+        if foreign_id in track_by_foreign_id:
+            raise Exception('More than one Google Sheet track with the same %s ID %s: %s, %s' % (
+                platform,
+                foreign_id,
+                track_by_foreign_id[foreign_id],
+                track
+            ))
+        track_by_foreign_id[foreign_id] = track
+        return
+
+    def get_track_by_foreign_id(self, platform, foreign_id):
+        return self.track_by_foreign_id[platform].get(foreign_id)
+
+    def next_row(self):
+        if len(self) == 0:
+            return 2
+        return self[-1].id+1
 
     def write_back(self, tracks=None):
         if tracks is None:
-            tracks = self.tracks
+            tracks = self
+        elif isinstance(tracks, GoogleTrack):
+            tracks = [tracks]
 
         data = []
 
         for track in tracks:
-            for dirty_field in track.dirty_fields:
-                col_num = self.Track_field_to_col_num.get(dirty_field)
-                if col_num is not None:
-                    value = getattr(track, dirty_field)
-                else:
-                    col_num = self.attribute_to_col_num.get(dirty_field)
-                    if col_num is None:
-                        raise Exception("Unknown dirty field '%s'" % dirty_field)
-                    value = track.attributes[dirty_field]
+            for dirty_attribute in track._dirty_attributes:
+                col_num = self.attribute_to_col_num.get(dirty_attribute)
+                if col_num is None:
+                    raise Exception("Unknown dirty attribute '%s'" % dirty_attribute)
+                value = track[dirty_attribute]
                 if isinstance(value, list):
                     value = ', '.join(value)
 
@@ -172,11 +178,11 @@ class Sheet:
                     value = 'F'
 
                 data.append({
-                    'range': '%s!%s%d' % (self.page, col_num_to_alpha(col_num), track.row_num),
+                    'range': '%s!%s%d' % (self.page, col_num_to_alpha(col_num), track.id),
                     'values': [[value]]
                 })
 
-            track.dirty_fields = set()
+            track._dirty_attributes = set()
 
         if data == []:
             return 0
@@ -241,11 +247,7 @@ def parse_sheet(spreadsheet_id = DEFAULT_SPREADSHEET_ID, page = DEFAULT_SPREADSH
 
     header = values[0]
 
-    sheet = Sheet(spreadsheet_id, page, header)
-
-    # these are simpler than usual because more complicated values don't appear
-    int_regex = re.compile(r'^[1-9][0-9]*^')
-    float_regex = re.compile(r'^[1-9][0-9]*(\.[0-9]+)?$')
+    sheet = GoogleSheet(spreadsheet_id, page, header)
 
     # do some basic post-processing
     for i in range(num_rows):
@@ -259,33 +261,29 @@ def parse_sheet(spreadsheet_id = DEFAULT_SPREADSHEET_ID, page = DEFAULT_SPREADSH
                 row[j] = True
             elif row[j] == 'F':
                 row[j] = False
-            elif int_regex.match(row[j]):
-                row[j] = int(row[j])
-            elif float_regex.match(row[j]):
-                row[j] = float(row[j])
 
     num_errors = 0
 
     for row_num in range(1, num_rows):
-        track_info = TrackInfo(sheet, row_num+1)
-
         row = values[row_num]
 
-        for col_num in range(len(row)):
-            value = row[col_num]
+        attributes = {
+            header[i]: infer_type(value)
+            for i, value in enumerate(row)
+        }
 
-            Track_field = sheet.col_num_to_Track_field.get(col_num)
-            if Track_field is not None:
-                if Track_field == 'artists':
-                    value = re.split(r' *[,&] *', value)
-                setattr(track_info, Track_field, value)
-            else:
-                track_info.attributes[header[col_num]] = value
-
-        # make sure some fields are always there - otherwise we can't find the song
-        if track_info.artists is None or track_info.title is None:
+        artists_orig = attributes['Artists']
+        title = attributes['Title']
+        if artists_orig is None or title is None:
             sys.stderr.write('Row %d: Missing artists or title\n' % (row_num+1))
             num_errors += 1
+            continue
+
+        artists = frozenset(re.split(r' *[,&] *', artists_orig))
+
+        track = GoogleTrack(sheet, row_num+1, artists, title, attributes)
+
+        sheet.append(track)
 
     if num_errors > 0:
         sys.stderr.write('*** Fix the above %d errors manually! ***\n' % num_errors)

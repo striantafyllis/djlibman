@@ -53,7 +53,7 @@ def convert_field_name(sheet, token):
 
 def eval_query(
         rekordbox_state: library_organizer.RekordboxState,
-        sheet: google_sheet.Sheet,
+        sheet: google_sheet.GoogleSheet,
         tokens: list[str]
 ) -> list[rekordbox.RekordboxTrack] :
     for i in range(len(tokens)):
@@ -164,7 +164,7 @@ def handle_streaming_search(service: StreamingService,
            and track.track_info.spotify_uri is None
     ]
 
-    search_trackinfo_list.sort(key=lambda t: t.row_num)
+    search_trackinfo_list.sort(key=lambda t: t.id)
 
     if len(search_trackinfo_list) == 0:
         sys.stderr.write('No tracks to search for!\n')
@@ -191,7 +191,7 @@ def handle_streaming_search(service: StreamingService,
 
             if reply == 'yes':
                 track_info.spotify_uri = track_uri
-                track_info.dirty_fields.add('spotify_uri')
+                track_info._dirty_attributes.add('spotify_uri')
                 track_info.write_back()
                 print('         Wrote back Spotify URI %s' % track_uri)
                 break
@@ -211,7 +211,7 @@ def handle_streaming_search(service: StreamingService,
 
             if reply.upper() == 'yes':
                 track_info.spotify_uri = 'NOT FOUND'
-                track_info.dirty_fields.add('spotify_uri')
+                track_info._dirty_attributes.add('spotify_uri')
                 track_info.write_back()
                 print("        Wrote back URI 'NOT FOUND'")
 
@@ -483,7 +483,7 @@ def handle_show_cmd(
 # - <query expression>
 def cli_loop(
         rekordbox_state: library_organizer.RekordboxState,
-        sheet: google_sheet.Sheet,
+        sheet: google_sheet.GoogleSheet,
         playlist_dir: str
 ):
     print('Ready to accept queries')

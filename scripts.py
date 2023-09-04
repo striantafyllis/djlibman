@@ -14,6 +14,40 @@ from youtube_service import YouTubeService
 from utils import *
 import library_organizer
 
+
+def query_playlists(
+        rekordbox_state: library_organizer.RekordboxState,
+        sheet: google_sheet.Sheet,
+        *playlists
+):
+    playlists = [p.upper() for p in playlists]
+
+    tracklist = []
+
+    for track in rekordbox_state.main_library.tracks:
+        # TODO this should not be necessary if sanity checks have passed
+        if track.track_info is None:
+            continue
+
+        track_playlists = track.track_info.attributes['Playlists']
+        if track_playlists is None or track_playlists == '':
+            print('WARNING: Track with no playlists: %s \u2013 %s' % (track.artist_orig, track.title))
+            continue
+
+        track_playlists = track_playlists.split(',')
+        track_playlists = [p.strip().upper() for p in track_playlists]
+
+        is_in_playlists = True
+        for p in playlists:
+            is_in_playlists &= p in track_playlists
+
+        if is_in_playlists:
+            tracklist.append(track)
+
+    return tracklist
+
+
+
 def populate_riffs(
         rekordbox_state: library_organizer.RekordboxState,
         sheet: google_sheet.Sheet

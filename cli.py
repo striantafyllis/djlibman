@@ -54,11 +54,8 @@ def convert_field_name(sheet, token):
 def eval_query(
         rekordbox_state: library_organizer.RekordboxState,
         sheet: google_sheet.Sheet,
-        query_text: str
+        tokens: list[str]
 ) -> list[rekordbox.Track] :
-    tokens = tokenize(query_text)
-    # print('Tokens: %s' % tokens)
-
     for i in range(len(tokens)):
         token = tokens[i]
 
@@ -520,7 +517,7 @@ def cli_loop(
                 fail_on_exception = True
                 continue
 
-            if len(tokens) == 4 and map(lambda x: x.upper(), tokens[:3]) == ['WRITE', 'M3U', 'PLAYLIST']:
+            if len(tokens) == 4 and list(map(lambda x: x.upper(), tokens[:3])) == ['WRITE', 'M3U', 'PLAYLIST']:
                 handle_write_playlist_cmd(tokens[3], playlist_dir, tracklist)
                 tracklist = None
                 continue
@@ -533,19 +530,25 @@ def cli_loop(
                 handle_streaming_service_cmd(tokens, rekordbox_state, tracklist)
                 continue
 
-            if tokens[0].upper() == 'SCRIPT':
-                if len(tokens) != 2:
-                    raise Exception('Malformed SCRIPT command')
-
+            if len(tokens) >= 2 and tokens[0].upper() == 'SCRIPT':
                 script_name = tokens[1]
 
                 if not script_name in dir(scripts):
                     raise Exception('Unknown script %s' % script_name)
 
-                getattr(scripts, script_name)(rekordbox_state, sheet)
+                getattr(scripts, script_name)(rekordbox_state, sheet, *tokens[2:])
                 continue
 
-            tracklist = eval_query(rekordbox_state, sheet, query_text)
+            if len(tokens) >= 2 and tokens[0].upper() == 'QUERY':
+                query_name = tokens[1]
+
+                if not query_name in dir(scripts):
+                    raise Exception('Unknown query %s' % query_name)
+
+                tracklist = getattr(scripts, query_name)(rekordbox_state, sheet, *tokens[2:])
+            else:
+                tracklist = eval_query(rekordbox_state, sheet, tokens)
+
             for track in tracklist:
                 print('%s \u2013 %s' % (track.artist_orig, track.title))
             print('(%d tracks)' % len(tracklist))

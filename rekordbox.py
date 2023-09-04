@@ -1,131 +1,63 @@
 #!/usr/bin/env python
 
-import sys
-import re
-from dataclasses import dataclass
 import xml.etree.ElementTree as ET
 import urllib.parse
-from collections import defaultdict
+import re
+
+from data_model import *
+from utils import *
 
 
 default_playlist_dir = '/Users/spyros/Music/'
 default_rekordbox_xml = default_playlist_dir + 'rekordbox.xml'
 
-@dataclass
-class Track:
-    rekordbox_id: int
-    artist_orig: str
-    artists: list[str]
-    title: str
-    duration: int
-    bpm: float
-    date_added: str
-    bit_rate: int
-    location: str
-    key: str
-    track_info = None
-
-    def __str__(self):
-        return "Track id: %d artists: '%s' title: '%s'" % (
-            self.rekordbox_id,
-            ','.join(self.artists),
-            self.title
-        )
-
-class Playlist:
-    name: str
-    tracks: list[Track]
-
-    def __init__(self, name: str, tracks: list[Track]):
-        self.name = name
-        self.tracks = tracks
-        self.track_ids = frozenset([track.rekordbox_id for track in tracks])
-
-    def __contains__(self, track):
-        return track.rekordbox_id in self.track_ids
+# Rename some Rekordbox attributes that are obscurely named so that they agree with the Google sheet
+_attrib_rename = {
+    'TrackID': 'Rekordbox ID',
+    'Artist': 'Artists',
+    'Name': 'Title',
+    'AverageBpm': 'BPM',
+    'Tonality': 'Key',
+    'DateAdded': 'Date Added',
+    'TotalTime': 'Duration'
+}
 
 
-class Collection:
-    def __init__(self, **kwargs):
-        self.tracks_by_rekordbox_id = {}
-        self.tracks_by_artists_and_name = defaultdict(dict)
-        return
-
-    def add_track(self, track: Track) -> None:
-        if track.rekordbox_id in self.tracks_by_rekordbox_id:
-            raise Exception('Duplicate track ID: %d' % track.rekordbox_id)
-        self.tracks_by_rekordbox_id[track.rekordbox_id] = track
-
-        artists = frozenset(track.artists)
-        if track.title in self.tracks_by_artists_and_name[artists]:
-            # this unfortunately happens so it can only be a warning; fix rekordbox library
-            # so it doesn't happen
-            sys.stderr.write("WARNING: Duplicate artists and name: '%s' - '%s'\n" % (artists, track.title))
-        self.tracks_by_artists_and_name[artists][track.title] = track
-
-        return
-
-    def all_tracks_by_id(self):
-        tracks = list(self.tracks_by_rekordbox_id.values())
-        tracks.sort(key = lambda t: t.rekordbox_id)
-        return tracks
-
-
-def expect_str(node, key):
-    value = node.attrib.get(key)
-    if value is None:
-        raise Exception("Missing attribute '%s' in node %s" % (key, node))
-    return value
-
-def expect_int(node, key):
-    return int(expect_str(node, key))
-
-def expect_float(node, key):
-    return float(expect_str(node, key))
-
-def expect_filename(node, key):
-    value = expect_str(node, key)
-    if value.startswith('file://localhost'):
-        value = urllib.parse.unquote(value[16:])
-    return value
-
-
-def parse_collection(node: ET.Element):
+def _parse_collection(node: ET.Element):
     assert node.tag ==  'COLLECTION'
-    collection = Collection()
+    collection = Library('Rekordbox')
 
     for child in node:
         if child.tag == 'TRACK':
-            track = parse_rekordbox_collection_track(child)
-            collection.add_track(track)
+            track = _parse_collection_track(child)
+            collection.append(track)
         else:
             raise Exception('Unknown tag %s in node COLLECTION' % child.tag)
 
     return collection
 
-def parse_rekordbox_collection_track(node: ET.Element):
+def _parse_collection_track(node: ET.Element):
     assert node.tag == 'TRACK'
 
-    return Track(
-        rekordbox_id= expect_int(node, 'TrackID'),
-        artist_orig = expect_str(node, 'Artist'),
-        artists = re.split(r' *[,&] *', expect_str(node, 'Artist')),
-        title= expect_str(node, 'Name'),
-        duration = expect_int(node, 'TotalTime'),
-        bpm = expect_float(node, 'AverageBpm'),
-        date_added = expect_str(node, 'DateAdded'),
-        bit_rate = expect_int(node, 'BitRate'),
-        location = expect_filename(node, 'Location'),
-        key = expect_str(node, 'Tonality')
-    )
+    attributes = {
+        _attrib_rename.get(key, key): infer_type(value)
+        for key, value in node.attrib.items()
+    }
 
-def parse_playlists(node: ET.Element, collection: Collection):
+    id = attributes['Rekordbox ID']
+    artists = frozenset(re.split(r' *[,&] *', attributes['Artists']))
+    title = attributes['Title']
+
+    return Track(id, artists, title, attributes)
+
+
+def _parse_playlists(node: ET.Element, collection: Library):
     assert node.tag == 'PLAYLISTS'
 
     all_playlists = []
 
     for child in node:
-        all_playlists += parse_playlist_node(child, collection, [])
+        all_playlists += _parse_playlist_node(child, collection, [])
 
     playlists = {}
 
@@ -135,9 +67,9 @@ def parse_playlists(node: ET.Element, collection: Collection):
 
     return playlists
 
-def parse_playlist_node(node: ET.Element,
-                        collection: Collection,
-                        prefix: list[str]):
+def _parse_playlist_node(node: ET.Element,
+                         collection: Library,
+                         prefix: list[str]):
     assert node.tag == 'NODE'
 
     name = node.attrib['Name']
@@ -148,38 +80,40 @@ def parse_playlist_node(node: ET.Element,
         if name != 'ROOT':
             prefix = prefix + [name]
         for child in node:
-            all_playlists += parse_playlist_node(child, collection, prefix)
+            all_playlists += _parse_playlist_node(child, collection, prefix)
 
         return all_playlists
     elif type == '1':
         # leaf playlist
         full_name = '/'.join(prefix + [name])
 
-        tracks = []
+        # Rekordbox playlists have no ID, but their names are unique, so I'll just
+        # use the name as the ID also
+        playlist = Playlist(full_name, full_name)
 
         for child in node:
             assert child.tag == 'TRACK'
             track_id = int(child.attrib['Key'])
 
-            track = collection.tracks_by_rekordbox_id.get(track_id)
+            track = collection.get_track_by_id(track_id)
             if track is None:
                 raise Exception('Unknown track ID %d in playlist %s' % (track_id, full_name))
 
-            tracks.append(track)
+            playlist.append(track)
 
-        return [Playlist(full_name, tracks)]
+        return [playlist]
 
 
-def debug_print_xml_node(node, indent=0):
+def _debug_print_xml_node(node, indent=0):
     print(" "*indent + "tag='%s' attrib=%s children=%d" % (node.tag, node.attrib, len(node)))
     # tag: string
     # attrib: dict
     for child in node:
-        debug_print_xml_node(child, indent+4)
+        _debug_print_xml_node(child, indent + 4)
     return
 
 
-def parse_library(library_file=default_rekordbox_xml):
+def parse_library(library_file=default_rekordbox_xml) -> tuple[Library, list[Playlist]]:
     library = ET.parse(library_file)
 
     library_root = library.getroot()
@@ -193,11 +127,11 @@ def parse_library(library_file=default_rekordbox_xml):
             continue
         elif child.tag == 'COLLECTION':
             assert collection is None
-            collection = parse_collection(child)
+            collection = _parse_collection(child)
         elif child.tag == 'PLAYLISTS':
             assert playlists is None
             assert collection is not None
-            playlists = parse_playlists(child, collection)
+            playlists = _parse_playlists(child, collection)
         else:
             sys.stderr.write('WARNING: Unprocessed child: COLLECTION -> %s\n' % child.tag)
 

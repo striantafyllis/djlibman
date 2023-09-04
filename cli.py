@@ -55,7 +55,7 @@ def eval_query(
         rekordbox_state: library_organizer.RekordboxState,
         sheet: google_sheet.Sheet,
         tokens: list[str]
-) -> list[rekordbox.Track] :
+) -> list[rekordbox.RekordboxTrack] :
     for i in range(len(tokens)):
         token = tokens[i]
 
@@ -96,7 +96,7 @@ def eval_query(
 # PLAYLIST <name>
 def handle_write_playlist_cmd(playlist_name: str,
                               playlist_dir: str,
-                              tracklist: list[rekordbox.Track]):
+                              tracklist: list[rekordbox.RekordboxTrack]):
     if playlist_name.startswith("'") or playlist_name.startswith('"'):
         playlist_name = playlist_name[1:-1]
     playlist_filename = os.path.join(playlist_dir, playlist_name)
@@ -111,7 +111,7 @@ def handle_write_playlist_cmd(playlist_name: str,
 #     CREATE PLAYLIST (FROM (QUERY|REKORDBOX? PLAYLIST <playlist name>))
 def handle_streaming_service_cmd(tokens: list[str],
                                  rekordbox_state: str,
-                                 tracklist: list[rekordbox.Track]):
+                                 tracklist: list[rekordbox.RekordboxTrack]):
     assert len(tokens) >= 1 and tokens[0].upper() in ('SPOTIFY', 'YOUTUBE')
 
     service = library_organizer.get_streaming_service_by_name(tokens[0])
@@ -139,7 +139,7 @@ def handle_streaming_service_cmd(tokens: list[str],
 def handle_streaming_search(service: StreamingService,
                             tokens: list[str],
                             rekordbox_state : library_organizer.RekordboxState,
-                            tracklist: list[rekordbox.Track]):
+                            tracklist: list[rekordbox.RekordboxTrack]):
     if len(tokens) == 1 and tokens[0].upper() == 'QUERY':
         if tracklist is not None:
             search_tracklist = tracklist
@@ -222,7 +222,7 @@ def handle_streaming_create_playlist(
         service: StreamingService,
         tokens: list[str],
         rekordbox_state: library_organizer.RekordboxState,
-        tracklist: list[rekordbox.Track]
+        tracklist: list[rekordbox.RekordboxTrack]
 ):
     if len(tokens) < 1:
         raise Exception('Malformed %s CREATE PLAYLIST command' % service.name())
@@ -382,7 +382,7 @@ def handle_streaming_create_playlist(
 #         (SPOTIFY|YOUTUBE) PLAYLIST <playlist name>
 def handle_show_cmd(
         tokens: list[str],
-        rekordbox_state: library_organizer.RekordboxState) -> list[rekordbox.Track]:
+        rekordbox_state: library_organizer.RekordboxState) -> list[rekordbox.RekordboxTrack]:
 
     if len(tokens) == 0:
         raise Exception('No arguments to SHOW command')
@@ -487,7 +487,7 @@ def cli_loop(
         playlist_dir: str
 ):
     print('Ready to accept queries')
-    tracklist: list[rekordbox.Track] = None
+    tracklist: list[rekordbox.RekordboxTrack] = None
     fail_on_exception = False
     while (True):
         sys.stdout.write('> ')

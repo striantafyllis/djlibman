@@ -2,7 +2,9 @@
 Defines common classes such as Track, Playlist etc.
 """
 
+import sys
 from typing import Union
+from collections import defaultdict
 
 class Track:
     """Generic representation of a track on some platform, Rekordbox, Google sheet,
@@ -16,10 +18,11 @@ class Track:
     attributes: dict[str, Union[str, int, float, list[str]]]
     foreign_keys: dict[str, Union[int, str]]
 
-    def __init__(self, id, artists, title):
+    def __init__(self, id, artists, title, attributes):
         self.id = id
         self.artists = artists
         self.title = title
+        self.attributes = attributes
 
     def __str__(self):
         return "Track id: %s artists: '%s' title: '%s'" % (
@@ -29,18 +32,9 @@ class Track:
         )
 
 class Tracklist(list[Track]):
-    _track_ids: set
-
     def __init__(self, tracks: list[Track]=[]):
         super(Tracklist, self).__init__(tracks)
         self._track_ids = set([track.id for track in tracks])
-
-    def append(self, track: Track):
-        if track.id in self._track_ids:
-            raise Exception('Duplicate track ID in tracklist: %s' % track.id)
-        self._track_ids.add(track.id)
-        super(Tracklist, self).append(track)
-        return
 
     def __str__(self):
         return '\n'.join([
@@ -54,8 +48,7 @@ class Playlist(Tracklist):
        platform-dependent ID - e.g. a URI in Spotify."""
     id: Union[int, str]
     name: str
-
-    def __init__(self, id: Union[int, str], name: str, tracks: list[Track] = None):
+    def __init__(self, id: Union[int, str], name: str, tracks: list[Track] = []):
         super(Playlist, self).__init__(tracks)
         self.id = id
         self.name = name
@@ -73,13 +66,54 @@ class Library(Tracklist):
        so representing them as a tracklist is appropriate."""
 
     name: str
-    attributes: list[str]  # the attributes, in the order they appear in the sheet, XML, JSON etc.
     attribute_types: dict[str, type]
+    _tracks_by_id: dict[Union[int, str], Track]
+    _tracks_by_artists_and_name: dict[frozenset[str], dict[str, Track]]
 
-    def __init__(self, name: str, tracks: list[Track] = None):
-        super(Library, self).__init__(tracks)
+    def __init__(self, name: str):
+        super(Library, self).__init__()
         self.name = name
+        self.attributes = []
+        self.attribute_types = {}
+        self._tracks_by_id = {}
+        self._tracks_by_artists_and_name = defaultdict(dict)
+
         return
+
+    def append(self, track: Track):
+        # Save the names and types of attributes
+        for attribute, value in track.attributes.items():
+            expected_type = self.attribute_types.get(attribute)
+            if expected_type is None:
+                self.attribute_types[attribute] = type(value)
+            elif not isinstance(value, expected_type):
+                raise Exception("Track %s attribute %s has value %s type %s; expected type %s" % (
+                    track,
+                    attribute,
+                    value,
+                    type(value).__name__,
+                    expected_type.__name__
+                ))
+
+        if track.id in self._tracks_by_id:
+            raise Exception('Duplicate track ID in library %s: %s' % (self.name, track.id))
+        self._tracks_by_id[track.id] = track
+
+        if track.title in self._tracks_by_artists_and_name[track.artists]:
+            # this unfortunately happens so it can only be a warning; fix rekordbox library
+            # so it doesn't happen
+            sys.stderr.write("WARNING: Library %s: Duplicate artists and name: '%s' \u2013 '%s'\n" % (
+                self.name, ', '.join(track.artists), track.title))
+        self._tracks_by_artists_and_name[track.artists][track.title] = track
+
+        super(Tracklist, self).append(track)
+        return
+
+    def get_track_by_id(self, id: Union[int, str]):
+        return self._tracks_by_id.get(id)
+
+    def get_track_by_artists_and_name(self, artists: frozenset[str], name: str):
+        return self._tracks_by_artists_and_name[artists].get(name)
 
 
 

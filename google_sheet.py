@@ -68,7 +68,7 @@ class TrackInfo:
     key: str
     date_added: str
     attributes: dict
-    track: rekordbox.Track = None
+    track: rekordbox.RekordboxTrack = None
     dirty_fields: set[str]
 
     def __init__(self, sheet, row_num=None):

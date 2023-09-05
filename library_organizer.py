@@ -207,7 +207,7 @@ def reconcile_sheet_with_rekordbox(
     for sheet_track in sheet:
         rekordbox_track = rekordbox_state.collection.get_track_by_id(sheet_track['Rekordbox ID'])
 
-        for attribute, rekordbox_value in rekordbox_track:
+        for attribute, rekordbox_value in rekordbox_track.items():
             if attribute not in sheet_track:
                 sheet_track[attribute] = rekordbox_value
             elif sheet_track[attribute] != rekordbox_value:

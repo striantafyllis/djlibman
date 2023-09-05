@@ -23,9 +23,9 @@ class Track(dict[str, Union[str, int, float, list[str]]]):
         self.title = title
 
     def __str__(self):
-        return "Track id: %s artists: '%s' title: '%s'" % (
+        return "ID %s %s \u2013 %s" % (
             self.id,
-            ','.join(self.artists),
+            ', '.join(self.artists),
             self.title
         )
 

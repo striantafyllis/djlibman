@@ -136,27 +136,34 @@ def handle_streaming_search(service: StreamingService,
                             rekordbox_state : library_organizer.RekordboxState,
                             sheet: google_sheet.GoogleSheet,
                             tracklist: Tracklist):
-    if len(tokens) == 1 and tokens[0].upper() == 'QUERY':
-        if tracklist is not None:
-            search_tracklist = tracklist
+    if len(tokens) == 0:
+        search_tracklist = sheet
+    elif len(tokens) == 1:
+        if tokens[0].upper() == 'QUERY':
+            if tracklist is not None:
+                search_tracklist = tracklist
+            else:
+                raise Exception('No previous query')
         else:
-            raise Exception('No previous query')
-    else:
-        if len(tokens) == 0:
-            playlist_name = 'Main Library'
-        elif len(tokens) == 1:
             playlist_name = tokens[0]
             if playlist_name.startswith("'") or playlist_name.startswith(('"')):
                 playlist_name = playlist_name[1:-1]
 
-        search_tracklist = rekordbox_state.playlists.get(playlist_name)
-        if search_tracklist is None:
-            raise Exception("Rekordbox playlist '%s' does not exist" % playlist_name)
+            playlist = rekordbox_state.playlists.get(playlist_name)
+            if playlist is None:
+                raise Exception("Rekordbox playlist '%s' does not exist" % playlist_name)
+
+            search_tracklist = [
+                sheet.get_track_by_foreign_id('Rekordbox', playlist_track.id)
+                for playlist_track in playlist
+            ]
+    else:
+        raise Exception('Malformed %s SEARCH statement' % service.name())
 
     new_search_tracklist = []
 
     for track in search_tracklist:
-        if isinstance(track, google_sheet.SheetTrack) and track.get('Spotify ID') is None:
+        if track is not None and track.get('Spotify ID') is None:
             new_search_tracklist.append(track)
 
     new_search_tracklist.sort(key=lambda t: t.id)
@@ -197,7 +204,7 @@ def handle_streaming_search(service: StreamingService,
                 print('Giving up on all tracks!')
                 return
 
-        if track.spotify_uri is None:
+        if track['Spotify ID'] is None:
             reply = get_user_choice('        Unable to find %s URI for rekordbox ID %s %s \u2013 %s; mark as NOT FOUND?' % (
                 service.name(),
                 track['Rekordbox ID'],
@@ -205,7 +212,7 @@ def handle_streaming_search(service: StreamingService,
                 track.title
             ))
 
-            if reply.upper() == 'yes':
+            if reply == 'yes':
                 track[service.name() + ' ID'] = 'NOT FOUND'
                 track.write_back()
                 print("        Wrote back URI 'NOT FOUND'")

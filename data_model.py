@@ -33,7 +33,6 @@ class Track(dict[str, Union[str, int, float, list[str]]]):
 class Tracklist(list[Track]):
     def __init__(self, tracks: list[Track]=[]):
         super(Tracklist, self).__init__(tracks)
-        self._track_ids = set([track.id for track in tracks])
 
     def __str__(self):
         return '\n'.join([

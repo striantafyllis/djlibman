@@ -1,4 +1,5 @@
 
+from data_model import *
 
 class StreamingService:
     def __init__(self):
@@ -8,21 +9,15 @@ class StreamingService:
         """Returns the name of the service"""
         raise Exception('Not implemented')
 
-    def TrackInfo_field_name(self) -> str:
-        return self.name().lower() + '_uri'
-
-    def get_TrackInfo_field(self, track_info: TrackInfo):
-        return getattr(track_info, self.TrackInfo_field_name())
-
-    def search(self, track_info: TrackInfo) -> list[tuple[str, str]]:
-        """Searches for a track; returns a list of (URI, string description) pairs"""
+    def search(self, track: Track) -> Tracklist:
+        """Searches for a track; returns a list of tracks found"""
         raise Exception('Not implemented')
 
     def get_playlists(self) -> dict[str, str]:
         """Returns all the user's playlists in a uri->name dictionary"""
         raise Exception('Not implemented')
 
-    def get_playlist_tracks(self, playlist_uri) -> list[tuple[str, str]]:
+    def get_playlist_tracks(self, playlist_uri) -> Playlist:
         """Returns the tracks in a playlist as a list of (URI, string description) pairs"""
         raise Exception('Not implemented')
 

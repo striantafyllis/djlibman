@@ -4,7 +4,7 @@ import re
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
-import google_sheet
+from data_model import *
 import streaming_service
 
 SPOTIPY_CLIENT_ID = os.environ['SPOTIPY_CLIENT_ID']
@@ -24,6 +24,24 @@ SCOPES = [
 
 CACHED_TOKEN_FILE = 'spotify_cached_token.json'
 
+class SpotifyTrack(Track):
+    def __init__(self, track_attributes):
+        artists = [artist['name'] for artist in track_attributes['artists']]
+
+        # downstream apps may not be able to handle dict-valued attributes...
+        del track_attributes['artists']
+
+        title = track_attributes['name']
+        id = track_attributes['id']
+
+        track_attributes['url'] = 'https://open.spotify.com/track/%s' % id
+
+        super(SpotifyTrack, self).__init__(id, artists, title, track_attributes)
+        return
+
+    def __str__(self):
+        return super(SpotifyTrack, self).__str__() + ' URL: ' + self['url']
+
 
 class SpotifyService(streaming_service.StreamingService):
     def __init__(self):
@@ -41,11 +59,11 @@ class SpotifyService(streaming_service.StreamingService):
     def name(self):
         return 'Spotify'
 
-    def search(self, track: google_sheet.TrackInfo):
-        query = ' '.join(track.artists)
+    def search(self, track_attributes: Track) -> Tracklist:
+        query = ' '.join(track_attributes.artists)
 
         # preprocess the title to make it more likely that spotify will find it
-        title = track.title
+        title = track_attributes.title
 
         title = re.sub(r'feat\.', '', title, flags=re.IGNORECASE)
         title = re.sub(r'\(?original mix\)?', '', title, flags=re.IGNORECASE)
@@ -64,19 +82,7 @@ class SpotifyService(streaming_service.StreamingService):
             type = 'track'
         )
 
-        return_val = []
-
-        for track in results['tracks']['items']:
-            artists = [artist['name'] for artist in track['artists']]
-            title = track['name']
-            uri = track['id']
-            url = 'https://open.spotify.com/track/%s' % uri
-
-            description = '%s \u2013 %s %s' % (', '.join(artists), title, url)
-
-            return_val.append((uri, description))
-
-        return return_val
+        return Tracklist([SpotifyTrack(track_attributes) for track_attributes in results['tracks']['items']])
 
     def get_playlists(self) -> dict[str, str]:
         user = self.spotify.current_user()['id']
@@ -94,8 +100,8 @@ class SpotifyService(streaming_service.StreamingService):
 
         return results
 
-    def get_playlist_tracks(self, playlist_uri: str) -> list[tuple[str, str]]:
-        return_val = []
+    def get_playlist_tracks(self, playlist_uri: str) -> Playlist:
+        tracks = []
         offset = 0
 
         while True:
@@ -106,23 +112,17 @@ class SpotifyService(streaming_service.StreamingService):
             )
 
             for result in results['items']:
-                track = result['track']
+                track_attributes = result['track']
 
-                artists = [artist['name'] for artist in track['artists']]
-                title = track['name']
-                uri = track['id']
-                url = 'https://open.spotify.com/track/%s' % uri
-
-                description = '%s \u2013 %s %s' % (', '.join(artists), title, url)
-
-                return_val.append((uri, description))
+                tracks.append(SpotifyTrack(track_attributes))
 
             if len(results['items']) < MAX_TRACKS_PER_REQUEST:
                 break
 
             offset += MAX_TRACKS_PER_REQUEST
 
-        return return_val
+        return Playlist(playlist_uri, '', tracks)
+
 
     def delete_playlist(self, playlist_uri: str):
         self.spotify.current_user_unfollow_playlist(playlist_uri)

@@ -5,7 +5,7 @@ import argparse
 import library_organizer
 import rekordbox
 import google_sheet
-# import cli
+import cli
 
 def main():
     parser = argparse.ArgumentParser(
@@ -32,13 +32,13 @@ def main():
 
     library_organizer.cross_reference_rekordbox_to_google_sheet(rekordbox_state, sheet)
 
-    library_organizer.sheet_vs_rekordbox_sanity_checks(sheet, rekordbox_state)
+    library_organizer.reconcile_sheet_with_rekordbox(sheet, rekordbox_state)
 
-    # cli.cli_loop(
-    #     rekordbox_state,
-    #     sheet,
-    #     playlist_dir
-    # )
+    cli.cli_loop(
+        rekordbox_state,
+        sheet,
+        playlist_dir
+    )
 
     return 0
 

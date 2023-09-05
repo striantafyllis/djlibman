@@ -57,14 +57,14 @@ def col_num_to_alpha(col_num):
         return first_letter + second_letter
 
 
-class GoogleTrack(Track):
+class SheetTrack(Track):
     """In a Google track, the ID is the row in the Google sheet.
        Also, we keep track of the attributes whose value has changed so we can write them back."""
     sheet: object
     _dirty_attributes: set[str]
 
     def __init__(self, sheet, id, artists, title, attributes):
-        super(GoogleTrack, self).__init__(id, artists, title, attributes)
+        super(SheetTrack, self).__init__(id, artists, title, attributes)
         self.sheet = sheet
         self._dirty_attributes = set()
         return
@@ -72,8 +72,9 @@ class GoogleTrack(Track):
     def __setitem__(self, attribute, value):
         previous_value = self.get(attribute)
 
-        super(GoogleTrack, self).__setitem__(attribute, value)
-        self._dirty_attributes.add(attribute)
+        super(SheetTrack, self).__setitem__(attribute, value)
+        if attribute in self.sheet.header:
+            self._dirty_attributes.add(attribute)
 
         # adjust the foreign key maps if necessary
         platform = self.sheet.foreign_id_attribute_to_platform.get(attribute)
@@ -92,7 +93,7 @@ class GoogleSheet(Library):
     col_num_to_attribute: dict[int, str]
     attribute_to_col_num: dict[str, int]
     foreign_id_attribute_to_platform: dict[str, str]
-    track_by_foreign_id: dict[str, dict[Union[int, str], GoogleTrack]]
+    track_by_foreign_id: dict[str, dict[Union[int, str], SheetTrack]]
 
     def __init__(self, id, page, header):
         super(GoogleSheet, self).__init__('Google Main Library')
@@ -104,7 +105,7 @@ class GoogleSheet(Library):
         self.attribute_to_col_num = {}
         self.foreign_id_attribute_to_platform = {}
 
-        self.track_by_foreign_id = defaultdict(dict[Union[int, str], GoogleTrack])
+        self.track_by_foreign_id = defaultdict(dict[Union[int, str], SheetTrack])
 
         for col_num, attribute in enumerate(header):
             self.col_num_to_attribute[col_num] = attribute
@@ -122,9 +123,14 @@ class GoogleSheet(Library):
         if missing_cols != []:
             raise Exception('Sheet %s:%s has missing columns: %s' % (self.id, self.page, missing_cols))
 
-    def append(self, track: GoogleTrack):
+    def append(self, track: SheetTrack):
         assert track.id == self.next_row()
         super(GoogleSheet, self).append(track)
+
+        # add missing attributes in the header; this lets us avoid KeyErrors later
+        for attribute in self.header:
+            if attribute not in track:
+                track[attribute] = None
 
         for foreign_id_attribute, platform in self.foreign_id_attribute_to_platform.items():
             foreign_id = track.get(foreign_id_attribute)
@@ -158,7 +164,7 @@ class GoogleSheet(Library):
     def write_back(self, tracks=None):
         if tracks is None:
             tracks = self
-        elif isinstance(tracks, GoogleTrack):
+        elif isinstance(tracks, SheetTrack):
             tracks = [tracks]
 
         data = []
@@ -281,7 +287,7 @@ def parse_sheet(spreadsheet_id = DEFAULT_SPREADSHEET_ID, page = DEFAULT_SPREADSH
 
         artists = frozenset(re.split(r' *[,&] *', artists_orig))
 
-        track = GoogleTrack(sheet, row_num+1, artists, title, attributes)
+        track = SheetTrack(sheet, row_num + 1, artists, title, attributes)
 
         sheet.append(track)
 

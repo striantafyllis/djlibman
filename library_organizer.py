@@ -4,13 +4,14 @@ Creates a single library out of Rekordbox, the Google sheet, and the streaming s
 Handles synchronization between all three.
 """
 
+import urllib.parse
 
 from data_model import *
 import rekordbox
 import google_sheet
-# from streaming_service import StreamingService
-# from spotify_service import SpotifyService
-# from youtube_service import YouTubeService
+from streaming_service import StreamingService
+from spotify_service import SpotifyService
+from youtube_service import YouTubeService
 from utils import *
 
 
@@ -147,7 +148,7 @@ def cross_reference_rekordbox_to_google_sheet(
     return
 
 
-def sheet_vs_rekordbox_sanity_checks(
+def reconcile_sheet_with_rekordbox(
         sheet: google_sheet.GoogleSheet,
         rekordbox_state: RekordboxState):
 
@@ -171,7 +172,7 @@ def sheet_vs_rekordbox_sanity_checks(
 
         if sheet_track is None:
             print('%s is in Rekordbox Main Library but not in the Google sheet; adding.' % rekordbox_track)
-            sheet_track = google_sheet.GoogleTrack(
+            sheet_track = google_sheet.SheetTrack(
                 sheet,
                 sheet.next_row(),
                 rekordbox_track.artists,
@@ -199,20 +200,23 @@ def sheet_vs_rekordbox_sanity_checks(
 
     num_mismatched_fields = 0
 
+    # Make sure all common attributes have the same value between Google sheet and Rekordbox;
+    # if not, write the corrected values in the Google sheet.
+    # Then merge all Rekordbox attributes into the Google sheet tracks in memory;
+    # this allows us to query with a mix of sheet and Rekordbox-only attributes later.
     for sheet_track in sheet:
         rekordbox_track = rekordbox_state.collection.get_track_by_id(sheet_track['Rekordbox ID'])
 
-        for attribute in sheet.header:
-            if attribute not in rekordbox_track:
-                continue
-
-            if sheet_track[attribute] != rekordbox_track[attribute]:
+        for attribute, rekordbox_value in rekordbox_track:
+            if attribute not in sheet_track:
+                sheet_track[attribute] = rekordbox_value
+            elif sheet_track[attribute] != rekordbox_value:
                 print("%s: attribute %s has value '%s' in Google sheet but '%s' in Rekordbox" % (
-                    sheet_track, attribute, sheet_track[attribute], rekordbox_track[attribute]
+                    sheet_track, attribute, sheet_track[attribute], rekordbox_value
                 ))
                 num_mismatched_fields += 1
 
-                sheet_track[attribute] = rekordbox_track[attribute]
+                sheet_track[attribute] = rekordbox_value
 
     if num_mismatched_fields > 0:
         print('%d mismatching fields in Google sheet!' % num_mismatched_fields)
@@ -227,8 +231,10 @@ def sheet_vs_rekordbox_sanity_checks(
             sys.exit(1)
 
 
-def write_m3u_playlist(playlist_filename: str,
-                       tracklist: list[Track]):
+def write_m3u_playlist(
+        rekordbox_state: RekordboxState,
+        playlist_filename: str,
+        tracklist: list[Track]):
     if not playlist_filename.endswith('.m3u8'):
         playlist_filename += '.m3u8'
 
@@ -238,11 +244,16 @@ def write_m3u_playlist(playlist_filename: str,
 
     for track in tracklist:
         playlist_file.write('#EXTINF:%d,%s \u2013 %s\n' % (
-            track.duration,
-            track.artist_orig,
+            track['Duration'],
+            track['Artists'],
             track.title
         ))
-        playlist_file.write(track.location + '\n')
+
+        location = track.location
+        if location.startswith('file://localhost'):
+            location = urllib.parse.unquote(location[16:])
+
+        playlist_file.write(location + '\n')
 
     playlist_file.close()
 
@@ -250,24 +261,24 @@ def write_m3u_playlist(playlist_filename: str,
 
 
 
-# youtube_service: YouTubeService = None
-# spotify_service: SpotifyService = None
-#
-# def get_streaming_service_by_name(service_name: str) -> StreamingService:
-#     global youtube_service
-#     global spotify_service
-#     if service_name.upper() == 'YOUTUBE':
-#         if youtube_service is None:
-#             youtube_service = YouTubeService()
-#         service = youtube_service
-#     elif service_name.upper() == 'SPOTIFY':
-#         if spotify_service is None:
-#             spotify_service = SpotifyService()
-#         service = spotify_service
-#     else:
-#         raise Exception('Unimplemented streaming service %s' % service_name)
-#
-#     return service
+youtube_service: YouTubeService = None
+spotify_service: SpotifyService = None
+
+def get_streaming_service_by_name(service_name: str) -> StreamingService:
+    global youtube_service
+    global spotify_service
+    if service_name.upper() == 'YOUTUBE':
+        if youtube_service is None:
+            youtube_service = YouTubeService()
+        service = youtube_service
+    elif service_name.upper() == 'SPOTIFY':
+        if spotify_service is None:
+            spotify_service = SpotifyService()
+        service = spotify_service
+    else:
+        raise Exception('Unimplemented streaming service %s' % service_name)
+
+    return service
 
 
 def main():

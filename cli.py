@@ -7,6 +7,7 @@ import time
 import re
 import os.path
 
+from data_model import *
 import library_organizer
 import rekordbox
 import google_sheet
@@ -39,14 +40,8 @@ def tokenize(text):
     return tokens
 
 def convert_field_name(sheet, token):
-    # see if it's a field name of the Track class
-    track_field = google_sheet.col_name_to_Track_field.get(token)
-    if track_field is not None:
-        return 'track.%s' % track_field
-
-    # otherwise, try to find it in the TrackInfo attributes
     if token in sheet.header:
-        return "track.track_info.attributes.get('%s')" % token
+        return "track.get('%s')" % token
 
     raise Exception("Unrecognizable field: '%s'" % token)
 
@@ -55,7 +50,7 @@ def eval_query(
         rekordbox_state: library_organizer.RekordboxState,
         sheet: google_sheet.GoogleSheet,
         tokens: list[str]
-) -> list[rekordbox.RekordboxTrack] :
+) -> Tracklist :
     for i in range(len(tokens)):
         token = tokens[i]
 
@@ -81,11 +76,8 @@ def eval_query(
 
     compiled_python_expr = compile(python_expr, '<input>', 'eval')
 
-    result = []
-    for track in rekordbox_state.main_library.tracks:
-        # TODO this should not be necessary if sanity checks have passed
-        if track.track_info is None:
-            continue
+    result = Tracklist()
+    for track in sheet:
         eval_result = eval(compiled_python_expr)
         if eval_result:
             result.append(track)
@@ -94,9 +86,11 @@ def eval_query(
 
 
 # PLAYLIST <name>
-def handle_write_playlist_cmd(playlist_name: str,
-                              playlist_dir: str,
-                              tracklist: list[rekordbox.RekordboxTrack]):
+def handle_write_playlist_cmd(
+        rekordbox_state: library_organizer.RekordboxState,
+        playlist_name: str,
+        playlist_dir: str,
+        tracklist: Tracklist):
     if playlist_name.startswith("'") or playlist_name.startswith('"'):
         playlist_name = playlist_name[1:-1]
     playlist_filename = os.path.join(playlist_dir, playlist_name)
@@ -104,14 +98,15 @@ def handle_write_playlist_cmd(playlist_name: str,
     if tracklist is None:
         raise Exception('No previous query')
 
-    library_organizer.write_m3u_playlist(playlist_filename, tracklist)
+    library_organizer.write_m3u_playlist(rekordbox_state, playlist_filename, tracklist)
 
 # (SPOTIFY|YOUTUBE)
 #     FIND/SEARCH ([QUERY]|<Rekordbox playlist name>)
 #     CREATE PLAYLIST (FROM (QUERY|REKORDBOX? PLAYLIST <playlist name>))
 def handle_streaming_service_cmd(tokens: list[str],
                                  rekordbox_state: str,
-                                 tracklist: list[rekordbox.RekordboxTrack]):
+                                 sheet: google_sheet.GoogleSheet,
+                                 tracklist: Tracklist):
     assert len(tokens) >= 1 and tokens[0].upper() in ('SPOTIFY', 'YOUTUBE')
 
     service = library_organizer.get_streaming_service_by_name(tokens[0])
@@ -122,7 +117,7 @@ def handle_streaming_service_cmd(tokens: list[str],
         raise Exception('No %s command' % service.name())
 
     if tokens[0].upper() in ['FIND', 'SEARCH']:
-        handle_streaming_search(service, tokens[1:], rekordbox_state, tracklist)
+        handle_streaming_search(service, tokens[1:], rekordbox_state, sheet, tracklist)
         return
 
     if len(tokens) >= 2 and tokens[0].upper() == 'CREATE' and tokens[1].upper() == 'PLAYLIST':
@@ -139,7 +134,8 @@ def handle_streaming_service_cmd(tokens: list[str],
 def handle_streaming_search(service: StreamingService,
                             tokens: list[str],
                             rekordbox_state : library_organizer.RekordboxState,
-                            tracklist: list[rekordbox.RekordboxTrack]):
+                            sheet: google_sheet.GoogleSheet,
+                            tracklist: Tracklist):
     if len(tokens) == 1 and tokens[0].upper() == 'QUERY':
         if tracklist is not None:
             search_tracklist = tracklist
@@ -157,43 +153,42 @@ def handle_streaming_search(service: StreamingService,
         if search_tracklist is None:
             raise Exception("Rekordbox playlist '%s' does not exist" % playlist_name)
 
-    search_trackinfo_list = [
-        track.track_info
-        for track in search_tracklist.tracks
-        if track.track_info is not None
-           and track.track_info.spotify_uri is None
-    ]
+    new_search_tracklist = []
 
-    search_trackinfo_list.sort(key=lambda t: t.id)
+    for track in search_tracklist:
+        if isinstance(track, google_sheet.SheetTrack) and track.get('Spotify ID') is None:
+            new_search_tracklist.append(track)
 
-    if len(search_trackinfo_list) == 0:
-        sys.stderr.write('No tracks to search for!\n')
+    new_search_tracklist.sort(key=lambda t: t.id)
 
-    print('Searching %s for %d tracks ...' % (service.name(), len(search_trackinfo_list)))
+    if len(new_search_tracklist) == 0:
+        sys.stdout.write('No tracks to search for!\n')
+        return
 
-    for track_info in search_trackinfo_list:
+    print('Searching %s for %d tracks ...' % (service.name(), len(new_search_tracklist)))
+
+    for track in new_search_tracklist:
         print('    Searching %s for rekordbox ID %d %s \u2013 %s' % (
             service.name(),
-            track_info.rekordbox_id,
-            ', '.join(track_info.artists),
-            track_info.title
+            track['Rekordbox ID'],
+            ', '.join(track.artists),
+            track.title
         ))
 
-        possible_streaming_tracks = service.search(track_info)
+        possible_streaming_tracks = service.search(track)
 
-        for idx, (track_uri, track_description) in enumerate(possible_streaming_tracks):
+        for idx, streaming_track in enumerate(possible_streaming_tracks):
             print('        Track #%d: %s ' % (
                 (idx+1),
-                track_description
+                streaming_track
             ))
 
             reply = get_user_choice('        Is this it?', ['yes', 'no', 'next track', 'exit'])
 
             if reply == 'yes':
-                track_info.spotify_uri = track_uri
-                track_info._dirty_attributes.add('spotify_uri')
-                track_info.write_back()
-                print('         Wrote back Spotify URI %s' % track_uri)
+                track[service.name() + ' ID'] = streaming_track.id
+                track.write_back()
+                print('         Wrote back %s ID %s' % (service.name(), streaming_track.id))
                 break
             elif reply == 'next track':
                 print('        Giving up on this track!')
@@ -202,17 +197,17 @@ def handle_streaming_search(service: StreamingService,
                 print('Giving up on all tracks!')
                 return
 
-        if track_info.spotify_uri is None:
-            reply = get_user_choice('        Unable to find Spotify URI for rekordbox ID %s %s \u2013 %s; mark as NOT FOUND?' % (
-                track_info.rekordbox_id,
-                ', '.join(track_info.artists),
-                track_info.title
+        if track.spotify_uri is None:
+            reply = get_user_choice('        Unable to find %s URI for rekordbox ID %s %s \u2013 %s; mark as NOT FOUND?' % (
+                service.name(),
+                track['Rekordbox ID'],
+                ', '.join(track.artists),
+                track.title
             ))
 
             if reply.upper() == 'yes':
-                track_info.spotify_uri = 'NOT FOUND'
-                track_info._dirty_attributes.add('spotify_uri')
-                track_info.write_back()
+                track[service.name() + ' ID'] = 'NOT FOUND'
+                track.write_back()
                 print("        Wrote back URI 'NOT FOUND'")
 
     return
@@ -222,7 +217,7 @@ def handle_streaming_create_playlist(
         service: StreamingService,
         tokens: list[str],
         rekordbox_state: library_organizer.RekordboxState,
-        tracklist: list[rekordbox.RekordboxTrack]
+        tracklist: Tracklist
 ):
     if len(tokens) < 1:
         raise Exception('Malformed %s CREATE PLAYLIST command' % service.name())
@@ -266,7 +261,7 @@ def handle_streaming_create_playlist(
                     if rekordbox_playlist is None:
                         raise Exception("Rekordbox playlist '%s' not found" % playlist_name)
 
-                    tracklist_to_write = rekordbox_playlist.tracks
+                    tracklist_to_write = rekordbox_playlist
 
                     # especially for the Main Library, use the ordering of the Google doc
                     if playlist_name == 'Main Library':
@@ -382,7 +377,7 @@ def handle_streaming_create_playlist(
 #         (SPOTIFY|YOUTUBE) PLAYLIST <playlist name>
 def handle_show_cmd(
         tokens: list[str],
-        rekordbox_state: library_organizer.RekordboxState) -> list[rekordbox.RekordboxTrack]:
+        rekordbox_state: library_organizer.RekordboxState) -> Tracklist:
 
     if len(tokens) == 0:
         raise Exception('No arguments to SHOW command')
@@ -394,7 +389,7 @@ def handle_show_cmd(
         playlists = list(rekordbox_state.playlists.values())
         playlists.sort(key=lambda p: p.name)
         for playlist in playlists:
-            print('    %s (%d tracks)' % (playlist.name, len(playlist.tracks)))
+            print('    %s (%d tracks)' % (playlist.name, len(playlist)))
 
         return None
 
@@ -434,18 +429,16 @@ def handle_show_cmd(
             if playlist is None:
                 raise Exception("Playlist '%s' not found" % playlist_name)
 
-            tracklist = playlist.tracks
-
             print("Tracks in playlist '%s':" % playlist_name)
 
-            for idx, track in enumerate(tracklist):
+            for idx, track in enumerate(playlist):
                 print('%d. %s \u2013 %s' % (
                     idx+1,
                     ', '.join(track.artists),
                     track.title
                 ))
 
-            return tracklist
+            return playlist
         else:
             # Streaming service playlist
             service = library_organizer.get_streaming_service_by_name(service_name)
@@ -518,7 +511,7 @@ def cli_loop(
                 continue
 
             if len(tokens) == 4 and list(map(lambda x: x.upper(), tokens[:3])) == ['WRITE', 'M3U', 'PLAYLIST']:
-                handle_write_playlist_cmd(tokens[3], playlist_dir, tracklist)
+                handle_write_playlist_cmd(rekordbox_state, tokens[3], playlist_dir, tracklist)
                 tracklist = None
                 continue
 
@@ -527,7 +520,7 @@ def cli_loop(
                 continue
 
             if tokens[0].upper() in ['SPOTIFY', 'YOUTUBE']:
-                handle_streaming_service_cmd(tokens, rekordbox_state, tracklist)
+                handle_streaming_service_cmd(tokens, rekordbox_state, sheet, tracklist)
                 continue
 
             if len(tokens) >= 2 and tokens[0].upper() == 'SCRIPT':

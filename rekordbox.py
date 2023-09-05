@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import xml.etree.ElementTree as ET
-import urllib.parse
 import re
 
 from data_model import *
@@ -22,6 +21,13 @@ _attrib_rename = {
     'TotalTime': 'Duration'
 }
 
+class RekordboxTrack(Track):
+    def __init__(self, attributes):
+        id = attributes['Rekordbox ID']
+        artists = frozenset(re.split(r' *[,&] *', attributes['Artists']))
+        title = attributes['Title']
+        super(RekordboxTrack, self).__init__(id, artists, title, attributes)
+        return
 
 def _parse_collection(node: ET.Element):
     assert node.tag ==  'COLLECTION'
@@ -44,11 +50,8 @@ def _parse_collection_track(node: ET.Element):
         for key, value in node.attrib.items()
     }
 
-    id = attributes['Rekordbox ID']
-    artists = frozenset(re.split(r' *[,&] *', attributes['Artists']))
-    title = attributes['Title']
 
-    return Track(id, artists, title, attributes)
+    return RekordboxTrack(attributes)
 
 
 def _parse_playlists(node: ET.Element, collection: Library):

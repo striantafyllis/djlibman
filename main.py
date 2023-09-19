@@ -6,6 +6,7 @@ import library_organizer
 import rekordbox
 import google_sheet
 import cli
+import new_cli
 
 def main():
     parser = argparse.ArgumentParser(
@@ -17,10 +18,12 @@ def main():
     parser.add_argument('--google_sheet_id', default=google_sheet.DEFAULT_SPREADSHEET_ID)
     parser.add_argument('--google_sheet_page', default=google_sheet.DEFAULT_SPREADSHEET_PAGE)
     parser.add_argument('--batch', action='store_true')
+    parser.add_argument('--new', action='store_true')
 
     args = parser.parse_args()
 
     batch_mode = args.batch
+    use_new = args.new
 
     playlist_dir = args.playlist_dir
 
@@ -37,13 +40,22 @@ def main():
 
     library_organizer.reconcile_sheet_with_rekordbox(batch_mode, sheet, rekordbox_state)
 
-    cli.cli_loop(
-        batch_mode,
-        sys.stdin,
-        rekordbox_state,
-        sheet,
-        playlist_dir
-    )
+    if use_new:
+        new_cli.cli_loop(
+            batch_mode,
+            sys.stdin,
+            rekordbox_state,
+            sheet,
+            playlist_dir
+        )
+    else:
+        cli.cli_loop(
+            batch_mode,
+            sys.stdin,
+            rekordbox_state,
+            sheet,
+            playlist_dir
+        )
 
     return 0
 

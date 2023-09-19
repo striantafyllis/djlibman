@@ -13,7 +13,7 @@ scope = "user-library-read"
 # cache_handler = spotipy.CacheFileHandler(cache_path='spotify_cached_token.json')
 
 sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope,
-                                               cache_path='spotify_cached_token.json',
+                                               cache_path='../spotify_cached_token.json',
                                                client_id=SPOTIPY_CLIENT_ID,
                                                client_secret=SPOTIPY_CLIENT_SECRET,
                                                redirect_uri=SPOTIPY_REDIRECT_URI))

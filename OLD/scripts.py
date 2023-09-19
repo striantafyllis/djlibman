@@ -6,11 +6,7 @@ Each script function takes as arguments:
 - the Google sheet
 """
 
-import rekordbox
 import google_sheet
-from streaming_service import StreamingService
-from spotify_service import SpotifyService
-from youtube_service import YouTubeService
 from utils import *
 import library_organizer
 

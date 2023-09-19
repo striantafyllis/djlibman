@@ -25,8 +25,8 @@ def main():
     # The file google_cached_token.json stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first
     # time.
-    if os.path.exists('google_cached_token.json'):
-        creds = Credentials.from_authorized_user_file('google_cached_token.json', SCOPES)
+    if os.path.exists('../google_cached_token.json'):
+        creds = Credentials.from_authorized_user_file('../google_cached_token.json', SCOPES)
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -36,7 +36,7 @@ def main():
                 '/Users/spyros/google_credentials_music_library_management.json', SCOPES)
             creds = flow.run_local_server(port=0)
         # Save the credentials for the next run
-        with open('google_cached_token.json', 'w') as token:
+        with open('../google_cached_token.json', 'w') as token:
             token.write(creds.to_json())
 
     try:

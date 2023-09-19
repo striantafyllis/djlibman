@@ -18,7 +18,7 @@ SCOPES = ['https://www.googleapis.com/auth/drive']
 
 CREDENTIALS_FILE = '/Users/spyros/google_credentials_music_library_management.json'
 
-CACHED_TOKEN_FILE = 'google_cached_token.json'
+CACHED_TOKEN_FILE = '../google_cached_token.json'
 
 DEFAULT_SPREADSHEET_ID = '1INf3kKkOQta6Im1mqMNFPxSQ1lRvFaMcQLrR1H2HP50'
 # DEFAULT_SPREADSHEET_ID = '1G2_P_pj05owEmVZul9_wWLUjF38stWx5c4DFcipu3L0'

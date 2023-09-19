@@ -1,4 +1,3 @@
-import sys
 import os
 import re
 import spotipy
@@ -22,7 +21,7 @@ SCOPES = [
     'playlist-modify-public'
 ]
 
-CACHED_TOKEN_FILE = 'spotify_cached_token.json'
+CACHED_TOKEN_FILE = '../spotify_cached_token.json'
 
 class SpotifyTrack(Track):
     def __init__(self, track_attributes):

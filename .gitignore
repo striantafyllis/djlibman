@@ -3,3 +3,6 @@
 /grammar/*.interp
 /grammar/*.tokens
 /grammar/*.py
+code_examples/grammar/*.interp
+code_examples/grammar/*.tokens
+code_examples/grammar/*.py

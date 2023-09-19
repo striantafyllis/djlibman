@@ -16,8 +16,11 @@ def main():
     parser.add_argument('--rekordbox_xml', default=rekordbox.default_rekordbox_xml)
     parser.add_argument('--google_sheet_id', default=google_sheet.DEFAULT_SPREADSHEET_ID)
     parser.add_argument('--google_sheet_page', default=google_sheet.DEFAULT_SPREADSHEET_PAGE)
+    parser.add_argument('--batch', action='store_true')
 
     args = parser.parse_args()
+
+    batch_mode = args.batch
 
     playlist_dir = args.playlist_dir
 
@@ -30,11 +33,13 @@ def main():
 
     library_organizer.sheet_stats(sheet)
 
-    library_organizer.cross_reference_rekordbox_to_google_sheet(rekordbox_state, sheet)
+    library_organizer.cross_reference_rekordbox_to_google_sheet(batch_mode, rekordbox_state, sheet)
 
-    library_organizer.reconcile_sheet_with_rekordbox(sheet, rekordbox_state)
+    library_organizer.reconcile_sheet_with_rekordbox(batch_mode, sheet, rekordbox_state)
 
     cli.cli_loop(
+        batch_mode,
+        sys.stdin,
         rekordbox_state,
         sheet,
         playlist_dir

@@ -2,6 +2,7 @@
 import sys
 import os.path
 import re
+from datetime import date
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -63,7 +64,7 @@ class SheetTrack(Track):
     sheet: object
     _dirty_attributes: set[str]
 
-    def __init__(self, sheet, id, artists, title, attributes):
+    def __init__(self, sheet, id, artists, title, attributes={}):
         super(SheetTrack, self).__init__(id, artists, title, attributes)
         self.sheet = sheet
         self._dirty_attributes = set()
@@ -182,6 +183,8 @@ class GoogleSheet(Library):
                     value = 'T'
                 elif value is False:
                     value = 'F'
+                elif isinstance(value, date):
+                    value = value.strftime('%Y-%m-%d')
 
                 data.append({
                     'range': '%s!%s%d' % (self.page, col_num_to_alpha(col_num), track.id),

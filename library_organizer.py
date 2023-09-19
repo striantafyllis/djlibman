@@ -102,6 +102,7 @@ def sheet_stats(sheet: google_sheet.GoogleSheet):
 
 
 def cross_reference_rekordbox_to_google_sheet(
+        batch_mode: bool,
         rekordbox_state: RekordboxState,
         sheet: google_sheet.GoogleSheet):
 
@@ -135,7 +136,7 @@ def cross_reference_rekordbox_to_google_sheet(
 
     if num_missing_ids > 0:
         print('%d missing track IDs in Google sheet!' % num_missing_ids)
-        reply = get_user_choice('Write missing IDs?')
+        reply = get_user_choice(batch_mode, 'Write missing IDs?')
 
         if reply == 'yes':
             updated_cells = sheet.write_back()
@@ -149,6 +150,7 @@ def cross_reference_rekordbox_to_google_sheet(
 
 
 def reconcile_sheet_with_rekordbox(
+        batch_mode: bool,
         sheet: google_sheet.GoogleSheet,
         rekordbox_state: RekordboxState):
 
@@ -188,7 +190,7 @@ def reconcile_sheet_with_rekordbox(
 
     if num_tracks_missing_from_google_sheet > 0:
         print('%d tracks missing from Google sheet!' % num_tracks_missing_from_google_sheet)
-        reply = get_user_choice('Add missing tracks?')
+        reply = get_user_choice(batch_mode, 'Add missing tracks?')
 
         if reply == 'yes':
             updated_cells = sheet.write_back()
@@ -220,7 +222,7 @@ def reconcile_sheet_with_rekordbox(
 
     if num_mismatched_fields > 0:
         print('%d mismatching fields in Google sheet!' % num_mismatched_fields)
-        reply = get_user_choice('Correct mismatched fields?')
+        reply = get_user_choice(batch_mode, 'Correct mismatched fields?')
 
         if reply == 'yes':
             updated_cells = sheet.write_back()

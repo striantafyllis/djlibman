@@ -49,6 +49,7 @@ def query_playlists(
 
 
 def populate_instruments(
+        batch_mode: bool,
         rekordbox_state: library_organizer.RekordboxState,
         sheet: google_sheet.GoogleSheet
 ):
@@ -67,7 +68,7 @@ def populate_instruments(
             num_changed_fields += 1
 
     if num_changed_fields > 0:
-        choice = get_user_choice('Write back %d Instruments fields?' % num_changed_fields)
+        choice = get_user_choice(batch_mode, 'Write back %d Instruments fields?' % num_changed_fields)
         if choice == 'yes':
             sheet.write_back()
     return
@@ -85,6 +86,7 @@ def set_danceable(
 
 
 def merge_genres_and_flavors(
+        batch_mode: bool,
         rekordbox_state: library_organizer.RekordboxState,
         sheet: google_sheet.GoogleSheet
 ):
@@ -114,7 +116,7 @@ def merge_genres_and_flavors(
         num_changed_fields += 1
 
     if num_changed_fields > 0:
-        choice = get_user_choice('Write %d changed flavors?' % num_changed_fields)
+        choice = get_user_choice(batch_mode, 'Write %d changed flavors?' % num_changed_fields)
         if choice == 'yes':
             sheet.write_back()
             print('Wrote %d changed flavors' % num_changed_fields)
@@ -122,6 +124,7 @@ def merge_genres_and_flavors(
     return
 
 def fill_in_flavors(
+        batch_mode: bool,
         rekordbox_state: library_organizer.RekordboxState,
         sheet: google_sheet.GoogleSheet
 ):
@@ -148,7 +151,7 @@ def fill_in_flavors(
             track._dirty_attributes.add('Flavors')
             num_changed_fields += 1
 
-    choice = get_user_choice('Filled in %d flavors; write?' % num_changed_fields)
+    choice = get_user_choice(batch_mode, 'Filled in %d flavors; write?' % num_changed_fields)
     if choice == 'yes':
         sheet.write_back()
         print('Wrote %d flavors' % num_changed_fields)
@@ -157,6 +160,7 @@ def fill_in_flavors(
 
 
 def fill_in_genres(
+        batch_mode: bool,
         rekordbox_state: library_organizer.RekordboxState,
         sheet: google_sheet.GoogleSheet
 ):
@@ -178,7 +182,7 @@ def fill_in_genres(
             track._dirty_attributes.add('Genres')
             num_changed_fields += 1
 
-    choice = get_user_choice('Filled in %d genres; write?' % num_changed_fields)
+    choice = get_user_choice(batch_mode, 'Filled in %d genres; write?' % num_changed_fields)
     if choice == 'yes':
         sheet.write_back()
         print('Wrote %d genres' % num_changed_fields)
@@ -188,6 +192,7 @@ def fill_in_genres(
 
 
 def fix_boolean_attributes(
+        batch_mode,
         rekordbox_state: library_organizer.RekordboxState,
         sheet: google_sheet.GoogleSheet
 ):
@@ -212,7 +217,7 @@ def fix_boolean_attributes(
         print("    '%s'" % attribute)
     print('Detected last set row: %d' % last_set_row)
 
-    reply = get_user_choice('Fix?')
+    reply = get_user_choice(batch_mode, 'Fix?')
 
     if reply == 'no':
         print('Aborting')

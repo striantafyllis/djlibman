@@ -6,7 +6,6 @@ import library_organizer
 import rekordbox
 import google_sheet
 import cli
-import new_cli
 
 def main():
     parser = argparse.ArgumentParser(
@@ -40,22 +39,13 @@ def main():
 
     library_organizer.reconcile_sheet_with_rekordbox(batch_mode, sheet, rekordbox_state)
 
-    if use_new:
-        new_cli.cli_loop(
-            batch_mode,
-            sys.stdin,
-            rekordbox_state,
-            sheet,
-            playlist_dir
-        )
-    else:
-        cli.cli_loop(
-            batch_mode,
-            sys.stdin,
-            rekordbox_state,
-            sheet,
-            playlist_dir
-        )
+    cli.cli_loop(
+        batch_mode,
+        sys.stdin,
+        rekordbox_state,
+        sheet,
+        playlist_dir
+    )
 
     return 0
 

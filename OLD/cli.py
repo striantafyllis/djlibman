@@ -251,7 +251,7 @@ def handle_streaming_create_playlist(
 
     if len(tokens) >= 1 and tokens[0].upper() == 'FROM':
         if len(tokens) >= 2:
-            if len(tokens) == 2 and tokens[1] == 'QUERY':
+            if len(tokens) == 2 and tokens[1].upper() == 'QUERY':
                 if tracklist is None:
                     raise Exception('No previous query')
                 tracklist_to_write = tracklist
@@ -281,11 +281,18 @@ def handle_streaming_create_playlist(
 
     streaming_track_uris = []
     for track in tracklist_to_write:
-        sheet_track = sheet.get_track_by_foreign_id('Rekordbox', track.id)
-        if sheet_track is not None:
-            service_id = sheet_track.get(service.name() + ' ID')
-            if service_id is not None and service_id != '' and service_id != 'NOT FOUND':
-                streaming_track_uris.append(service_id)
+        service_id_field = service.name() + ' ID'
+        if service_id_field in track:
+            service_id = track.get(service_id_field)
+        else:
+            sheet_track = sheet.get_track_by_foreign_id('Rekordbox', track.id)
+            if sheet_track is not None:
+                service_id = sheet_track.get(service_id_field)
+            else:
+                service_id = None
+
+        if service_id is not None and service_id != '' and service_id != 'NOT FOUND':
+            streaming_track_uris.append(service_id)
 
     print("Writing %d tracks to %s playlist '%s' (%d tracks omitted because of missing %s URIs)" % (
       len(streaming_track_uris),
@@ -538,7 +545,7 @@ def cli_loop(
                 continue
 
             if len(tokens) == 2 and tokens[0].upper() == 'RUN':
-                filename = tokens[2]
+                filename = tokens[1]
                 if filename[0] == "'":
                     filename = filename[1:-1]
 
@@ -561,10 +568,10 @@ def cli_loop(
                     )
                 finally:
                     script_fh.close()
+                continue
 
             if len(tokens) == 4 and list(map(lambda x: x.upper(), tokens[:3])) == ['WRITE', 'M3U', 'PLAYLIST']:
                 handle_write_playlist_cmd(rekordbox_state, tokens[3], playlist_dir, tracklist)
-                tracklist = None
                 continue
 
             if tokens[0].upper() == 'SHOW':
@@ -594,8 +601,8 @@ def cli_loop(
             else:
                 tracklist = eval_query(rekordbox_state, sheet, tokens)
 
-            for track in tracklist:
-                print('%s \u2013 %s' % (track.artist_orig, track.title))
+            for num, track in enumerate(tracklist):
+                print('%d: %s' % (num+1, track))
             print('(%d tracks)' % len(tracklist))
         except Exception as e:
             sys.stdout.flush()

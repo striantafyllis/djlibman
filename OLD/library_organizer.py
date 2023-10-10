@@ -245,13 +245,18 @@ def write_m3u_playlist(
     playlist_file.write('#EXTM3U\n')
 
     for track in tracklist:
+        if not isinstance(track, rekordbox.RekordboxTrack):
+            track = rekordbox_state.collection.get_track_by_id(track['Rekordbox ID'])
+            if track is None:
+                print('WARNING: Skipping track %s; no Rekordbox ID' % track)
+                continue
         playlist_file.write('#EXTINF:%d,%s \u2013 %s\n' % (
             track['Duration'],
             track['Artists'],
             track.title
         ))
 
-        location = track.location
+        location = track['Location']
         if location.startswith('file://localhost'):
             location = urllib.parse.unquote(location[16:])
 

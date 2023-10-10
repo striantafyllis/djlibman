@@ -20,14 +20,10 @@ def query_playlists(
 
     tracklist = []
 
-    for track in rekordbox_state.main_library.tracks:
-        # TODO this should not be necessary if sanity checks have passed
-        if track.track_info is None:
-            continue
-
-        track_playlists = track.track_info.attributes['Playlists']
+    for track in sheet:
+        track_playlists = track.get('Playlists')
         if track_playlists is None or track_playlists == '':
-            print('WARNING: Track with no playlists: %s \u2013 %s' % (track.artist_orig, track.title))
+            print('WARNING: Track with no playlists: %' % track)
             continue
 
         track_playlists = track_playlists.split(',')

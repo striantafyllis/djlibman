@@ -91,6 +91,9 @@ class Library(Tracklist):
                     self.attribute_types[attribute] = float
                 elif expected_type == float and isinstance(value, int):
                     pass
+                elif attribute == 'Artists' and isinstance(value, int):
+                    # some tracks have this problem for some reason
+                    pass
                 else:
                     raise Exception("Track %s attribute %s has value %s type %s; expected type %s" % (
                         track,

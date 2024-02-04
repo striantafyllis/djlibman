@@ -10,6 +10,34 @@ import google_sheet
 from utils import *
 import library_organizer
 
+def query_flavors(
+        rekordbox_state: library_organizer.RekordboxState,
+        sheet: google_sheet.GoogleSheet,
+        flavor,
+        min_bpm,
+        max_bpm
+):
+    flavor = flavor.upper()
+    min_bpm = float(min_bpm)
+    max_bpm = float(max_bpm)
+
+    tracklist = []
+
+    for track in sheet:
+        track_flavors = track.get('Flavors')
+        if track_flavors is None or track_flavors == '':
+            # print('WARNING: Track with no flavors: %' % track)
+            continue
+
+        track_flavors = track_flavors.split(',')
+        track_flavors = [p.strip().upper() for p in track_flavors]
+
+        track_bpm = track.get('BPM')
+
+        if flavor in track_flavors and track_bpm >= min_bpm and track_bpm <= max_bpm:
+            tracklist.append(track)
+
+    return tracklist
 
 def query_playlists(
         rekordbox_state: library_organizer.RekordboxState,

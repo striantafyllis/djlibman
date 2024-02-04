@@ -6,9 +6,9 @@ import re
 from data_model import *
 from utils import *
 
-
-default_playlist_dir = '/Users/spyros/Music/'
-default_rekordbox_xml = default_playlist_dir + 'rekordbox.xml'
+default_music_dir = '/Users/spyros/Music/'
+default_playlist_dir = default_music_dir + 'playlists/'
+default_rekordbox_xml = default_music_dir + 'rekordbox.xml'
 
 # Rename some Rekordbox attributes that are obscurely named so that they agree with the Google sheet
 _attrib_rename = {
@@ -24,7 +24,7 @@ _attrib_rename = {
 class RekordboxTrack(Track):
     def __init__(self, attributes):
         id = attributes['Rekordbox ID']
-        artists = frozenset(re.split(r' *[,&] *', attributes['Artists']))
+        artists = frozenset(re.split(r' *[,&] *', str(attributes['Artists'])))
         title = attributes['Title']
         super(RekordboxTrack, self).__init__(id, artists, title, attributes)
         return

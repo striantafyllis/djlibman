@@ -20,7 +20,7 @@ class RekordboxState:
     playlists: dict[str, Playlist]
     main_library: Playlist
     second_look: Playlist
-    backlog: Playlist
+    back_catalog: Playlist
     other: Playlist
 
     def __init__(self,
@@ -31,7 +31,7 @@ class RekordboxState:
 
         self.main_library = playlists.get('Main Library')
         self.second_look = playlists.get('second look')
-        self.backlog = playlists.get('backlog')
+        self.back_catalog = playlists.get('back catalog')
         self.other = playlists.get('other / non-house')
         return
 
@@ -55,10 +55,10 @@ def rekordbox_stats(rekordbox_state: RekordboxState):
     else:
         print('  Second look tracks: %d' % len(rekordbox_state.second_look))
 
-    if rekordbox_state.backlog is None:
-        sys.stderr.write("  WARNING: No 'backlog' playlist")
+    if rekordbox_state.back_catalog is None:
+        sys.stderr.write("  WARNING: No 'back catalog' playlist")
     else:
-        print('  Backlog tracks: %d' % len(rekordbox_state.backlog))
+        print('  Back catalog tracks: %d' % len(rekordbox_state.back_catalog))
 
     if rekordbox_state.other is None:
         sys.stderr.write("  WARNING: No 'other / non-house' playlist")
@@ -74,8 +74,8 @@ def rekordbox_sanity_checks(rekordbox_state):
             containing_playlists.append('Main Library')
         if track in rekordbox_state.second_look:
             containing_playlists.append('second look')
-        if track in rekordbox_state.backlog:
-            containing_playlists.append('backlog')
+        if track in rekordbox_state.back_catalog:
+            containing_playlists.append('back catalog')
         if track in rekordbox_state.other:
             containing_playlists.append('other / non-house')
 

@@ -511,12 +511,12 @@ def cli_loop(
 
         query_text = query_text.strip()
 
-        tokens = tokenize(query_text)
-
-        if len(tokens) == 0:
-            continue
-
         try:
+            tokens = tokenize(query_text)
+
+            if len(tokens) == 0:
+                continue
+
             if len(tokens) == 1 and tokens[0].upper() in ['Q', 'X', 'QUIT', 'EXIT']:
                 break
 

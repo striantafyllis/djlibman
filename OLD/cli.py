@@ -30,7 +30,7 @@ def tokenize(text):
         # - integers
         # - single-quoted strings
         # - double-quoted strings
-        m = re.match(r"\(|\)|==|!=|<=|>=|<|>|&|\||[A-Za-z_][A-Za-z_0-9]*|[1-9][0-9]*|'[^']*'|\"[^\"]*\"", text)
+        m = re.match(r"\(|\)|==|!=|<=|>=|<|>|&|\||[A-Za-z_][A-Za-z_0-9]*|0|[1-9][0-9]*|'[^']*'|\"[^\"]*\"", text)
         if m:
             tokens.append(m.group(0))
             text = text[m.end():]

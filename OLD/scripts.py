@@ -10,6 +10,38 @@ import google_sheet
 from utils import *
 import library_organizer
 
+valid_classes = ['A', 'B', 'C', 'X']
+
+def query_class(
+        rekordbox_state: library_organizer.RekordboxState,
+        sheet: google_sheet.GoogleSheet,
+        classes,
+        min_bpm=None,
+        max_bpm=None
+):
+    classes = classes.upper()
+    min_bpm = float(min_bpm) if min_bpm is not None else None
+    max_bpm = float(max_bpm) if max_bpm is not None else None
+
+    tracklist = []
+
+    for track in sheet:
+        track_class = track.get('Class')
+        if track_class not in valid_classes:
+            print("WARNING: Track with invalid class '%s': %s" % (track_class, track))
+            continue
+
+        track_bpm = track.get('BPM')
+
+        if (track_class in classes and
+                (min_bpm is None or track_bpm >= min_bpm) and
+                (max_bpm is None or track_bpm <= max_bpm)):
+            tracklist.append(track)
+
+    return tracklist
+
+
+
 def query_flavors(
         rekordbox_state: library_organizer.RekordboxState,
         sheet: google_sheet.GoogleSheet,

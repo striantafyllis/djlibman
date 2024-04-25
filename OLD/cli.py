@@ -14,6 +14,7 @@ import google_sheet
 from streaming_service import StreamingService
 from utils import *
 import scripts
+import random
 
 
 def tokenize(text):
@@ -124,6 +125,10 @@ def handle_streaming_service_cmd(
 
     if len(tokens) >= 2 and tokens[0].upper() == 'CREATE' and tokens[1].upper() == 'PLAYLIST':
         handle_streaming_create_playlist(batch_mode, service, tokens[2:], rekordbox_state, sheet, tracklist)
+        return
+
+    if len(tokens) >= 2 and tokens[0].upper() == 'SHUFFLE' and tokens[1].upper() == 'PLAYLIST':
+        handle_streaming_shuffle_playlist(batch_mode, service, tokens[2:], rekordbox_state, sheet, tracklist)
         return
 
     if tokens[0].upper() == 'PLAYLIST':
@@ -382,6 +387,66 @@ def handle_streaming_create_playlist(
         len(streaming_track_uris),
         service.name(),
         streaming_playlist_name))
+
+
+# (SPOTIFY|YOUTUBE) CREATE PLAYLIST (FROM (QUERY|REKORDBOX? PLAYLIST <playlist name>))
+def handle_streaming_shuffle_playlist(
+        batch_mode: bool,
+        service: StreamingService,
+        tokens: list[str],
+        rekordbox_state: library_organizer.RekordboxState,
+        sheet: google_sheet.GoogleSheet,
+        tracklist: Tracklist
+):
+    if len(tokens) != 1:
+        raise Exception('Malformed %s SHUFFLE PLAYLIST command' % service.name())
+
+    playlist_name = tokens[0]
+
+    if playlist_name.startswith('"') or playlist_name.startswith("'"):
+        playlist_name = playlist_name[1:-1]
+
+    # get existing tracks
+    playlists = service.get_playlists()
+
+    playlist_uri = playlists.get(playlist_name)
+
+    if playlist_uri is None:
+        raise Exception("%s playlist '%s' does not exist" % (service.name(), playlist_name))
+
+    playlist_tracks = service.get_playlist_tracks(playlist_uri)
+
+    playlist_track_ids = [track.id for track in playlist_tracks]
+
+    random.shuffle(playlist_track_ids)
+
+    new_playlist_name_base = playlist_name + ' - shuffled'
+    i = 1
+
+    while True:
+        new_playlist_name = '%s - %d' % (new_playlist_name_base, i) if i > 1 else new_playlist_name_base
+
+        new_playlist_uri = playlists.get(new_playlist_name)
+        if new_playlist_uri is None:
+            break
+
+        i += 1
+
+    new_playlist_uri = service.create_playlist(new_playlist_name)
+    print("Created %s playlist '%s' - URI %s" % (
+        service.name(),
+        new_playlist_name,
+        new_playlist_uri))
+
+    service.add_tracks_to_playlist(new_playlist_uri, playlist_track_ids)
+
+    print("Added %d tracks to %s playlist '%s'" % (
+        len(playlist_track_ids),
+        service.name(),
+        new_playlist_name))
+
+    return
+
 
 # SHOW
 #     REKORDBOX? PLAYLISTS

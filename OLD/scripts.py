@@ -7,10 +7,45 @@ Each script function takes as arguments:
 """
 
 import google_sheet
-from utils import *
+from OLD.utils import *
 import library_organizer
 
 valid_classes = ['A', 'B', 'C', 'X']
+
+def query_mix_13(
+        rekordbox_state: library_organizer.RekordboxState,
+        sheet: google_sheet.GoogleSheet
+):
+    # playlist: exuberance
+    # class: A or B
+    # BPM: >= 110
+
+    tracklist = []
+
+    for track in sheet:
+        track_playlists = track.get('Playlists')
+        if track_playlists is None or track_playlists == '':
+            print('WARNING: Track with no playlists: %' % track)
+            continue
+
+        track_playlists = track_playlists.split(',')
+        track_playlists = [p.strip().upper() for p in track_playlists]
+
+        if 'EXUBERANCE' not in track_playlists:
+            continue
+
+        track_class = track.get('Class')
+        if track_class not in ('A', 'B'):
+            continue
+
+        track_bpm = track.get('BPM')
+        if track_bpm < 110:
+            continue
+
+        tracklist.append(track)
+
+    return tracklist
+
 
 def query_class(
         rekordbox_state: library_organizer.RekordboxState,

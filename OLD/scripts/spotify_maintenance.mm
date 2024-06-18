@@ -14,3 +14,5 @@ spotify create playlist 'DJ A 100' from rekordbox playlist 'Classes/A 100'
 spotify create playlist 'DJ B 100' from rekordbox playlist 'Classes/B 100'
 
 spotify create playlist 'DJ AB 100' from rekordbox playlist 'Classes/AB 100'
+
+spotify create playlist 'recent' from rekordbox playlist 'recent'

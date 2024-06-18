@@ -12,7 +12,7 @@ import library_organizer
 import rekordbox
 import google_sheet
 from streaming_service import StreamingService
-from utils import *
+from OLD.utils import *
 import scripts
 import random
 
@@ -22,7 +22,7 @@ def tokenize(text):
 
     while text != '':
         # eat whitespace
-        m = re.match('\s*', text)
+        m = re.match(r'\s*', text)
         text = text[m.end():]
 
         # match:

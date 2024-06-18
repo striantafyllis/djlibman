@@ -26,6 +26,6 @@ write m3u playlist 'AB 100'
 query query_class CX 0 110
 write m3u playlist 'CX 100'
 
-query query_class ABCX 110
+query query_class ABCX 0 110
 write m3u playlist 'ALL 100'
 

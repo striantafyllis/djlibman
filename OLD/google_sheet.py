@@ -1,8 +1,5 @@
-
-import sys
 import os.path
 import re
-from datetime import date
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -12,7 +9,7 @@ from googleapiclient.discovery import build
 from google.auth.exceptions import RefreshError
 
 from data_model import *
-from utils import *
+from OLD.utils import *
 
 SCOPES = ['https://www.googleapis.com/auth/drive']
 

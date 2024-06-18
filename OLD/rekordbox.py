@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 import re
 
 from data_model import *
-from utils import *
+from OLD.utils import *
 
 default_music_dir = '/Users/spyros/Music/'
 default_playlist_dir = default_music_dir + 'playlists/'

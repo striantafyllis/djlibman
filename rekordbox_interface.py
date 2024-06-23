@@ -4,7 +4,6 @@ import xml.etree.ElementTree as ET
 import os.path
 import sys
 
-import pandas
 import pandas as pd
 
 from internal_utils import *
@@ -23,12 +22,14 @@ class RekordboxInterface:
     def __init__(self, config):
         self._rekordbox_xml = config['rekordbox_xml']
         self._playlist_dir = config['playlist_dir']
+        self._last_read_version = None
+        self._collection = None
+        self._playlists = None
 
-        self._parse()
         return
 
     def _refresh(self):
-        if os.path.getmtime(self._rekordbox_xml) > self._last_read_version:
+        if self._last_read_version is None or os.path.getmtime(self._rekordbox_xml) > self._last_read_version:
             self._parse()
 
         return
@@ -52,7 +53,7 @@ class RekordboxInterface:
             elif child.tag == 'PLAYLISTS':
                 assert self._playlists is None
                 assert self._collection is not None
-                playlists = _parse_playlists(child)
+                self._playlists = _parse_playlists(child)
             else:
                 sys.stderr.write('WARNING: Unprocessed child: COLLECTION -> %s\n' % child.tag)
 
@@ -67,7 +68,7 @@ class RekordboxInterface:
 
     def get_playlist_names(self):
         self._refresh()
-        return self._playlists.keys()
+        return list(self._playlists.keys())
 
     def get_playlist_track_ids(self, playlist_name):
         self._refresh()
@@ -88,7 +89,7 @@ def _parse_collection(node: ET.Element):
         if child.tag == 'TRACK':
             track = {
                 _attrib_rename.get(key, key): value
-                for key, value in node.attrib.items()
+                for key, value in child.attrib.items()
             }
             collection.append(track)
         else:
@@ -101,7 +102,7 @@ def _parse_collection(node: ET.Element):
         for key, value in collection_columnar.items()
     }
 
-    return pandas.DataFrame(collection_columnar_typed, index=collection_columnar_typed['TrackID'])
+    return pd.DataFrame(collection_columnar_typed, index=collection_columnar_typed['TrackID'])
 
 
 def _parse_playlists(node: ET.Element):

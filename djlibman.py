@@ -10,6 +10,7 @@ import code
 import time
 
 import google_interface
+import rekordbox_interface
 import spotify_interface
 
 import pandas as pd
@@ -26,9 +27,9 @@ def quit():
 
 class Context:
     def __init__(self):
+        self.rekordbox = None
         self.google = None
         self.spotify = None
-        self.rekordbox = None
         self.docs = {}
         return
 
@@ -118,6 +119,9 @@ def main():
 
     ctx = Context()
 
+    if 'rekordbox' in config.sections():
+        ctx.rekordbox = rekordbox_interface.RekordboxInterface(config['rekordbox'])
+
     if 'google' in config.sections():
         ctx.google = google_interface.GoogleInterface(config['google'])
 
@@ -157,8 +161,9 @@ def main():
     # add ctx itself, plus google, rekordbox and spotify; note that any docs with
     # conflicting names will be overwritten
     shell_locals['ctx'] = ctx
+    shell_locals['rekordbox'] = ctx.rekordbox
     shell_locals['google'] = ctx.google
-    # TODO add spotify, rekordbox etc.
+    shell_locals['spotify'] = ctx.spotify
 
     # finally, add all the globals; this gives us all the functions etc.
     # notice again that any conflicting document names will be overwritten

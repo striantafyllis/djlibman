@@ -5,13 +5,13 @@ import pandas as pd
 def list_of_dicts_to_dict_of_lists(list_of_dicts):
     dict_of_lists = {}
 
-    for i, dct in list_of_dicts.enumerate():
+    for i, dct in enumerate(list_of_dicts):
         for key, value in dct.items():
             lst = dict_of_lists.get(key)
             if lst is None:
                 lst = [None] * i
                 dict_of_lists[key] = lst
-            lst.add(value)
+            lst.append(value)
 
     return dict_of_lists
 

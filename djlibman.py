@@ -32,11 +32,11 @@ class Context:
         self.docs = {}
         return
 
-    def add_google_sheet(self, names, id, page, has_header=False, column_types = {}):
+    def add_google_sheet(self, names, id, page, has_header=False):
         if self.google is None:
             raise Exception("Cannot add Google sheet '%s'; no Google connection specified" % names[0])
 
-        doc = google_interface.GoogleSheet(self.google, id, page, has_header, column_types)
+        doc = google_interface.GoogleSheet(self.google, id, page, has_header)
 
         for name in names:
             if name in self.docs:
@@ -44,36 +44,6 @@ class Context:
             self.docs[name] = doc
 
         return
-
-def get_column_types(config):
-    column_types = {}
-
-    for key in config:
-        if key.startswith('type.'):
-            column_name = key[5:]
-
-            type_name = config[key]
-
-            if type_name.upper() in ['INT', 'INTEGER']:
-                type = int
-            elif type_name.upper() in ['FLOAT', 'DOUBLE']:
-                type = float
-            elif type_name.upper() in ['BOOL', 'BOOLEAN']:
-                type = bool
-            elif type_name.upper() == 'LIST':
-                type = list
-            elif type_name.upper() in ['DATE', 'TIMESTAMP']:
-                type = pd.Timestamp
-            else:
-                raise Exception("Unrecognized type name '%s'" % type_name)
-
-            if column_name in column_types:
-                raise Exception("Duplicate column type: '%s'" % column_name)
-
-            column_types[column_name] = type
-
-    return column_types
-
 
 def python_shell(shell_locals):
     global should_quit
@@ -155,7 +125,7 @@ def main():
         ctx.spotify = spotify_interface.SpotifyInterface(config['spotify'])
 
     for section_name in config.sections():
-        if section_name in ['google', 'spotify']:
+        if section_name in ['google', 'spotify', 'rekordbox']:
             continue
         elif section_name.startswith('docs.'):
             section = config[section_name]
@@ -169,9 +139,8 @@ def main():
                 id = section['id']
                 page = section['page']
                 has_header = section.getboolean('header')
-                column_types = get_column_types(section)
 
-                ctx.add_google_sheet(names, id, page, has_header, column_types)
+                ctx.add_google_sheet(names, id, page, has_header)
             else:
                 raise Exception("Unsupported doc type: '%s'" % type)
 

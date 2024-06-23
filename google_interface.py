@@ -11,6 +11,8 @@ from googleapiclient.discovery import build
 # from googleapiclient.errors import HttpError
 from google.auth.exceptions import RefreshError
 
+from internal_utils import *
+
 _SCOPES = 'https://www.googleapis.com/auth/drive'
 
 
@@ -71,12 +73,11 @@ class GoogleInterface:
         return self._connection
 
 class GoogleSheet:
-    def __init__(self, interface, id, page, has_header=False, column_types = {}):
+    def __init__(self, interface, id, page, has_header=False):
         self._interface = interface
         self._id = id
         self._page = page
         self._has_header = has_header
-        self._column_types = column_types
         return
 
     def read(self):
@@ -105,18 +106,10 @@ class GoogleSheet:
         else:
             column_names = [_col_num_to_alpha(col_num) for col_num in range(num_columns)]
 
-        # a bit of a mess here because config column names come out in lowercase
-        column_names_lower = [column_name.lower() for column_name in column_names]
-        for column_name in self._column_types:
-            if column_name not in column_names_lower:
-                raise Exception("Google sheet '%s' page '%s': column '%s' has a declared type but is not present in header" %
-                                (self._id, self._page, column_name))
-
         columns = {}
 
         for col_num in range(num_columns):
             column_name = column_names[col_num]
-            column_type = self._column_types.get(column_name.lower())
             column_values = [None] * num_rows
 
             for row_num in range(num_rows):
@@ -125,21 +118,9 @@ class GoogleSheet:
                     continue
 
                 value = row[col_num]
+                column_values[row_num] = value if value != '' else None
 
-                if column_type is not None:
-                    if column_type == list:
-                        value = [s.strip() for s in value.split(',')]
-                    else:
-                        try:
-                            value = column_type(value)
-                        except ValueError:
-                            raise Exception(
-                                "Google sheet '%s' page '%s' column %s row %d: value '%s'; expected %s" %
-                                (self._id, self._page, column_name, row_num, value, column_type))
-
-                column_values[row_num] = value
-
-            columns[column_name] = pd.Series(column_values)
+            columns[column_name] = infer_type(column_values)
 
         df = pd.DataFrame(data=columns)
 

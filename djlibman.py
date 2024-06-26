@@ -14,7 +14,9 @@ import google_interface
 import rekordbox_interface
 import spotify_interface
 
-import pandas as pd
+# we want all utils and scripts to be available in the user python shell
+from utils import *
+from scripts import *
 
 def test_func():
     print('Test')

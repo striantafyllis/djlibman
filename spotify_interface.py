@@ -14,8 +14,13 @@ _SCOPES = [
     'playlist-read-private',
     'playlist-read-collaborative',
     'playlist-modify-private',
-    'playlist-modify-public'
+    'playlist-modify-public',
+    'user-library-read',
+    'user-library-modify',
+    'user-read-recently-played'
 ]
+
+BASE_62 = re.compile(r'^[0-9A-Za-z]$')
 
 class SpotifyInterface:
     def __init__(self, config):
@@ -24,16 +29,9 @@ class SpotifyInterface:
         self._redirect_uri = config['redirect_uri']
         self._cached_token_file = config['cached_token_file']
 
-        # the connection will be initialized when it's first used
-        self._connection = None
-
-    def _init_connection(self):
-        if self._connection is not None:
-            return
-
-        scope = ','.join(_SCOPES)
-
-        self._connection = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope,
+        # this just creates the wrapper object; the actual network connection
+        # will be initialized when we first try to use it
+        self._connection = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=','.join(_SCOPES),
                                                             cache_path=self._cached_token_file,
                                                             client_id=self._client_id,
                                                             client_secret=self._client_secret,
@@ -41,20 +39,66 @@ class SpotifyInterface:
 
         return
 
+
     def get_connection(self):
         """Provides access to the raw Spotify interface. When possible, use one of the
         accessors below, which will also convert the results to Pandas DataFrames."""
-        self._init_connection()
         return self._connection
 
+    def _results_wrapper(self, query, item_key=None, index=None):
+        result = query
+        items = result['items']
+
+        while result['next']:
+            result = self._connection.next(result)
+            items += result['items']
+
+        if item_key is not None:
+            items = [item[item_key] for item in items]
+
+        df = pd.DataFrame.from_records(items)
+
+        if index is not None:
+            df = df.set_index(index, drop=False)
+
+        return df
+
     def get_playlists(self):
-        self._init_connection()
+        return self._results_wrapper(
+            self._connection.current_user_playlists(),
+            index='name')
 
-        results = self._connection.current_user_playlists()
-        playlists = results['items']
+    def get_playlist_tracks(self, playlist_name_or_id):
+        # Spotify playlist IDs are base-62 numbers and they are usually about 22 digits long
+        if len(playlist_name_or_id) > 20 and BASE_62.match(playlist_name_or_id):
+            playlist_id = playlist_name_or_id
+        else:
+            # the string is a playlist name
+            playlists = self.get_playlists()
 
-        while results['next']:
-            results = self._connection.next(results)
-            playlists.append(results['items'])
+            if playlist_name_or_id not in playlists.index:
+                raise Exception("Spotify playlist '%s' not found" % playlist_name_or_id)
 
-        return pd.DataFrame.from_records(playlists)
+            playlist_id = playlists.at[playlist_name_or_id, 'id']
+
+        df = self._results_wrapper(
+            self._connection.playlist_items(playlist_id),
+            item_key='track',
+            index='id')
+
+        # add artist names for convenience
+        df['artist_names'] = df.artists.apply(lambda artists: [artist['name'] for artist in artists])
+
+        return df
+
+    def get_liked_tracks(self):
+        df = self._results_wrapper(
+            self._connection.current_user_saved_tracks(),
+            item_key='track',
+            index='id')
+
+        # add artist names for convenience
+        df['artist_names'] = df.artists.apply(lambda artists: [artist['name'] for artist in artists])
+
+        return df
+

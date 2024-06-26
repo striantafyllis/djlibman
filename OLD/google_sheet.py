@@ -281,8 +281,8 @@ def parse_sheet(spreadsheet_id = DEFAULT_SPREADSHEET_ID, page = DEFAULT_SPREADSH
         artists_orig = attributes['Artists']
         title = attributes['Title']
         if artists_orig is None or title is None:
-            sys.stderr.write('Row %d: Missing artists or title\n' % (row_num+1))
-            num_errors += 1
+            # sys.stderr.write('Row %d: Missing artists or title\n' % (row_num+1))
+            # num_errors += 1
             continue
 
         artists = frozenset(re.split(r' *[,&] *', artists_orig))

@@ -73,11 +73,11 @@ class GoogleInterface:
         return self._connection
 
 class GoogleSheet:
-    def __init__(self, interface, id, page, has_header=False):
+    def __init__(self, interface, config):
         self._interface = interface
-        self._id = id
-        self._page = page
-        self._has_header = has_header
+        self._id = config["id"]
+        self._page = config["page"]
+        self._has_header = config.getboolean('header')
         return
 
     def read(self):

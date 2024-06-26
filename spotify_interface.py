@@ -3,13 +3,16 @@ import re
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
-_MAX_TRACKS_PER_REQUEST = 100
+import pandas as pd
+import numpy as np
+
+_MAX_ITEMS_PER_REQUEST = 50
 
 _SCOPES = [
-    # 'user-library-read',
+    'user-library-read',
     'user-library-modify',
-    # 'playlist-read-private',
-    # 'playlist-read-collaborative',
+    'playlist-read-private',
+    'playlist-read-collaborative',
     'playlist-modify-private',
     'playlist-modify-public'
 ]
@@ -38,5 +41,20 @@ class SpotifyInterface:
 
         return
 
+    def get_connection(self):
+        """Provides access to the raw Spotify interface. When possible, use one of the
+        accessors below, which will also convert the results to Pandas DataFrames."""
+        self._init_connection()
+        return self._connection
 
+    def get_playlists(self):
+        self._init_connection()
 
+        results = self._connection.current_user_playlists()
+        playlists = results['items']
+
+        while results['next']:
+            results = self._connection.next(results)
+            playlists.append(results['items'])
+
+        return pd.DataFrame.from_records(playlists)

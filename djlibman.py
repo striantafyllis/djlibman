@@ -9,6 +9,7 @@ import readline
 import code
 import time
 
+import file_interface
 import google_interface
 import rekordbox_interface
 import spotify_interface
@@ -33,18 +34,10 @@ class Context:
         self.docs = {}
         return
 
-    def add_google_sheet(self, names, id, page, has_header=False):
-        if self.google is None:
-            raise Exception("Cannot add Google sheet '%s'; no Google connection specified" % names[0])
-
-        doc = google_interface.GoogleSheet(self.google, id, page, has_header)
-
-        for name in names:
-            if name in self.docs:
-                raise Exception("Duplicate doc name: '%s'" % name)
-            self.docs[name] = doc
-
-        return
+    def add_doc(self, name, doc):
+        if name in self.docs:
+            raise Exception("Duplicate doc name: '%s'" % name)
+        self.docs[name] = doc
 
 def python_shell(shell_locals):
     global should_quit
@@ -133,18 +126,17 @@ def main():
             continue
         elif section_name.startswith('docs.'):
             section = config[section_name]
-            names = [section_name[5:]]
-            if 'name' in section:
-                names.append(section['name'])
+            name = section_name[5:]
 
             type = section['type']
 
             if type == 'google_sheet':
-                id = section['id']
-                page = section['page']
-                has_header = section.getboolean('header')
+                if ctx.google is None:
+                    raise Exception("Cannot add Google sheet '%s'; no Google connection specified" % name)
 
-                ctx.add_google_sheet(names, id, page, has_header)
+                ctx.add_doc(name, google_interface.GoogleSheet(ctx.google, section))
+            elif type == 'excel':
+                ctx.add_doc(name, file_interface.ExcelSheet(section))
             else:
                 raise Exception("Unsupported doc type: '%s'" % type)
 

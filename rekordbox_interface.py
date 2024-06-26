@@ -22,20 +22,20 @@ class RekordboxInterface:
     def __init__(self, config):
         self._rekordbox_xml = config['rekordbox_xml']
         self._playlist_dir = config['playlist_dir']
-        self._last_read_version = None
+        self._last_read_time = None
         self._collection = None
         self._playlists = None
 
         return
 
     def _refresh(self):
-        if self._last_read_version is None or os.path.getmtime(self._rekordbox_xml) > self._last_read_version:
+        if self._last_read_time is None or os.path.getmtime(self._rekordbox_xml) > self._last_read_time:
             self._parse()
 
         return
 
     def _parse(self):
-        self._last_read_version = os.path.getmtime(self._rekordbox_xml)
+        self._last_read_time = os.path.getmtime(self._rekordbox_xml)
 
         self._collection = None
         self._playlists = None

@@ -6,6 +6,8 @@ from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
 import numpy as np
 
+from internal_utils import *
+
 _MAX_ITEMS_PER_REQUEST = 50
 
 _SCOPES = [
@@ -17,6 +19,45 @@ _SCOPES = [
     'playlist-modify-public',
     'user-read-recently-played'
 ]
+
+_ARTIST_COLUMNS = ['id', 'name']
+
+_ALBUM_COLUMNS = {
+        'id': None,
+        'name': None,
+        'album_type': None,
+        'release_date': lambda item: pd.to_datetime(item['release_date'], utc=True),
+        'artists': _ARTIST_COLUMNS
+    }
+
+_TRACK_COLUMNS = {
+    'id': None,
+    'name': None,
+    'artists': _ARTIST_COLUMNS,
+    'duration_ms': None,
+    'popularity': None,
+    'added_at': lambda item: pd.to_datetime(
+        item['played_at'] if 'played_at' in item else item['added_at'],
+        utc=True),
+    'added_by': lambda item: item['added_by']['id'] if 'added_by' in item else None,
+    'album': _ALBUM_COLUMNS,
+    'disc_number': None,
+    'track_number': None,
+    # ignored columns from Spotify:
+    # 'is_local',
+    # 'primary_color',
+    # 'video_thumbnail',
+    # 'preview_url',
+    # 'available_markets',
+    # 'explicit',
+    # 'type',
+    # 'episode',
+    # 'track',
+    # 'external_ids',
+    # 'external_urls',
+    # 'href',
+    # 'uri'
+}
 
 BASE_62 = re.compile(r'^[0-9A-Za-z]+$')
 
@@ -92,15 +133,8 @@ def _postprocess_tracks(results):
         del result['track']
         result.update(track_fields)
 
-        # add artist names for convenience
-        result['artist_names'] = [artist['name'] for artist in result['artists']]
-
-        # convert timestamps
-        for field in ['added_at', 'played_at']:
-            if field in result:
-                result[field] = pd.to_datetime(result[field])
-
-    return results
+    projection = project(results, _TRACK_COLUMNS)
+    return projection
 
 
 class SpotifyInterface:
@@ -126,11 +160,14 @@ class SpotifyInterface:
         accessors below, which will also convert the results to Pandas DataFrames."""
         return self._connection
 
-    def get_playlists(self, start=0, stop=None, stop_condition=None):
+    def get_playlists(self, start=0, stop=None, stop_condition=None, raw=False):
         results = _batch_result(
             lambda limit, offset: self._connection.current_user_playlists(limit, offset),
             start, stop, stop_condition
         )
+
+        if raw:
+            return results
 
         df = pd.DataFrame.from_records(results)
         df = df.set_index(df.name)
@@ -152,7 +189,7 @@ class SpotifyInterface:
         return playlists.at[playlist_name_or_id, 'id']
 
     def get_playlist_tracks(self, playlist_name_or_id, start=0, stop=None, stop_condition=None,
-                            up_to_track=None):
+                            up_to_track=None, raw=False):
         if up_to_track is not None:
             assert stop is None
             stop_condition = lambda item: item['track']['name'] == up_to_track
@@ -166,34 +203,43 @@ class SpotifyInterface:
             ),
             start, stop, stop_condition)
 
-        _postprocess_tracks(results)
+        if raw:
+            return results
+
+        results = _postprocess_tracks(results)
 
         df = pd.DataFrame.from_records(results)
         df = df.set_index(df.id)
 
         return df
 
-    def get_liked_tracks(self, start=0, stop=None, stop_condition=None):
+    def get_liked_tracks(self, start=0, stop=None, stop_condition=None, raw=False):
         results = _batch_result(
             lambda limit, offset: self._connection.current_user_saved_tracks(
                 limit=limit, offset=offset
             ),
             start, stop, stop_condition)
 
-        _postprocess_tracks(results)
+        if raw:
+            return results
+
+        results = _postprocess_tracks(results)
 
         df = pd.DataFrame.from_records(results)
         df = df.set_index(df.id)
 
         return df
 
-    def get_recently_played_tracks(self):
+    def get_recently_played_tracks(self, raw=False):
         """Access the last played tracks, up to 50; Spotify doesn't give us access to more."""
         result = self._connection.current_user_recently_played()
 
         results = result['items']
 
-        _postprocess_tracks(results)
+        if raw:
+            return results
+
+        results = _postprocess_tracks(results)
 
         df = pd.DataFrame.from_records(results)
         df = df.set_index(df.id)

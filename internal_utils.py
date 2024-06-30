@@ -2,6 +2,38 @@
 import numpy as np
 import pandas as pd
 
+
+def project(table, projection):
+    if isinstance(table, list):
+        return [project(row, projection) for row in table]
+
+    if isinstance(table, dict):
+        row = table
+
+        result_dict = {}
+
+        if isinstance(projection, dict):
+            for key, value_func in projection.items():
+                if value_func is None:
+                    value = row[key]
+                elif callable(value_func):
+                    value = value_func(row)
+                elif isinstance(value_func, dict) or isinstance(value_func, list):
+                    value = project(row[key], value_func)
+                else:
+                    value = value_func
+
+                result_dict[key] = value
+
+        elif isinstance(projection, list):
+            result_dict = {key: row[key] for key in projection}
+        else:
+            raise ValueError("Invalid project argument: '%s'" % projection)
+
+        return result_dict
+
+    raise ValueError('Invalid project value type: %s' % type(table))
+
 def list_of_dicts_to_dict_of_lists(list_of_dicts):
     dict_of_lists = {}
 

@@ -78,8 +78,27 @@ def add_to_l2_queue_one_time(ctx):
 
     return
 
+def manage_consider_one_time(ctx):
+    print('Getting consider tracks...')
 
+    consider = ctx.spotify.get_playlist_tracks('consider')
 
+    print('consider: %d tracks' % len(consider))
+
+    queue_history = ctx.docs['queue_history']
+    history = queue_history.read()
+
+    print('history: %d tracks' % len(history))
+
+    remaining_consider = consider.index.difference(history.index)
+
+    print('Remaining consider: %d tracks' % len(remaining_consider))
+
+    queue_tracks = consider[consider.id.isin(remaining_consider)][['id', 'artist_names', 'name', 'added_at']]
+
+    ctx.docs['queue'].write(queue_tracks)
+
+    return
 
 
 

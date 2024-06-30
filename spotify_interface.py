@@ -206,13 +206,12 @@ class SpotifyInterface:
 
         if isinstance(tracks, pd.DataFrame):
             tracks = tracks.id
-        else:
-            tracks = pd.Index(tracks)
 
         if not allow_duplicates:
             existing_tracks = self.get_playlist_tracks(playlist_id)
 
-            new_tracks = tracks.difference(existing_tracks.index)
+            new_tracks = [track_id for track_id in tracks if track_id not in existing_tracks]
+
             if len(new_tracks) != len(tracks):
                 print('Ignoring %d tracks that already exist in playlist %s' % (
                     len(tracks) - len(new_tracks),

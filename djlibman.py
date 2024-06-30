@@ -8,6 +8,7 @@ import os.path
 import readline
 import code
 import time
+import ast
 
 import file_interface
 import google_interface
@@ -38,12 +39,44 @@ class Context:
         self.google = None
         self.spotify = None
         self.docs = {}
+        self.backups = 0
         return
 
-    def add_doc(self, name, doc):
+    def set_backups(self, backups):
+        self.backups = backups
+
+    def add_doc(self, name, type, **kwargs):
         if name in self.docs:
             raise Exception("Duplicate doc name: '%s'" % name)
+
+        if type == 'google_sheet':
+            if self.google is None:
+                raise Exception("Cannot add Google sheet '%s'; no Google connection specified" % name)
+
+            doc = google_interface.GoogleSheet(self.google, **kwargs)
+        else:
+            if 'path' not in kwargs:
+                raise Exception("Cannot add file document '%s'; no path specified" % name)
+            path = kwargs['path']
+            del kwargs['path']
+
+            kwargs['backups'] = self.backups
+
+            if type == 'excel':
+                doc = file_interface.ExcelSheet(path, **kwargs)
+            elif type == 'csv':
+                doc = file_interface.CsvFile(path, **kwargs)
+            else:
+                raise Exception("Unsupported doc type: '%s'" % type)
+
         self.docs[name] = doc
+        return
+
+    def delete_backups(self):
+        for doc in self.docs.values():
+            if isinstance(doc, file_interface.FileDoc):
+                doc.delete_backups()
+        return
 
 def python_shell(shell_locals):
     global should_quit
@@ -118,36 +151,51 @@ def main():
 
     ctx = Context()
 
-    if 'rekordbox' in config.sections():
-        ctx.rekordbox = rekordbox_interface.RekordboxInterface(config['rekordbox'])
-
-    if 'google' in config.sections():
-        ctx.google = google_interface.GoogleInterface(config['google'])
-
-    if 'spotify' in config.sections():
-        ctx.spotify = spotify_interface.SpotifyInterface(config['spotify'])
-
     for section_name in config.sections():
-        if section_name in ['google', 'spotify', 'rekordbox']:
-            continue
-        elif section_name.startswith('docs.'):
-            section = config[section_name]
-            name = section_name[5:]
+        section = config[section_name]
 
+        if section_name == 'general':
+            for field in section.keys():
+                if field == 'backups':
+                    ctx.set_backups(section.getint('backups'))
+                else:
+                    raise Exception('Unknown field in config section %s: %s' % (section_name, field))
+
+        elif section_name == 'rekordbox':
+            ctx.rekordbox = rekordbox_interface.RekordboxInterface(section)
+
+        elif section.name == 'google':
+            ctx.google = google_interface.GoogleInterface(section)
+
+        elif section.name == 'spotify':
+            ctx.spotify = spotify_interface.SpotifyInterface(section)
+
+        elif section_name.startswith('docs.'):
+            name = section_name[5:]
             type = section['type']
 
-            if type == 'google_sheet':
-                if ctx.google is None:
-                    raise Exception("Cannot add Google sheet '%s'; no Google connection specified" % name)
+            kwargs = {}
 
-                ctx.add_doc(name, google_interface.GoogleSheet(ctx.google, section))
-            elif type == 'excel':
-                ctx.add_doc(name, file_interface.ExcelSheet(section))
-            else:
-                raise Exception("Unsupported doc type: '%s'" % type)
+            for field in section.keys():
+                if field in ['type']:
+                    continue
+                if field in ['path', 'index_column', 'sheet']:
+                    kwargs[field] = section[field]
+                elif field == 'header':
+                    kwargs['header'] = section.getint('header')
+                elif field == 'list_columns':
+                    kwargs['list_columns'] = ast.literal_eval(section['list_columns'])
+                elif field == 'boolean_columns':
+                    kwargs['boolean_columns'] = ast.literal_eval(section['boolean_columns'])
+                elif field == 'datetime_columns':
+                    kwargs['datetime_columns'] = ast.literal_eval(section['datetime_columns'])
+                else:
+                    raise Exception("Unknown field in config section %s: %s" % (section_name, field))
+
+            ctx.add_doc(name, type, **kwargs)
 
         else:
-            raise Exception("Unrecognized section: '%s'" % section_name)
+            raise Exception("Unrecognized config section: '%s'" % section_name)
 
     # build the local vars of the console
 

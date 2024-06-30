@@ -22,6 +22,9 @@ BASE_62 = re.compile(r'^[0-9A-Za-z]+$')
 
 def _batch_result(request_func, start=0, stop=None, stop_condition=None, use_offset=True):
     """Stop condition is inclusive"""
+
+    assert stop is None or stop_condition is None
+
     if start < 0:
         raise ValueError('Negative start: %s' % start)
 
@@ -34,10 +37,12 @@ def _batch_result(request_func, start=0, stop=None, stop_condition=None, use_off
 
     all_items = []
 
-    while True:
-        limit = min(_MAX_ITEMS_PER_REQUEST, stop-start)
+    offset = start
 
-        result = request_func(offset=start, limit=limit)
+    while True:
+        limit = min(_MAX_ITEMS_PER_REQUEST, stop-offset)
+
+        result = request_func(offset=offset, limit=limit)
         items = result['items']
 
         stop_idx = None
@@ -60,7 +65,7 @@ def _batch_result(request_func, start=0, stop=None, stop_condition=None, use_off
         if not result['next']:
             break
 
-        start += len(items)
+        offset += len(items)
 
     return all_items
 
@@ -146,7 +151,12 @@ class SpotifyInterface:
 
         return playlists.at[playlist_name_or_id, 'id']
 
-    def get_playlist_tracks(self, playlist_name_or_id, start=0, stop=None, stop_condition=None):
+    def get_playlist_tracks(self, playlist_name_or_id, start=0, stop=None, stop_condition=None,
+                            up_to_track=None):
+        if up_to_track is not None:
+            assert stop is None
+            stop_condition = lambda item: item['track']['name'] == up_to_track
+
         playlist_id = self._get_playlist_id(playlist_name_or_id)
 
         results = _batch_result(
@@ -191,11 +201,25 @@ class SpotifyInterface:
         return df
 
 
-    def add_tracks_to_playlist(self, playlist_name_or_id, tracks):
+    def add_tracks_to_playlist(self, playlist_name_or_id, tracks, allow_duplicates=False):
         playlist_id = self._get_playlist_id(playlist_name_or_id)
 
         if isinstance(tracks, pd.DataFrame):
             tracks = tracks.id
+        else:
+            tracks = pd.Index(tracks)
+
+        if not allow_duplicates:
+            existing_tracks = self.get_playlist_tracks(playlist_id)
+
+            new_tracks = tracks.difference(existing_tracks.index)
+            if len(new_tracks) != len(tracks):
+                print('Ignoring %d tracks that already exist in playlist %s' % (
+                    len(tracks) - len(new_tracks),
+                    playlist_name_or_id
+                ))
+
+            tracks = new_tracks
 
         _batch_request(
             tracks,

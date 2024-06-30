@@ -36,6 +36,10 @@ class GoogleInterface:
         self._credentials = config['credentials']
         self._cached_token_file = config['cached_token_file']
 
+        for field in config.keys():
+            if field not in ['credentials', 'cached_token_file']:
+                raise Exception('Unknown field in config section google: %s' % field)
+
         # the connection will be initialized when it's first used
         self._connection = None
         return

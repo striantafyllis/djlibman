@@ -22,6 +22,11 @@ class RekordboxInterface:
     def __init__(self, config):
         self._rekordbox_xml = config['rekordbox_xml']
         self._playlist_dir = config['playlist_dir']
+
+        for field in config.keys():
+            if field not in ['rekordbox_xml', 'playlist_dir']:
+                raise Exception('Unknown field in config section rekordbox: %s' % field)
+
         self._last_read_time = None
         self._collection = None
         self._playlists = None

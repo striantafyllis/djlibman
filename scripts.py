@@ -2,53 +2,84 @@
 from utils import *
 
 
-def manage_consider_playlist(ctx, up_to_track, source_playlist='consider', target_playlist='to buy'):
-    playlists = ctx.spotify.get_playlists()
+def add_to_history(ctx, new_items):
+    queue_history = ctx.docs['queue_history']
 
-    source_playlist_id = playlists.loc[source_playlist, 'id']
-    target_playlist_id = playlists.loc[target_playlist, 'id']
+    history = queue_history.read()
 
-    sys.stdout.write("Getting tracks of playlist '%s'... " % source_playlist)
-    sys.stdout.flush()
-    source_playlist_tracks = ctx.spotify.get_playlist_tracks(source_playlist_id)
-    sys.stdout.write("%d tracks\n" % len(source_playlist_tracks))
-    sys.stdout.flush()
+    if history.index.name != 'id':
+        raise Exception('queue_history not indexed by ID')
 
-    sys.stdout.write("Getting liked tracks... ")
-    sys.stdout.flush()
-    liked_tracks = ctx.spotify.get_liked_tracks()
-    sys.stdout.write("%d tracks\n" % len(liked_tracks))
-    sys.stdout.flush()
+    for column in history.columns:
+        if column not in new_items.columns:
+            raise Exception("New items are missing column '%s'" % column)
 
-    if isinstance(up_to_track, int):
-        up_to = up_to_track
+    # this takes care of extra columns, columns in different order etc.
+    new_items = new_items[history.columns]
+
+    if new_items.index.name == 'id':
+        new_history_ids = new_items.index
     else:
-        # is there no better way to do this in Pandas?
-        up_to = None
-        for i in range(len(source_playlist_tracks)):
-            if up_to_track in source_playlist_tracks.name.iat[i]:
-                up_to = i+1
-                break
-        if up_to is None:
-            raise Exception("Track '%s' not found in playlist '%s'" % (up_to_track, source_playlist))
+        new_history_ids = pd.Index(new_items.id)
 
-    listened_track_ids = source_playlist_tracks.index[:up_to]
-    liked_listened_track_ids = listened_track_ids.intersection(liked_tracks.index)
+    existing_new_ids = new_history_ids.intersection(history.index)
+    unique_new_ids = new_history_ids.difference(history.index)
 
-    print("The following tracks will be removed from playlist '%s':" % (source_playlist))
-    pretty_print_tracks(source_playlist_tracks.loc[listened_track_ids], indent='    ', enum=True)
+    print('History has %d items' % len(history))
+    print('Received %d new items, of which %d already exist; adding %d new items' % (
+        len(new_items),
+        len(existing_new_ids),
+          len(unique_new_ids)))
 
-    print()
-    print("Of these, the following tracks will be added to playlist '%s':" % target_playlist)
-    pretty_print_tracks(source_playlist_tracks.loc[liked_listened_track_ids], indent='    ', enum=True)
-    print()
+    new_history = pd.concat([history, new_items.loc[unique_new_ids]])
 
-    choice = get_user_choice('Proceed?')
-    if choice == 'yes':
-        print("Adding %d tracks to playlist '%s'" % (len(liked_listened_track_ids), target_playlist))
-        ctx.spotify.add_tracks_to_playlist(target_playlist_id, liked_listened_track_ids)
-
-        print("Removing %d tracks from playlist '%s'" % (len(listened_track_ids), source_playlist))
-        ctx.spotify.remove_tracks_from_playlist(source_playlist_id, listened_track_ids)
+    queue_history.write(new_history)
 
     return
+
+
+def add_to_history_one_time(ctx):
+    consider = ctx.spotify.get_playlist_tracks('consider')
+    print('Playlist consider: %d items' % len(consider))
+
+    backup_consider = ctx.spotify.get_playlist_tracks('backup - consider')
+    print('Playlist backup - consider: %d items' % len(backup_consider))
+
+    listened_index = backup_consider.index.difference(consider.index)
+
+    print('Listened items: %d' % len(listened_index))
+
+    consider_listened = backup_consider.loc[listened_index]
+
+    assert len(consider_listened) == len(listened_index)
+
+    add_to_history(ctx, consider_listened)
+
+    return
+
+
+def add_to_l2_queue_one_time(ctx):
+    consider = ctx.spotify.get_playlist_tracks('consider', stop=137)
+
+    print('Consider tracks: %d' % len(consider))
+
+    print('Adding to history...')
+    add_to_history(ctx, consider)
+
+    liked = ctx.spotify.get_liked_tracks(stop=33)
+    print('Liked tracks: %d' % len(liked))
+
+    liked_consider_index = consider.index.intersection(liked.index)
+    print('Liked consider: %d' % len(liked_consider_index))
+
+    print('Adding to L2 queue...')
+
+    ctx.spotify.add_tracks_to_playlist('L2 queue', liked_consider_index)
+
+    return
+
+
+
+
+
+

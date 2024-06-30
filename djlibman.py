@@ -14,6 +14,10 @@ import google_interface
 import rekordbox_interface
 import spotify_interface
 
+# we want Pandas and NumPy to be available at the command line
+import pandas as pd
+import numpy as np
+
 # we want all utils and scripts to be available in the user python shell
 from utils import *
 from scripts import *

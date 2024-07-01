@@ -295,7 +295,7 @@ class SpotifyInterface:
             new_tracks = [track_id for track_id in tracks if track_id not in existing_tracks]
 
             if len(new_tracks) != len(tracks):
-                print('Ignoring %d tracks that already exist in playlist %s' % (
+                print("Ignoring %d tracks that already exist in playlist '%s'" % (
                     len(tracks) - len(new_tracks),
                     playlist_name_or_id
                 ))
@@ -306,6 +306,8 @@ class SpotifyInterface:
             lambda x: self._connection.playlist_add_items(playlist_id, x),
             tracks
         )
+
+        print("Added %d new tracks to playlist '%s'" % (len(tracks), playlist_name_or_id))
 
         return
 
@@ -321,4 +323,43 @@ class SpotifyInterface:
         )
 
         return
+
+    def add_liked_tracks(self, tracks):
+        if isinstance(tracks, pd.DataFrame):
+            tracks = tracks.id
+
+        if not isinstance(tracks, pd.Index):
+            tracks = pd.Index(tracks)
+
+        # don't add tracks that are already liked because it messes up the added_at timestamp
+        already_liked_tracks = self.get_liked_tracks().index
+
+        new_tracks = tracks.difference(already_liked_tracks, sort=False)
+
+        if len(new_tracks) < len(tracks):
+            print('Ignoring %d already liked tracks' % (len(tracks) - len(new_tracks)))
+
+        _batch_request(
+            lambda x: self._connection.current_user_saved_tracks_add(x),
+            new_tracks
+        )
+
+        print('Added %d liked tracks' % len(new_tracks))
+
+        return
+
+    def remove_liked_tracks(self, tracks):
+        if isinstance(tracks, pd.DataFrame):
+            tracks = tracks.id
+
+        _batch_request(
+            lambda x: self._connection.current_user_saved_tracks_delete(x),
+            tracks
+        )
+
+        return
+
+
+
+
 

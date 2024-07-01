@@ -6,6 +6,9 @@ import re
 import pandas as pd
 import numpy as np
 
+# needed for calls to eval() on csvs etc.
+from pandas import Timestamp
+
 from utils import *
 
 
@@ -191,6 +194,20 @@ class CsvFile(FileDoc):
             header = self._header,
             converters = self._converters
         )
+
+        # Pandas can save nested Python objects, but then it reads them back as strings.
+        # This code corrects that mess automatically as much as possible. Declaring converters also helps.
+
+        rows, cols = raw.shape
+
+        for row in range(rows):
+            for col in range(cols):
+                el = raw.iat[row,col]
+                if isinstance(el, str) and len(el) >= 2 and el[0] in ['[', '{']:
+                    # try:
+                        raw.iat[row, col] = eval(el)
+                    # except SyntaxError:
+                    #     pass
 
         return raw
 

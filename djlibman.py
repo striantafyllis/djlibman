@@ -158,6 +158,8 @@ def main():
             for field in section.keys():
                 if field == 'backups':
                     ctx.set_backups(section.getint('backups'))
+                elif field.startswith('pandas.'):
+                    pd.set_option(field[7:], section.getint(field))
                 else:
                     raise Exception('Unknown field in config section %s: %s' % (section_name, field))
 

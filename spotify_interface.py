@@ -140,6 +140,15 @@ def _postprocess_tracks(results):
 class SpotifyInterface:
     def __init__(self, config):
         self._client_id = config['client_id']
+
+        client_secret_loc = config['client_secret']
+
+        if client_secret_loc.startswith('$'):
+            self._client_secret = os.environ[client_secret_loc[1:]]
+        else:
+            with open(client_secret_loc) as client_secret_file:
+                self._client_secret = client_secret_file.read().strip()
+
         self._client_secret = config['client_secret']
         self._redirect_uri = config['redirect_uri']
         self._cached_token_file = config['cached_token_file']

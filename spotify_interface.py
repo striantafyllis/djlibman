@@ -192,19 +192,21 @@ class SpotifyInterface:
 
         return df
 
+    def get_playlist_id(self, playlist_name):
+        playlists = self.get_playlists(stop_condition=lambda item: item['name'] == playlist_name)
 
-    def _get_playlist_id(self, playlist_name_or_id):
+        if playlist_name not in playlists.index:
+            raise Exception("Spotify playlist '%s' not found" % playlist_name)
+
+        return playlists.at[playlist_name, 'id']
+
+    def _get_playlist_id_if_necessary(self, playlist_name_or_id):
         # Spotify playlist IDs are base-62 numbers and they are usually about 22 digits long
         if len(playlist_name_or_id) > 20 and BASE_62.match(playlist_name_or_id):
             return playlist_name_or_id
 
         # the string is a playlist name
-        playlists = self.get_playlists(stop_condition=lambda item: item['name'] == playlist_name_or_id)
-
-        if playlist_name_or_id not in playlists.index:
-            raise Exception("Spotify playlist '%s' not found" % playlist_name_or_id)
-
-        return playlists.at[playlist_name_or_id, 'id']
+        return self.get_playlist_id(playlist_name_or_id)
 
     def get_playlist_tracks(self, playlist_name_or_id, start=0, stop=None, stop_condition=None,
                             up_to_track=None, raw=False):
@@ -212,7 +214,7 @@ class SpotifyInterface:
             assert stop is None
             stop_condition = lambda item: item['track']['name'] == up_to_track
 
-        playlist_id = self._get_playlist_id(playlist_name_or_id)
+        playlist_id = self._get_playlist_id_if_necessary(playlist_name_or_id)
 
         results = _batch_result(
             lambda limit, offset: self._connection.playlist_items(
@@ -227,7 +229,8 @@ class SpotifyInterface:
         results = _postprocess_tracks(results)
 
         df = pd.DataFrame.from_records(results)
-        df = df.set_index(df.id)
+        if not df.empty:
+            df = df.set_index(df.id)
 
         return df
 
@@ -244,7 +247,8 @@ class SpotifyInterface:
         results = _postprocess_tracks(results)
 
         df = pd.DataFrame.from_records(results)
-        df = df.set_index(df.id)
+        if not df.empty:
+            df = df.set_index(df.id)
 
         return df
 
@@ -260,7 +264,8 @@ class SpotifyInterface:
         results = _postprocess_tracks(results)
 
         df = pd.DataFrame.from_records(results)
-        df = df.set_index(df.id)
+        if not df.empty:
+            df = df.set_index(df.id)
 
         return df
 
@@ -278,18 +283,19 @@ class SpotifyInterface:
         results = _postprocess_tracks(results)
 
         df = pd.DataFrame.from_records(results)
-        df = df.set_index(df.id)
+        if not df.empty:
+            df = df.set_index(df.id)
 
         return df
 
 
-    def add_tracks_to_playlist(self, playlist_name_or_id, tracks, allow_duplicates=False):
-        playlist_id = self._get_playlist_id(playlist_name_or_id)
+    def add_tracks_to_playlist(self, playlist_name_or_id, tracks, check_for_duplicates=True):
+        playlist_id = self._get_playlist_id_if_necessary(playlist_name_or_id)
 
         if isinstance(tracks, pd.DataFrame):
             tracks = tracks.id
 
-        if not allow_duplicates:
+        if check_for_duplicates:
             existing_tracks = self.get_playlist_tracks(playlist_id)
 
             new_tracks = [track_id for track_id in tracks if track_id not in existing_tracks]
@@ -312,7 +318,7 @@ class SpotifyInterface:
         return
 
     def remove_tracks_from_playlist(self, playlist_name_or_id, tracks):
-        playlist_id = self._get_playlist_id(playlist_name_or_id)
+        playlist_id = self._get_playlist_id_if_necessary(playlist_name_or_id)
 
         if isinstance(tracks, pd.DataFrame):
             tracks = tracks.id

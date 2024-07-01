@@ -29,8 +29,12 @@ def format_track(track):
 
 def pretty_print_tracks(tracks, indent='', enum=False):
     num_tracks = len(tracks)
+    if num_tracks == 0:
+        return
 
     if isinstance(tracks, pd.DataFrame):
+        if tracks.empty:
+            return
         tracks = tracks.iloc
 
     for i in range(num_tracks):
@@ -64,3 +68,37 @@ def get_user_choice(prompt: str, options: list[str] = ['yes', 'no'], batch_mode:
             sys.stdout.write('Reply not recognized; try again.')
         else:
             sys.stdout.write('Reply is ambiguous; try again.')
+
+
+def dataframe_duplicate_index_labels(df):
+    """Returns the positions of duplicate index labels in a dataframe.
+    I'm surprised that Pandas doesn't already offer this."""
+
+    unique_idx = df.index.unique()
+
+    if len(df.index) == len(unique_idx):
+        return []
+
+    already_seen_labels = set()
+
+    positions = []
+
+    for i, label in enumerate(df.index):
+        if label in already_seen_labels:
+            positions.append(i)
+        else:
+            already_seen_labels.add(label)
+
+    assert len(positions) == len(df.index) - len(unique_idx)
+
+    return positions
+
+def dataframe_drop_rows_at_positions(df, positions):
+    """Returns a new dataframe without the rows indicated by the positions.
+    I'm surprised pandas doesn't already offer this."""
+
+    new_df_index = [(i not in positions) for i in range(len(df))]
+
+    new_df = df.loc[new_df_index]
+
+    return new_df

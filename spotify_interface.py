@@ -37,7 +37,8 @@ _TRACK_COLUMNS = {
     'duration_ms': None,
     'popularity': None,
     'added_at': lambda item: pd.to_datetime(
-        item['played_at'] if 'played_at' in item else item['added_at'],
+        item['played_at'] if 'played_at' in item else
+            (item['added_at'] if 'added_at' in item else None),
         utc=True),
     'added_by': lambda item: item['added_by']['id'] if 'added_by' in item else None,
     'album': _ALBUM_COLUMNS,
@@ -111,27 +112,33 @@ def _batch_result(request_func, start=0, stop=None, stop_condition=None, use_off
     return all_items
 
 
-def _batch_request(items, request):
+def _batch_request(request, items, result_field=None):
     start = 0
+
+    results = [] if result_field is not None else None
 
     while start < len(items):
         end = min(start + _MAX_ITEMS_PER_REQUEST, len(items))
 
         batch = list(items[start:end])
-        request(batch)
+        result = request(batch)
+
+        if result_field is not None:
+            results += result[result_field]
 
         start = end
 
-    return
+    return results
 
 def _postprocess_tracks(results):
     """Apply some common manipulations to Spotify API returns involving tracks"""
 
     for result in results:
         # flatten the 'track' field
-        track_fields = result['track']
-        del result['track']
-        result.update(track_fields)
+        if 'track' in result:
+            track_fields = result['track']
+            del result['track']
+            result.update(track_fields)
 
     projection = project(results, _TRACK_COLUMNS)
     return projection
@@ -149,7 +156,6 @@ class SpotifyInterface:
             with open(client_secret_loc) as client_secret_file:
                 self._client_secret = client_secret_file.read().strip()
 
-        self._client_secret = config['client_secret']
         self._redirect_uri = config['redirect_uri']
         self._cached_token_file = config['cached_token_file']
 
@@ -168,6 +174,9 @@ class SpotifyInterface:
         """Provides access to the raw Spotify interface. When possible, use one of the
         accessors below, which will also convert the results to Pandas DataFrames."""
         return self._connection
+
+    def get_user_id(self):
+        return self._connection.current_user()['id']
 
     def get_playlists(self, start=0, stop=None, stop_condition=None, raw=False):
         results = _batch_result(
@@ -256,6 +265,24 @@ class SpotifyInterface:
         return df
 
 
+    def get_tracks_by_id(self, ids, raw=False):
+        results = _batch_request(
+            lambda items: self._connection.tracks(items),
+            ids,
+            result_field = 'tracks'
+        )
+
+        if raw:
+            return results
+
+        results = _postprocess_tracks(results)
+
+        df = pd.DataFrame.from_records(results)
+        df = df.set_index(df.id)
+
+        return df
+
+
     def add_tracks_to_playlist(self, playlist_name_or_id, tracks, allow_duplicates=False):
         playlist_id = self._get_playlist_id(playlist_name_or_id)
 
@@ -276,8 +303,8 @@ class SpotifyInterface:
             tracks = new_tracks
 
         _batch_request(
-            tracks,
-            lambda x: self._connection.playlist_add_items(playlist_id, x)
+            lambda x: self._connection.playlist_add_items(playlist_id, x),
+            tracks
         )
 
         return
@@ -289,8 +316,8 @@ class SpotifyInterface:
             tracks = tracks.id
 
         _batch_request(
-            tracks,
-            lambda x: self._connection.playlist_remove_all_occurrences_of_items(playlist_id=playlist_id, items=x)
+            lambda x: self._connection.playlist_remove_all_occurrences_of_items(playlist_id=playlist_id, items=x),
+            tracks
         )
 
         return

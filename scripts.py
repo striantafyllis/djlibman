@@ -165,7 +165,7 @@ def get_playlist_listened_tracks(
     print('WARNING: Attempting to determine listened tracks through the listening history; this may miss some tracks.')
     choice = get_user_choice('Continue?')
     if choice != 'yes':
-        return None
+        return pd.DataFrame([])
 
     listened_tracks = ctx.spotify.get_recently_played_tracks()
 
@@ -199,9 +199,6 @@ def move_l1_queue_listened_tracks_to_l2(
         ctx,
         playlist_tracks=l1_queue_tracks,
         last_listened_track=l1_queue_last_listened_track)
-
-    if listened_tracks is None:
-        return l1_queue_tracks, l2_queue_tracks
 
     print('L1 queue: %d listened tracks' % len(listened_tracks))
     pretty_print_tracks(listened_tracks, indent=' ' * 4, enum=True)
@@ -429,11 +426,11 @@ def add_shazam_to_l2_queue(
     print("'%s' playlist: %d tracks" % (shazam_name, len(shazam_tracks)))
 
     if len(shazam_tracks) == 0:
-        return
+        return l2_queue_tracks
 
     choice = get_user_choice("Add to L2 queue?")
     if choice != 'yes':
-        return
+        return l2_queue_tracks
 
     l2_queue_tracks = add_to_l2_queue(
         ctx,

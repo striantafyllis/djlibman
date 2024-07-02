@@ -102,3 +102,11 @@ def dataframe_drop_rows_at_positions(df, positions):
     new_df = df.loc[new_df_index]
 
     return new_df
+
+def dataframe_ensure_unique_index(df):
+    """Makes sure that all dataframe index entries are unique by removing rows that
+    have the same index label as a previous row. I'm surprised pandas doesn't already offer this."""
+
+    pos = dataframe_duplicate_index_labels(df)
+    return dataframe_drop_rows_at_positions(df, pos)
+

@@ -46,13 +46,18 @@ def pretty_print_tracks(tracks, indent='', enum=False):
 
     return
 
-def get_user_choice(prompt: str, options: list[str] = ['yes', 'no'], batch_mode: bool = False):
+def get_user_choice(prompt: str, options: list[str] = ['yes', 'no'], batch_mode: bool = False, exit_option=True):
     """Allows the user to choose among a number of options by typing any unambiguous prefix
     (usually the first letter) of an option"""
     assert len(options) > 0
 
     if batch_mode:
         return options[0]
+
+    if exit_option:
+        if 'exit' in options:
+            raise Exception("exit_option=True but 'exit' already in options")
+        options = options + ['exit']
 
     while True:
         sys.stdout.write(prompt + ' (' + '/'.join(options) + ') > ')
@@ -63,7 +68,10 @@ def get_user_choice(prompt: str, options: list[str] = ['yes', 'no'], batch_mode:
         possible_options = [option for option in options if option.upper().startswith(reply.upper())]
 
         if len(possible_options) == 1:
-            return possible_options[0]
+            choice = possible_options[0]
+            if exit_option and choice == 'exit':
+                raise KeyboardInterrupt()
+            return choice
         elif len(possible_options) == 0:
             sys.stdout.write('Reply not recognized; try again.')
         else:

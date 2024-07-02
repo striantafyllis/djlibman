@@ -158,7 +158,7 @@ def get_playlist_listened_tracks(
             if last_listened_track_idx is None:
                 raise Exception("Track '%s' not found in playlist" % last_listened_track)
 
-            return playlist_tracks.iloc[:last_listened_track_idx]
+            return playlist_tracks.iloc[:(last_listened_track_idx+1)]
 
         raise Exception("Invalid type for last_listened_track: %s" % type(last_listened_track))
 
@@ -203,6 +203,9 @@ def move_l1_queue_listened_tracks_to_l2(
     print('L1 queue: %d listened tracks' % len(listened_tracks))
     pretty_print_tracks(listened_tracks, indent=' ' * 4, enum=True)
     print()
+    choice = get_user_choice('Is this correct?')
+    if choice != 'yes':
+        return l1_queue_tracks, l2_queue_tracks, None
 
     if len(listened_tracks) == 0:
         return l1_queue_tracks, l2_queue_tracks, None
@@ -229,14 +232,15 @@ def move_l1_queue_listened_tracks_to_l2(
             if choice != 'yes':
                 return l1_queue_tracks, l2_queue_tracks, liked_tracks
 
-        choice = get_user_choice('Add %d tracks to the L2 queue?' % len(listened_liked_tracks_not_in_l2_idx))
-        if choice == 'yes':
-            ctx.spotify.add_tracks_to_playlist(l2_queue_id, listened_liked_tracks_not_in_l2_idx,
-                                               # avoid duplicate check since we've already done it
-                                               check_for_duplicates=False)
+        if len(listened_liked_tracks_not_in_l2_idx) > 0:
+            choice = get_user_choice('Add %d tracks to the L2 queue?' % len(listened_liked_tracks_not_in_l2_idx))
+            if choice == 'yes':
+                ctx.spotify.add_tracks_to_playlist(l2_queue_id, listened_liked_tracks_not_in_l2_idx,
+                                                   # avoid duplicate check since we've already done it
+                                                   check_for_duplicates=False)
 
-            l2_queue_tracks = pd.concat([l2_queue_tracks, l1_queue_tracks[listened_liked_tracks_not_in_l2_idx]])
-            print('L2 queue now has %d tracks' % (len(l2_queue_tracks)))
+                l2_queue_tracks = pd.concat([l2_queue_tracks, l1_queue_tracks.loc[listened_liked_tracks_not_in_l2_idx]])
+                print('L2 queue now has %d tracks' % (len(l2_queue_tracks)))
 
     choice = get_user_choice('Add %d listened tracks to queue history?' % len(listened_tracks))
     if choice == 'yes':
@@ -246,7 +250,7 @@ def move_l1_queue_listened_tracks_to_l2(
     if choice == 'yes':
         remove_from_queue(ctx, listened_tracks)
 
-    choice = get_user_choice('Remove %d listened tracks from L1 queue?')
+    choice = get_user_choice('Remove %d listened tracks from L1 queue?' % len(listened_tracks))
     if choice == 'yes':
         ctx.spotify.remove_tracks_from_playlist(l1_queue_id, listened_tracks.index)
         l1_queue_tracks = l1_queue_tracks.loc[l1_queue_tracks.index.difference(listened_tracks.index, sort=False)]
@@ -518,8 +522,15 @@ def manage_queues(
         l2_queue_name = 'L2 queue',
         shazam_name = 'My Shazam Tracks',
         l1_queue_last_listened_track = None,
+        # alias for l1_queue_last_listened_track to save typing
+        last_track = None,
         l1_queue_target_size = 100
 ):
+    if l1_queue_last_listened_track is None:
+        l1_queue_last_listened_track = last_track
+    elif last_track is not None:
+        raise Exception('Both last_track and l1_queue_last_listened_track are set')
+
     # Sanity check! Queue and queue history must be disjoint
     sanity_check_disk_queues(ctx)
 

@@ -73,12 +73,12 @@ class RekordboxInterface:
 
     def get_playlist_names(self):
         self._refresh()
-        return list(self._playlists.keys())
+        return pd.Index(self._playlists.keys(), name='Rekordbox Playlists')
 
     def get_playlist_track_ids(self, playlist_name):
         self._refresh()
 
-        return pd.Series(self._playlists[playlist_name])
+        return self._playlists[playlist_name]
 
     def get_playlist_tracks(self, playlist_name):
         self._refresh()
@@ -100,14 +100,13 @@ def _parse_collection(node: ET.Element):
         else:
             raise Exception('Unknown tag %s in node COLLECTION' % child.tag)
 
-    collection_columnar = list_of_dicts_to_dict_of_lists(collection)
+    df = pd.DataFrame.from_records(collection)
+    df = infer_types(df)
 
-    collection_columnar_typed = {
-        key: infer_type(value)
-        for key, value in collection_columnar.items()
-    }
+    # has to be done after infer_types so that the TrackIDs in the index are ints and not strings
+    df = df.set_index(df.TrackID)
 
-    return pd.DataFrame(collection_columnar_typed, index=collection_columnar_typed['TrackID'])
+    return df
 
 
 def _parse_playlists(node: ET.Element):
@@ -146,7 +145,7 @@ def _parse_playlist_node(node: ET.Element,
             track_id = np.int64(child.attrib['Key'])
             track_ids.append(track_id)
 
-        return { full_name: track_ids }
+        return { full_name: pd.Index(track_ids) }
 
 
 def _debug_print_xml_node(node, indent=0):

@@ -21,7 +21,11 @@ import numpy as np
 
 # we want all utils and scripts to be available in the user python shell
 from utils import *
-from scripts import *
+from spotify_scripts import *
+from local_scripts import *
+
+import spotify_scripts
+import local_scripts
 
 def test_func():
     print('Test')
@@ -126,6 +130,12 @@ def python_shell(shell_locals):
 
 
 def main():
+    global context
+
+    context = Context()
+    local_scripts.context = context
+    spotify_scripts.context = context
+
     parser = argparse.ArgumentParser(
         prog='djlibman.py',
         description='Organizes a DJ library between Rekordbox, Spotify, YouTube, google sheets and CSVs'
@@ -149,28 +159,26 @@ def main():
     config = configparser.ConfigParser()
     config.read(config_file)
 
-    ctx = Context()
-
     for section_name in config.sections():
         section = config[section_name]
 
         if section_name == 'general':
             for field in section.keys():
                 if field == 'backups':
-                    ctx.set_backups(section.getint('backups'))
+                    context.set_backups(section.getint('backups'))
                 elif field.startswith('pandas.'):
                     pd.set_option(field[7:], section.getint(field))
                 else:
                     raise Exception('Unknown field in config section %s: %s' % (section_name, field))
 
         elif section_name == 'rekordbox':
-            ctx.rekordbox = rekordbox_interface.RekordboxInterface(section)
+            context.rekordbox = rekordbox_interface.RekordboxInterface(section)
 
         elif section.name == 'google':
-            ctx.google = google_interface.GoogleInterface(section)
+            context.google = google_interface.GoogleInterface(section)
 
         elif section.name == 'spotify':
-            ctx.spotify = spotify_interface.SpotifyInterface(section)
+            context.spotify = spotify_interface.SpotifyInterface(section)
 
         elif section_name.startswith('docs.'):
             name = section_name[5:]
@@ -181,7 +189,7 @@ def main():
             for field in section.keys():
                 if field in ['type']:
                     continue
-                if field in ['path', 'index_column', 'sheet']:
+                if field in ['path', 'index_column', 'sheet', 'datetime_format']:
                     kwargs[field] = section[field]
                 elif field == 'header':
                     kwargs['header'] = section.getint('header')
@@ -194,7 +202,7 @@ def main():
                 else:
                     raise Exception("Unknown field in config section %s: %s" % (section_name, field))
 
-            ctx.add_doc(name, type, **kwargs)
+            context.add_doc(name, type, **kwargs)
 
         else:
             raise Exception("Unrecognized config section: '%s'" % section_name)
@@ -204,14 +212,14 @@ def main():
     # first add all the docs; in practice, only docs whose names are valid identifiers
     # will be accessible - the rest will be accessible through ctx itself
 
-    shell_locals = dict(ctx.docs)
+    shell_locals = dict(context.docs)
 
-    # add ctx itself, plus google, rekordbox and spotify; note that any docs with
+    # add google, rekordbox and spotify; note that any docs with
     # conflicting names will be overwritten
-    shell_locals['ctx'] = ctx
-    shell_locals['rekordbox'] = ctx.rekordbox
-    shell_locals['google'] = ctx.google
-    shell_locals['spotify'] = ctx.spotify
+    # shell_locals['ctx'] = ctx
+    shell_locals['rekordbox'] = context.rekordbox
+    shell_locals['google'] = context.google
+    shell_locals['spotify'] = context.spotify
 
     # finally, add all the globals; this gives us all the functions etc.
     # notice again that any conflicting document names will be overwritten

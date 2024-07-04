@@ -10,18 +10,18 @@ def get_attrib_or_fail(series, attrib_possible_names):
 
 
 def format_track(track):
-    if 'id' in track:
-        s = '%s: ' % track['id']
-    else:
-        s = ''
+    s = ''
+
+    for id_field in ['TrackID', 'id']:
+        if id_field in track:
+            s += '%s: ' % track[id_field]
+            break
 
     if 'artists' in track:
         # Spotify-style track; artists is a list of dict
         artists = ', '.join(artist['name'] for artist in track['artists'])
-    else:
-        artists = get_attrib_or_fail(track, ['artist_names', 'Artists'])
-        if isinstance(artists, list):
-            artists = ', '.join(artists)
+    elif 'Artists' in track:
+        artists = track['Artists']
 
     title = get_attrib_or_fail(track, ['Title', 'name'])
 

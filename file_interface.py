@@ -2,6 +2,7 @@
 import os
 import os.path
 import re
+import shutil
 
 import pandas as pd
 import numpy as np
@@ -15,8 +16,7 @@ from utils import *
 # some basic conversion functions
 
 def _is_empty(value):
-    # this is needed because pandas.read_excel() turns empty cells to NaN
-    return value is None or value == '' or (isinstance(value, float) and np.isnan(value))
+    return pd.isna(value) or value == ''
 
 def to_boolean(value):
     if _is_empty(value):
@@ -47,7 +47,8 @@ class FileDoc:
                  index_column = None,
                  list_columns = [],
                  boolean_columns = [],
-                 datetime_columns = []
+                 datetime_columns = [],
+                 datetime_format = None
                  ):
         self._path = path
         self._backups = backups
@@ -67,8 +68,9 @@ class FileDoc:
             self._deconverters[column] = from_boolean
 
         for column in datetime_columns:
-            self._converters[column] = lambda x: pd.to_datetime(x, utc=True)
-            # no need for deconversion
+            self._converters[column] = lambda x: pd.to_datetime(x, utc=True, format=datetime_format)
+            if datetime_format is not None:
+                self._deconverters[column] = lambda x: x.strftime(format=datetime_format)
 
         self._last_read_time = None
         self._contents = None
@@ -155,7 +157,8 @@ class FileDoc:
         self._move_backup(0)
 
         backup = self._backup_name(0)
-        os.rename(self._path, backup)
+        # os.rename(self._path, backup)
+        shutil.copyfile(self._path, backup)
         return
 
     def write(self, df):
@@ -181,7 +184,31 @@ class ExcelSheet(FileDoc):
             header = self._header
         )
 
+        # this is necessary because int columns will show up as floats
+        raw = raw.apply(lambda column: column.convert_dtypes(), axis=0)
+
         return raw
+
+    def _raw_write(self, df):
+        excel_writer = pd.ExcelWriter(
+            engine='openpyxl',
+            path=self._path,
+            mode='a',
+            if_sheet_exists='overlay',
+            engine_kwargs={ 'rich_text': True }
+        )
+
+        # remove timezone info from timestamps because Excel doesn't support timezones
+        df2 = df.map(lambda x: x.to_datetime64() if isinstance(x, pd.Timestamp) else x)
+
+        df2.to_excel(
+            excel_writer=excel_writer,
+            sheet_name=self._sheet,
+            header=True,
+            index=False
+        )
+        excel_writer.close()
+        return
 
 class CsvFile(FileDoc):
     def __init__(self, path, **kwargs):

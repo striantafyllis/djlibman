@@ -3,6 +3,16 @@ import numpy as np
 import pandas as pd
 
 
+def to_boolean(s):
+    if s is None or isinstance(s, bool):
+        return s
+    if s.upper() in ['T', 'TRUE']:
+        return True
+    if s.upper() in ['F', 'FALSE']:
+        return False
+    raise ValueError()
+
+
 def project(table, projection):
     if isinstance(table, list):
         return [project(row, projection) for row in table]
@@ -34,78 +44,64 @@ def project(table, projection):
 
     raise ValueError('Invalid project value type: %s' % type(table))
 
-def list_of_dicts_to_dict_of_lists(list_of_dicts):
-    dict_of_lists = {}
 
-    for i, dct in enumerate(list_of_dicts):
-        for key, value in dct.items():
-            lst = dict_of_lists.get(key)
-            if lst is None:
-                lst = [None] * i
-                dict_of_lists[key] = lst
-            lst.append(value)
+def infer_type(series):
+    """Given a Pandas series of strings, this infers a type that all elements can be converted to:
+       integer, float, or timestamp. If such a type is found, a new series of the new type is returned."""
 
-    return dict_of_lists
+    new_series = None
+    converter = None
 
-def infer_type(lst):
-    """Given a list of strings, this infers a type that fits all elements - integer, float etc.
-       If such a type is found, a new list of the new type is returned."""
+    _converters = [
+        to_boolean,
+        np.int64,
+        np.float64,
+        lambda s: pd.to_datetime(s, utc=True)
+    ]
 
-    new_list = []
-    new_list_type = None
+    for i in range(len(series)):
+        el = series.iloc[i]
 
-    for el in lst:
         if el is None:
-            new_list.append(None)
             continue
 
-        if new_list_type is None:
-            if el == 'T' or el == 'F':
-                new_list_type = np.bool
-                new_list.append(np.bool(el == 'T'))
-            else:
-                for type in [np.int64, np.float64, np.datetime64]:
-                    try:
-                        new_list.append(type(el))
-                        new_list_type = type
-                        break
-                    except ValueError:
-                        continue
+        if converter is None:
+            for conv in _converters:
+                try:
+                    new_el = conv(el)
+                    converter = conv
+                    new_series = pd.Series(index=series.index, dtype=object)
+                    new_series.iloc[i] = new_el
+                    break
+                except ValueError:
+                    continue
 
-                if new_list_type is None:
+                if converter is None:
                     # failed to find a type
-                    return lst
-        elif new_list_type == np.bool:
-            if el == 'T' or el == 'F':
-                new_list.append(np.bool(el == 'T'))
-            else:
-                # failed to find a type
-                return lst
+                    return series
         else:
             try:
-                new_list.append(new_list_type(el))
+                new_series.iloc[i] = converter(el)
             except ValueError:
-                if new_list_type == np.int64:
-                    new_list_type = np.float64
+                if converter == np.int64:
+                    converter = np.float64
                     try:
-                        new_list.append(new_list_type(el))
+                        new_series.iloc[i] = converter(el)
                     except ValueError:
                         # failed to find a type
-                        return lst
+                        return series
                 else:
                     # failed to find a type
-                    return lst
+                    return series
 
-    if new_list_type is not None:
-        # replace None values in the new list
-        for i in range(len(new_list)):
-            if new_list[i] is None:
-                if new_list_type == np.bool:
-                    new_list[i] = np.False_
-                elif new_list_type == np.datetime64:
-                    new_list[i] = np.datetime64("NaT")
-                else:
-                    new_list[i] = np.nan
+    if converter is None:
+        return series
 
-    return new_list
+    new_series = new_series.convert_dtypes()
 
+    return new_series
+
+def infer_types(df):
+    df = df.apply(lambda column: infer_type(column), axis=0)
+
+    return df

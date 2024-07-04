@@ -7,8 +7,12 @@ import numpy as np
 from internal_utils import *
 from utils import *
 
+context = None
 
-def sanity_check_disk_queues(ctx, queue_tracks=None, queue_history_tracks=None):
+def sanity_check_disk_queues(ctx=None, queue_tracks=None, queue_history_tracks=None):
+    if ctx is None:
+        ctx = context
+
     if queue_tracks is None:
         queue_tracks = ctx.docs['queue'].read()
         print('Queue: %d tracks' % len(queue_tracks))
@@ -62,7 +66,10 @@ def sanity_check_disk_queues(ctx, queue_tracks=None, queue_history_tracks=None):
     return
 
 
-def add_to_queue_history(ctx, new_tracks):
+def add_to_queue_history(ctx=None, new_tracks=[]):
+    if ctx is None:
+        ctx = context
+
     queue_history = ctx.docs['queue_history']
     queue_history_tracks = queue_history.read()
     print('Queue history: %d tracks' % len(queue_history_tracks))
@@ -96,7 +103,10 @@ def add_to_queue_history(ctx, new_tracks):
     return
 
 
-def remove_from_queue(ctx, listened_tracks, warn_for_missing=True):
+def remove_from_queue(ctx=None, listened_tracks=[], warn_for_missing=True):
+    if ctx is None:
+        ctx = context
+
     queue_tracks = ctx.docs['queue'].read()
     print('Queue: %d tracks' % len(queue_tracks))
 
@@ -123,11 +133,14 @@ def remove_from_queue(ctx, listened_tracks, warn_for_missing=True):
 
 
 def get_playlist_listened_tracks(
-        ctx,
+        ctx=None,
         playlist_name=None,
         playlist_id=None,
         playlist_tracks=None,
         last_listened_track=None):
+
+    if ctx is None:
+        ctx = context
 
     if playlist_tracks is None:
         if playlist_id is None:
@@ -174,12 +187,15 @@ def get_playlist_listened_tracks(
 
 
 def move_l1_queue_listened_tracks_to_l2(
-        ctx,
+        ctx=None,
         l1_queue_name='L1 queue',
         l2_queue_name='L2 queue',
         l1_queue_id=None,
         l2_queue_id=None,
         l1_queue_last_listened_track=None):
+
+    if ctx is None:
+        ctx = context
 
     if l1_queue_id is None:
         l1_queue_id = ctx.spotify.get_playlist_id(l1_queue_name)
@@ -260,11 +276,14 @@ def move_l1_queue_listened_tracks_to_l2(
 
 
 def replenish_l1_queue(
-        ctx,
+        ctx=None,
         l1_queue_name='L1 queue',
         l1_queue_id=None,
         l1_queue_tracks=None,
         l1_queue_target_size=100):
+
+    if ctx is None:
+        ctx = context
 
     if l1_queue_tracks is None:
         if l1_queue_id is None:
@@ -308,11 +327,13 @@ def replenish_l1_queue(
     return l1_queue_tracks
 
 def sanity_check_l1_queue(
-        ctx,
+        ctx=None,
         l1_queue_name='L1 queue',
         l1_queue_id=None,
         l1_queue_tracks=None,
         liked_tracks=None):
+    if ctx is None:
+        ctx = context
     if l1_queue_id is None:
         l1_queue_id = ctx.spotify.get_playlist_id(l1_queue_name)
 
@@ -371,11 +392,14 @@ def sanity_check_l1_queue(
 
 
 def add_to_l2_queue(
-        ctx,
-        tracks,
+        ctx=None,
+        tracks=[],
         l2_queue_name='L2 queue',
         l2_queue_id=None,
         l2_queue_tracks=None):
+    if ctx is None:
+        ctx = context
+
     tracks = dataframe_ensure_unique_index(tracks)
     print('Adding %d tracks to L2 queue' % len(tracks))
 
@@ -414,13 +438,16 @@ def add_to_l2_queue(
 
 
 def add_shazam_to_l2_queue(
-        ctx,
+        ctx=None,
         shazam_name = 'My Shazam Tracks',
         shazam_id=None,
         shazam_tracks=None,
         l2_queue_name='L2 queue',
         l2_queue_id=None,
         l2_queue_tracks=None):
+    if ctx is None:
+        ctx = context
+
     if shazam_id is None:
         shazam_id = ctx.spotify.get_playlist_id(shazam_name)
 
@@ -452,12 +479,15 @@ def add_shazam_to_l2_queue(
 
 
 def sanity_check_l2_queue(
-        ctx,
+        ctx=None,
         l2_queue_name='L2 queue',
         l2_queue_id=None,
         l2_queue_tracks=None,
         liked_tracks=None
 ):
+    if ctx is None:
+        ctx = context
+
     if l2_queue_tracks is None:
         if l2_queue_id is None:
             l2_queue_id = ctx.spotify.get_playlist_id(l2_queue_name)
@@ -516,8 +546,8 @@ def sanity_check_l2_queue(
 
     return l2_queue_tracks, liked_tracks
 
-def manage_queues(
-        ctx,
+def manage_spotify_queues(
+        ctx=None,
         l1_queue_name = 'L1 queue',
         l2_queue_name = 'L2 queue',
         shazam_name = 'My Shazam Tracks',
@@ -526,6 +556,9 @@ def manage_queues(
         last_track = None,
         l1_queue_target_size = 100
 ):
+    if ctx is None:
+        ctx = context
+
     if l1_queue_last_listened_track is None:
         l1_queue_last_listened_track = last_track
     elif last_track is not None:
@@ -575,8 +608,6 @@ def manage_queues(
         l2_queue_tracks=l2_queue_tracks,
         liked_tracks=liked_tracks
     )
-
-
 
     return
 

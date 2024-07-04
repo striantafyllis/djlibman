@@ -20,7 +20,7 @@ def _is_empty(value):
 
 def to_boolean(value):
     if _is_empty(value):
-        return False
+        return pd.NA
     if value.upper() in ['T', 'TRUE']:
         return True
     if value.upper() in ['F', 'FALSE']:
@@ -28,11 +28,13 @@ def to_boolean(value):
     raise Exception("Illegal value in boolean column: '%s'" % value)
 
 def from_boolean(value):
-    return 'T' if value else 'F'
+    if pd.isna(value):
+        return value
+    return 'T' if value == True else 'F'
 
 def to_list(value):
     if _is_empty(value):
-        return []
+        return value
     return [el.strip() for el in value.split(',')]
 
 def from_list(value):

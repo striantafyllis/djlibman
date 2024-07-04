@@ -145,7 +145,7 @@ def _parse_playlist_node(node: ET.Element,
             track_id = np.int64(child.attrib['Key'])
             track_ids.append(track_id)
 
-        return { full_name: pd.Index(track_ids) }
+        return { full_name: pd.Index(track_ids, name='TrackID') }
 
 
 def _debug_print_xml_node(node, indent=0):

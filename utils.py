@@ -1,13 +1,10 @@
 
 import sys
+import re
+import difflib
 import pandas as pd
 
-def get_attrib_or_fail(series, attrib_possible_names):
-    for attrib in attrib_possible_names:
-        if attrib in series:
-            return series[attrib]
-    raise Exception('None of the attributes %s are present in series %s' % (attrib_possible_names, series))
-
+from internal_utils import *
 
 def format_track(track):
     s = ''
@@ -26,6 +23,39 @@ def format_track(track):
     title = get_attrib_or_fail(track, ['Title', 'name'])
 
     return s + '%s \u2013 %s' % (artists, title)
+
+def format_track_for_search(track):
+    """Creates a search string that's more likely to generate matches out of a
+    track's artists and title."""
+
+    if 'artists' in track:
+        artists = ' '.join(artist['name'] for artist in track['artists'])
+    elif 'Artists' in track:
+        artists = track['Artists']
+    else:
+        raise Exception("None of the attributes %s are present in series %s" % (
+            ['artists', 'Artists'],
+            track
+        ))
+
+    title = get_attrib_or_fail(track, ['Title', 'name'])
+
+    # Remove some things that are usually in Rekordbox but not in Spotify
+    title = re.sub(r'(feat\.|featuring)', '', title, flags=re.IGNORECASE)
+    title = re.sub(r'original mix', '', title, flags=re.IGNORECASE)
+
+    string = artists + ' ' + title
+
+    # replace sequences of non-word characters with a single space
+    string = re.sub(r'\W+', ' ', string)
+
+    # get rid of capitalization problems
+    string = string.lower()
+
+    return string
+
+
+
 
 def pretty_print_tracks(tracks, indent='', enum=False):
     num_tracks = len(tracks)
@@ -77,44 +107,65 @@ def get_user_choice(prompt: str, options: list[str] = ['yes', 'no'], batch_mode:
         else:
             sys.stdout.write('Reply is ambiguous; try again.')
 
+def fuzzy_one_to_one_mapping(sequences1, sequences2, cutoff_ratio=0.6):
+    """Creates a one-to-one mapping between two string lists using fuzzy text matching.
+    Only pairings with a match ratio of at least cutoff_ratio are considered.
+    It is assumed that both sequences are relatively short and contain relatively short strings.
+    Returns:
+        {
+           pairs: [ { index1: <index into sequences1>,
+                      index2: <index into sequences2>,
+                      ratio: <match ratio>
+                      },
+                      ...
+           unmatched_indices1: [ indices into sequences1 ... ],
+           unmatched_indices2: [ indices into sequences2 ...]
+        }
+    """
 
-def dataframe_duplicate_index_labels(df):
-    """Returns the positions of duplicate index labels in a dataframe.
-    I'm surprised that Pandas doesn't already offer this."""
+    # using dict instead of set to preserve the order
+    unmatched_indices1 = { index: None for index in range(len(sequences1))}
+    unmatched_indices2 = { index: None for index in range(len(sequences2))}
 
-    unique_idx = df.index.unique()
+    sequence_matcher = difflib.SequenceMatcher()
 
-    if len(df.index) == len(unique_idx):
-        return []
+    all_pairs = []
 
-    already_seen_labels = set()
+    for index1 in range(len(sequences1)):
+        for index2 in range(len(sequences2)):
+            sequence_matcher.set_seqs(sequences1[index1], sequences2[index2])
+            ratio = sequence_matcher.ratio()
+            if ratio < cutoff_ratio:
+                continue
 
-    positions = []
+            all_pairs.append( {
+                'index1': index1,
+                'index2': index2,
+                'ratio': ratio
+            })
 
-    for i, label in enumerate(df.index):
-        if label in already_seen_labels:
-            positions.append(i)
-        else:
-            already_seen_labels.add(label)
+    all_pairs.sort(key=lambda x: x['ratio'], reverse=True)
 
-    assert len(positions) == len(df.index) - len(unique_idx)
+    result = []
 
-    return positions
+    for pair in all_pairs:
+        if len(unmatched_indices1) == 0:
+            break
+        if len(unmatched_indices2) == 0:
+            break
 
-def dataframe_drop_rows_at_positions(df, positions):
-    """Returns a new dataframe without the rows indicated by the positions.
-    I'm surprised pandas doesn't already offer this."""
+        if pair['index1'] not in unmatched_indices1:
+            continue
+        if pair['index2'] not in unmatched_indices2:
+            continue
 
-    new_df_index = [(i not in positions) for i in range(len(df))]
+        del unmatched_indices1[pair['index1']]
+        del unmatched_indices2[pair['index2']]
 
-    new_df = df.loc[new_df_index]
+        result.append(pair)
 
-    return new_df
-
-def dataframe_ensure_unique_index(df):
-    """Makes sure that all dataframe index entries are unique by removing rows that
-    have the same index label as a previous row. I'm surprised pandas doesn't already offer this."""
-
-    pos = dataframe_duplicate_index_labels(df)
-    return dataframe_drop_rows_at_positions(df, pos)
-
+    return {
+        'pairs': result,
+        'unmatched_indices1': unmatched_indices1,
+        'unmatched_indices2': unmatched_indices2
+    }

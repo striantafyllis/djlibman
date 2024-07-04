@@ -288,6 +288,24 @@ class SpotifyInterface:
 
         return df
 
+    def search(self, search_string, limit=10, raw=False):
+        # no batching
+        results = self._connection.search(q=search_string, limit=limit)
+
+        if raw:
+            return results
+
+        results = results['tracks']['items']
+
+        results = _postprocess_tracks(results)
+
+        df = pd.DataFrame.from_records(results)
+        if not df.empty:
+            df = df.set_index(df.id)
+
+        return df
+
+
 
     def add_tracks_to_playlist(self, playlist_name_or_id, tracks, check_for_duplicates=True):
         playlist_id = self._get_playlist_id_if_necessary(playlist_name_or_id)

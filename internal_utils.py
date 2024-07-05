@@ -195,7 +195,7 @@ def _move_backup(path, backup_num, max_backups):
         os.unlink(this_backup)
     else:
         # rename it to the next backup
-        _move_backup(path, backup_num+1)
+        _move_backup(path, backup_num+1, max_backups)
         next_backup = _backup_name(path, backup_num+1)
         os.rename(this_backup, next_backup)
 

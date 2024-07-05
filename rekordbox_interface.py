@@ -7,6 +7,7 @@ import sys
 import pandas as pd
 
 from internal_utils import *
+from utils import *
 
 # Rename some Rekordbox attributes
 _attrib_rename = {
@@ -82,6 +83,9 @@ class RekordboxInterface:
         self._refresh()
         return RekordboxInterface._reduce_playlist(self._playlists)
 
+    def pretty_print_playlist_names(self):
+        pretty_print(self.get_playlist_names())
+
     def get_playlist_track_ids(self, playlist_name):
         self._refresh()
 
@@ -104,6 +108,196 @@ class RekordboxInterface:
 
         track_ids = self.get_playlist_track_ids(playlist_name)
         return self._collection.loc[track_ids]
+
+    def _get_playlist_xml(self, playlist_name):
+        self._refresh()
+
+        if isinstance(playlist_name, str):
+            playlist_name = [playlist_name]
+
+        xml_root = self._xml.getroot()
+
+        playlists = None
+        for child in xml_root:
+            if child.tag == 'PLAYLISTS':
+                playlists = child
+                break
+        if playlists is None:
+            raise Exception('rekordbox.xml: no PLAYLISTS node')
+
+        playlist = playlists[0]
+        assert playlist.attrib['Name'] == 'ROOT'
+        assert playlist.attrib['Type'] == '0'
+
+        for i in range(len(playlist_name)):
+            name = playlist_name[i]
+
+            next_playlist = None
+            if playlist.attrib['Type'] != '0':
+                raise Exception('Playlist %s is not a folder playlist' % playlist_name[:(i-1)])
+
+            for child in playlist:
+                if child.attrib['Name'] == name:
+                    next_playlist = child
+                    break
+
+            if next_playlist is None:
+                raise Exception('Playlist %s not found in folder playlist %s' % (name, playlist_name[:(i-1)]))
+
+            playlist = next_playlist
+
+        return playlist
+
+    def add_playlist(self, playlist_name, track_ids=[], overwrite=False):
+        """Creates a new leaf playlist with the specified track IDs.
+           If any of the containing folder playlists don't exist, they will be created.
+           To create an empty folder playlist, set the last playlist name to None and the track IDs to empty"""
+        self._refresh()
+
+        if len(playlist_name) == 0:
+            raise Exception('Cannot create the top-level folder')
+
+        if playlist_name[-1] is None and len(track_ids) != 0:
+            raise Exception('The playlist is an empty folder playlist but track_ids specified')
+
+        if isinstance(track_ids, pd.DataFrame):
+            track_ids = track_ids.TrackID
+
+        # make sure the track IDs exist
+        if not isinstance(track_ids, pd.Index):
+            track_ids = pd.Index(track_ids, name='TrackID')
+
+        unknown_track_ids = track_ids.difference(self._collection.index, sort=False)
+        if len(unknown_track_ids) > 0:
+            raise Exception('Unknown track IDs: %s' % unknown_track_ids.to_list())
+
+        if isinstance(playlist_name, str):
+            playlist_name = [playlist_name]
+
+        xml_root = self._xml.getroot()
+
+        containing_folder = None
+        for child in xml_root:
+            if child.tag == 'PLAYLISTS':
+                containing_folder = child[0]
+                break
+        if containing_folder is None:
+            raise Exception('rekordbox.xml: no PLAYLISTS node')
+
+        assert containing_folder.attrib['Name'] == 'ROOT'
+
+        for i in range(len(playlist_name)-1):
+            if containing_folder.attrib['Type'] != '0':
+                raise Exception('Playlist %s is not a folder playlist' % playlist_name[:i])
+            next_containing_folder = None
+
+            for child in containing_folder:
+                if child.attrib['Name'] == playlist_name[i]:
+                    next_containing_folder = child
+                    break
+
+            if next_containing_folder is None:
+                print('Creating folder playlist %s' % playlist_name[:(i+1)])
+
+                next_containing_folder = ET.Element('NODE', attrib = {
+                    'Name': playlist_name[i],
+                    'Type': '0',
+                    'Count': '0'
+                })
+                containing_folder.append(next_containing_folder)
+                containing_folder.attrib['Count'] = str(int(containing_folder.attrib['Count'])+1)
+
+            containing_folder = next_containing_folder
+
+        name = playlist_name[-1]
+
+        if name is None:
+            # empty folder playlist case
+            return
+
+        insert_index = None
+        for i in range(len(containing_folder)):
+            child = containing_folder[i]
+
+            if child.attrib['Name'] == name:
+                if not overwrite:
+                    raise Exception('Playlist %s already exists' % playlist_name)
+                if child.attrib['Type'] != '1':
+                    raise Exception('Playlist %s already exists and is not a leaf playlist' % playlist_name)
+
+                containing_folder.remove(child)
+                insert_index = i
+                break
+
+        insert_index = len(containing_folder)
+        containing_folder.attrib['Count'] = str(len(containing_folder)+1)
+
+        playlist = ET.Element('NODE', attrib = {
+            'Name': name,
+            'Type': '1',
+            'KeyType': '0',
+            'Entries': str(len(track_ids))
+        })
+
+        for track_id in track_ids:
+            track = ET.Element('TRACK', attrib = {
+                'Key': str(track_id)
+            })
+            playlist.append(track)
+
+        containing_folder.insert(insert_index, playlist)
+
+        return
+
+    def delete_playlist(self, playlist_name, recursive=False):
+        """Deletes a playlist. If recursive=False, trying to delete a non-empty folder will cause an exception."""
+        self._refresh()
+
+        if len(playlist_name) == 0:
+            raise Exception('Cannot create the top-level folder')
+
+        if isinstance(playlist_name, str):
+            playlist_name = [playlist_name]
+
+        xml_root = self._xml.getroot()
+
+        playlist = None
+        for child in xml_root:
+            if child.tag == 'PLAYLISTS':
+                playlist = child[0]
+                break
+        if playlist is None:
+            raise Exception('rekordbox.xml: no PLAYLISTS node')
+
+        assert playlist.attrib['Name'] == 'ROOT'
+
+        for i in range(len(playlist_name)):
+            if playlist.attrib['Type'] != '0':
+                raise Exception('Playlist %s is not a folder playlist' % playlist_name[:i])
+            next_playlist = None
+
+            for child in playlist:
+                if child.attrib['Name'] == playlist_name[i]:
+                    next_playlist = child
+                    break
+
+            if next_playlist is None:
+                raise Exception('Playlist %s does not exist' % playlist_name[:(i+1)])
+
+            containing_playlist = playlist
+            playlist = next_playlist
+
+        if not recursive and playlist.attrib['Type'] == '0' and len(playlist) > 0:
+            raise Exception('Playlist %s is a non-empty folder' % playlist_name)
+
+        containing_playlist.remove(playlist)
+        containing_playlist.attrib['Count'] = str(int(containing_playlist.attrib['Count'])-1)
+
+        return
+
+
+
+
 
     def write(self):
         if self._xml is None:

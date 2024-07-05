@@ -1,4 +1,9 @@
 
+import re
+import os
+import os.path
+import shutil
+
 import numpy as np
 import pandas as pd
 
@@ -152,3 +157,61 @@ def get_attrib_or_fail(series, attrib_possible_names):
         if attrib in series:
             return series[attrib]
     raise Exception('None of the attributes %s are present in series %s' % (attrib_possible_names, series))
+
+
+def delete_backups(path):
+    filename = os.path.basename(path)
+    directory = os.path.dirname(path)
+
+    potential_backups = os.listdir(directory)
+
+    backups = [
+        backup for backup in potential_backups
+        if backup.startswith(filename) and re.fullmatch(r'\.bak(\.[0-9]+)?', backup[len(filename):])
+    ]
+
+    if len(backups) == 0:
+        return
+
+    for backup in backups:
+        os.unlink(os.path.join(directory, backup))
+
+    return
+
+def _backup_name(path, backup_num):
+    if backup_num == 0:
+        return path + '.bak'
+    else:
+        return path + '.bak' + '.%d' % backup_num
+
+def _move_backup(path, backup_num, max_backups):
+    this_backup = _backup_name(path, backup_num)
+
+    if not os.path.exists(this_backup):
+        return
+
+    if backup_num >= max_backups-1:
+        # just delete it
+        os.unlink(this_backup)
+    else:
+        # rename it to the next backup
+        _move_backup(path, backup_num+1)
+        next_backup = _backup_name(path, backup_num+1)
+        os.rename(this_backup, next_backup)
+
+    return
+
+def back_up_file(path, max_backups):
+    if max_backups <= 0:
+        return
+
+    if not os.path.exists(path):
+        return
+
+    _move_backup(path, 0, max_backups)
+
+    backup = _backup_name(path, 0)
+    # os.rename(self._path, backup)
+    shutil.copyfile(path, backup)
+    return
+

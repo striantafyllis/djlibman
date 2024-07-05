@@ -49,6 +49,25 @@ class Context:
     def set_backups(self, backups):
         self.backups = backups
 
+    def set_rekordbox(self, **kwargs):
+        if self.rekordbox is not None:
+            raise Exception('Rekordbox already set')
+
+        if 'rekordbox_xml' not in kwargs:
+            raise Exception('Rekordbox: field rekordbox_xml has to be specified')
+        else:
+            rekordbox_xml = kwargs['rekordbox_xml']
+            del kwargs['rekordbox_xml']
+
+        if 'backups' not in kwargs:
+            kwargs['backups'] = self.backups
+
+        self.rekordbox = rekordbox_interface.RekordboxInterface(rekordbox_xml, **kwargs)
+
+        return
+
+
+
     def add_doc(self, name, type, **kwargs):
         if name in self.docs:
             raise Exception("Duplicate doc name: '%s'" % name)
@@ -64,7 +83,8 @@ class Context:
             path = kwargs['path']
             del kwargs['path']
 
-            kwargs['backups'] = self.backups
+            if 'backups' not in kwargs:
+                kwargs['backups'] = self.backups
 
             if type == 'excel':
                 doc = file_interface.ExcelSheet(path, **kwargs)
@@ -172,7 +192,17 @@ def main():
                     raise Exception('Unknown field in config section %s: %s' % (section_name, field))
 
         elif section_name == 'rekordbox':
-            context.rekordbox = rekordbox_interface.RekordboxInterface(section)
+            kwargs = {}
+
+            for field in section.keys():
+                if field in ['rekordbox_xml']:
+                    kwargs[field] = section[field]
+                elif field in ['backups']:
+                    kwargs[field] = section.getint(field)
+                else:
+                    raise Exception('Unknown field in config section %s: %s' % (section_name, field))
+
+            context.set_rekordbox(**kwargs)
 
         elif section.name == 'google':
             context.google = google_interface.GoogleInterface(section)
@@ -191,14 +221,10 @@ def main():
                     continue
                 if field in ['path', 'index_column', 'sheet', 'datetime_format']:
                     kwargs[field] = section[field]
-                elif field == 'header':
-                    kwargs['header'] = section.getint('header')
-                elif field == 'list_columns':
-                    kwargs['list_columns'] = ast.literal_eval(section['list_columns'])
-                elif field == 'boolean_columns':
-                    kwargs['boolean_columns'] = ast.literal_eval(section['boolean_columns'])
-                elif field == 'datetime_columns':
-                    kwargs['datetime_columns'] = ast.literal_eval(section['datetime_columns'])
+                elif field in ['header', 'backups']:
+                    kwargs[field] = section.getint(field)
+                elif field in ['list_columns', 'boolean_columns', 'datetime_columns']:
+                    kwargs[field] = ast.literal_eval(section[field])
                 else:
                     raise Exception("Unknown field in config section %s: %s" % (section_name, field))
 

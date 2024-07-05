@@ -1,8 +1,4 @@
 
-import os
-import os.path
-import re
-import shutil
 
 import pandas as pd
 import numpy as np
@@ -10,6 +6,7 @@ import numpy as np
 # needed for calls to eval() on csvs etc.
 from pandas import Timestamp
 
+from internal_utils import *
 from utils import *
 
 
@@ -103,74 +100,18 @@ class FileDoc:
 
         return self._contents
 
-    def delete_backups(self):
-        filename = os.path.basename(self._path)
-        directory = os.path.dirname(self._path)
-
-        potential_backups = os.listdir(directory)
-
-        backups = [
-            backup for backup in potential_backups
-            if backup.startswith(filename) and re.fullmatch(r'\.bak(\.[0-9]+)?', backup[len(filename):])
-        ]
-
-        if len(backups) == 0:
-            return
-
-        print('Potential backup files for doc %s: %s' % (self._path, backups))
-        choice = get_user_choice('Delete?')
-
-        if choice == 'yes':
-            for backup in backups:
-                os.unlink(os.path.join(directory, backup))
-
-        return
-
-    def _backup_name(self, backup_num):
-        if backup_num == 0:
-            return self._path + '.bak'
-        else:
-            return self._path + '.bak' + '.%d' % backup_num
-
-    def _move_backup(self, backup_num):
-        this_backup = self._backup_name(backup_num)
-
-        if not os.path.exists(this_backup):
-            return
-
-        if backup_num >= self._backups-1:
-            # just delete it
-            os.unlink(this_backup)
-        else:
-            # rename it to the next backup
-            self._move_backup(backup_num+1)
-            next_backup = self._backup_name(backup_num+1)
-            os.rename(this_backup, next_backup)
-
-        return
-
-    def _backup_current(self):
-        if self._backups <= 0:
-            return
-
-        if not os.path.exists(self._path):
-            return
-
-        self._move_backup(0)
-
-        backup = self._backup_name(0)
-        # os.rename(self._path, backup)
-        shutil.copyfile(self._path, backup)
-        return
-
     def write(self, df):
-        self._backup_current()
+        back_up_file(self._path, self._backups)
 
         df2 = pd.DataFrame(df)
         for column_name, deconverter in self._deconverters.items():
             df2[column_name] = df2[column_name].apply(deconverter)
 
         self._raw_write(df2)
+        return
+
+    def delete_backups(self):
+        delete_backups(self._path)
         return
 
 

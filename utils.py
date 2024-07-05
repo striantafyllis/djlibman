@@ -76,6 +76,28 @@ def pretty_print_tracks(tracks, indent='', enum=False):
 
     return
 
+def pretty_print(data_structure, indent='', level_indent=' '*4):
+    """Good for pretty-printing nested maps and lists"""
+    if isinstance(data_structure, dict):
+        sys.stdout.write('{\n')
+        for key, value in data_structure.items():
+            sys.stdout.write(indent + level_indent + repr(key) + ': ')
+            pretty_print(value, indent=indent+level_indent, level_indent=level_indent)
+        sys.stdout.write(indent + '}\n')
+    elif isinstance(data_structure, list):
+        sys.stdout.write('[\n')
+        for value in data_structure:
+            sys.stdout.write(indent + level_indent)
+            pretty_print(value, indent=indent+level_indent, level_indent=level_indent)
+        sys.stdout.write(indent + ']\n')
+    else:
+        sys.stdout.write(repr(data_structure) + '\n')
+
+    sys.stdout.flush()
+    return
+
+
+
 def get_user_choice(prompt: str, options: list[str] = ['yes', 'no'], batch_mode: bool = False, exit_option=True):
     """Allows the user to choose among a number of options by typing any unambiguous prefix
     (usually the first letter) of an option"""

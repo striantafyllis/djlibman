@@ -148,7 +148,7 @@ class RekordboxInterface:
 
         return playlist
 
-    def add_playlist(self, playlist_name, track_ids=[], overwrite=False):
+    def create_playlist(self, playlist_name, track_ids=[], overwrite=False):
         """Creates a new leaf playlist with the specified track IDs.
            If any of the containing folder playlists don't exist, they will be created.
            To create an empty folder playlist, set the last playlist name to None and the track IDs to empty"""

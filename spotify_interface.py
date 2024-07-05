@@ -200,6 +200,13 @@ class SpotifyInterface:
 
         return playlists.at[playlist_name, 'id']
 
+    def add_playlist(self, playlist_name):
+        self._connection.user_playlist_create(user=self._connection.current_user(),
+                                              name=playlist_name,
+                                              public=False,
+                                              collaborative=False)
+        return
+
     def _get_playlist_id_if_necessary(self, playlist_name_or_id):
         # Spotify playlist IDs are base-62 numbers and they are usually about 22 digits long
         if len(playlist_name_or_id) > 20 and BASE_62.match(playlist_name_or_id):
@@ -304,8 +311,6 @@ class SpotifyInterface:
             df = df.set_index(df.id)
 
         return df
-
-
 
     def add_tracks_to_playlist(self, playlist_name_or_id, tracks, check_for_duplicates=True):
         playlist_id = self._get_playlist_id_if_necessary(playlist_name_or_id)

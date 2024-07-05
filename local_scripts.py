@@ -86,7 +86,6 @@ def djlib_sanity_checks(ctx=None):
     print('djlib excel sheet: %d tracks' % len(djlib_tracks))
 
     rekordbox_tracks = ctx.rekordbox.get_collection()
-    main_library_tracks = ctx.rekordbox.get_playlist_tracks('Main Library')
 
     errors = 0
 

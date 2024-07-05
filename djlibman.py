@@ -23,9 +23,11 @@ import numpy as np
 from utils import *
 from spotify_scripts import *
 from local_scripts import *
+from playlist_scripts import *
 
 import spotify_scripts
 import local_scripts
+import playlist_scripts
 
 def test_func():
     print('Test')
@@ -155,6 +157,7 @@ def main():
     context = Context()
     local_scripts.context = context
     spotify_scripts.context = context
+    playlist_scripts.context = context
 
     parser = argparse.ArgumentParser(
         prog='djlibman.py',

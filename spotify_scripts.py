@@ -70,6 +70,9 @@ def add_to_queue_history(ctx=None, new_tracks=[]):
     if ctx is None:
         ctx = context
 
+    if len(new_tracks) == 0:
+        return
+
     queue_history = ctx.docs['queue_history']
     queue_history_tracks = queue_history.read()
     print('Queue history: %d tracks' % len(queue_history_tracks))
@@ -77,9 +80,13 @@ def add_to_queue_history(ctx=None, new_tracks=[]):
     if queue_history_tracks.index.name != 'id':
         raise Exception('queue_history not indexed by ID')
 
-    for column in queue_history_tracks.columns:
-        if column not in new_tracks.columns:
-            raise Exception("New items are missing column '%s'" % column)
+    if not isinstance(new_tracks, pd.DataFrame):
+        new_tracks = pd.DataFrame(new_tracks, columns=queue_history.columns)
+        new_tracks = new_tracks.set_index(new_tracks[queue_history.index.name])
+    else:
+        for column in queue_history_tracks.columns:
+            if column not in new_tracks.columns:
+                raise Exception("New items are missing column '%s'" % column)
 
     # this takes care of extra columns, columns in different order etc.
     new_tracks = new_tracks[queue_history_tracks.columns]
@@ -455,6 +462,7 @@ def add_shazam_to_l2_queue(
         shazam_tracks = ctx.spotify.get_playlist_tracks(shazam_id)
 
     print("'%s' playlist: %d tracks" % (shazam_name, len(shazam_tracks)))
+    pretty_print_tracks(shazam_tracks, indent=' '*4, enum=True)
 
     if len(shazam_tracks) == 0:
         return l2_queue_tracks

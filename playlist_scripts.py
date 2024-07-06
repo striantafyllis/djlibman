@@ -1,11 +1,9 @@
 
 import re
-import pandas as pd
 
-from internal_utils import *
+from djlib_config import *
 from utils import *
 
-from spotify_scripts import *
 from local_scripts import *
 
 
@@ -38,12 +36,8 @@ _playlists = {
         lambda track: track['Date Added'] >= pd.Timestamp.now() - pd.Timedelta(60, 'days')
 }
 
-def djlib_values_sanity_check(ctx=None):
-    global context
-    if ctx is None:
-        ctx = context
-
-    djlib_tracks = ctx.docs['djlib'].read()
+def djlib_values_sanity_check():
+    djlib_tracks = docs['djlib'].read()
 
     errors = 0
 
@@ -62,7 +56,6 @@ def djlib_values_sanity_check(ctx=None):
     return (errors == 0)
 
 def build_playlist(name,
-                   ctx=None,
                    condition=None,
                    rekordbox=False,
                    spotify=False,
@@ -71,16 +64,12 @@ def build_playlist(name,
                    rekordbox_overwrite=True,
                    spotify_prefix='DJ ',
                    spotify_overwrite=True):
-    global context, _playlists
-
-    global context
-    if ctx is None:
-        ctx = context
+    global _playlists
 
     if condition is None:
         condition = _playlists[name]
 
-    djlib_tracks = ctx.docs['djlib'].read()
+    djlib_tracks = docs['djlib'].read()
 
     tracks_filter = djlib_tracks.apply(condition, axis=1)
 
@@ -102,11 +91,11 @@ def build_playlist(name,
 
         print()
         print('Creating Rekordbox playlist %s' % rekordbox_full_name)
-        ctx.rekordbox.create_playlist(rekordbox_full_name, djlib_playlist, overwrite=rekordbox_overwrite)
-        ctx.rekordbox.write()
+        rekordbox.create_playlist(rekordbox_full_name, djlib_playlist, overwrite=rekordbox_overwrite)
+        rekordbox.write()
 
     if spotify:
-        rekordbox_to_spotify_mapping = ctx.docs['rekordbox_to_spotify'].read()
+        rekordbox_to_spotify_mapping = docs['rekordbox_to_spotify'].read()
 
         # remove empty mappings
         rekordbox_to_spotify_mapping = rekordbox_to_spotify_mapping.loc[
@@ -127,7 +116,7 @@ def build_playlist(name,
 
         spotify_playlist_name = spotify_prefix + name
 
-        spotify_playlists = ctx.spotify.get_playlists()
+        spotify_playlists = spotify.get_playlists()
 
         if spotify_playlist_name in spotify_playlists.index:
             spotify_playlist_id = spotify_playlists.at[spotify_playlist_name, 'id']
@@ -135,7 +124,7 @@ def build_playlist(name,
             if not spotify_overwrite:
                 raise Exception("Spotify playlist '%s' already exists" % spotify_playlist_name)
 
-            spotify_playlist_tracks = ctx.spotify.get_playlist_tracks(spotify_playlist_id)
+            spotify_playlist_tracks = spotify.get_playlist_tracks(spotify_playlist_id)
 
             spotify_ids_to_remove = spotify_playlist_tracks.index.difference(
                 djlib_playlist_with_spotify.spotify_id,
@@ -154,8 +143,8 @@ def build_playlist(name,
                 len(spotify_ids_to_add)
             ))
 
-            ctx.spotify.remove_tracks_from_playlist(spotify_playlist_id, spotify_ids_to_remove)
-            ctx.spotify.add_tracks_to_playlist(spotify_playlist_id, spotify_ids_to_add)
+            spotify.remove_tracks_from_playlist(spotify_playlist_id, spotify_ids_to_remove)
+            spotify.add_tracks_to_playlist(spotify_playlist_id, spotify_ids_to_add)
 
         else:
             print("Creating Spotify playlist '%s' with %d tracks" % (
@@ -163,7 +152,7 @@ def build_playlist(name,
                 len(djlib_playlist_with_spotify)
             ))
 
-            ctx.spotify.add_playlist(spotify_playlist_name)
-            ctx.spotify.add_tracks_to_playlist(djlib_playlist_with_spotify.spotify_id)
+            spotify.add_playlist(spotify_playlist_name)
+            spotify.add_tracks_to_playlist(djlib_playlist_with_spotify.spotify_id)
 
     return

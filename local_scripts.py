@@ -2,20 +2,13 @@
 import pandas as pd
 import numpy as np
 
-from internal_utils import *
+from djlib_config import *
 from utils import *
 
-context = None
-
-def rekordbox_sanity_checks(ctx=None):
-    global context
-
-    if ctx is None:
-        ctx = context
-
+def rekordbox_sanity_checks():
     top_level_playlist_names = ['Main Library', 'back catalog', 'non-DJ']
 
-    collection = ctx.rekordbox.get_collection()
+    collection = rekordbox.get_collection()
     print('Rekordbox collection: %d tracks' % len(collection))
 
     errors = 0
@@ -24,7 +17,7 @@ def rekordbox_sanity_checks(ctx=None):
     top_level_playlists = []
     for name in top_level_playlist_names:
         try:
-            playlist = ctx.rekordbox.get_playlist_track_ids(name)
+            playlist = rekordbox.get_playlist_track_ids(name)
             top_level_playlists.append(playlist)
         except KeyError:
             sys.stderr.write("Top-level rekordbox playlist '%s' does not exist\n" % playlist)
@@ -75,17 +68,13 @@ def rekordbox_sanity_checks(ctx=None):
 
     return True
 
-def djlib_sanity_checks(ctx=None):
-    global context
-    if ctx is None:
-        ctx = context
-
-    djlib = ctx.docs['djlib']
+def djlib_sanity_checks():
+    djlib = docs['djlib']
     djlib_tracks = djlib.read()
 
     print('djlib excel sheet: %d tracks' % len(djlib_tracks))
 
-    rekordbox_tracks = ctx.rekordbox.get_collection()
+    rekordbox_tracks = rekordbox.get_collection()
 
     errors = 0
 
@@ -120,18 +109,14 @@ def djlib_sanity_checks(ctx=None):
 
     return True
 
-def djlib_maintenance(ctx=None):
-    global context
-    if ctx is None:
-        ctx = context
-
+def djlib_maintenance():
     djlib_tracks_changed = False
 
-    djlib = ctx.docs['djlib']
-    new_tracks_sheet = ctx.docs['new_tracks_scratch']
+    djlib = docs['djlib']
+    new_tracks_sheet = docs['new_tracks_scratch']
 
     djlib_tracks = djlib.read()
-    rekordbox_main_library_tracks = ctx.rekordbox.get_playlist_tracks('Main Library')
+    rekordbox_main_library_tracks = rekordbox.get_playlist_tracks('Main Library')
 
     if djlib_tracks.index.name != rekordbox_main_library_tracks.index.name:
         raise Exception('djlib and Rekordbox have different indices: %s vs. %s' % (
@@ -252,14 +237,9 @@ def djlib_maintenance(ctx=None):
     return
 
 
-def rekordbox_to_spotify_maintenance(ctx=None,
-                                     rekordbox_main_playlist='Main Library',
+def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
                                      cutoff_ratio=0.6):
-    global context
-    if ctx is None:
-        ctx = context
-
-    main_playlist_tracks = ctx.rekordbox.get_playlist_tracks(rekordbox_main_playlist)
+    main_playlist_tracks = rekordbox.get_playlist_tracks(rekordbox_main_playlist)
     print("Rekordbox '%s' playlist: %d tracks" % (
         rekordbox_main_playlist, len(main_playlist_tracks)))
 
@@ -269,7 +249,7 @@ def rekordbox_to_spotify_maintenance(ctx=None,
     )
     main_playlist_tracks = main_playlist_tracks[should_map]
 
-    rekordbox_to_spotify = ctx.docs['rekordbox_to_spotify']
+    rekordbox_to_spotify = docs['rekordbox_to_spotify']
 
     rekordbox_to_spotify_mapping = rekordbox_to_spotify.read()
     print('Rekordbox to Spotify mapping: %d entries' % len(rekordbox_to_spotify_mapping))
@@ -289,7 +269,7 @@ def rekordbox_to_spotify_maintenance(ctx=None,
 
     choice = get_user_choice('Look for mappings in Spotify Liked Tracks?')
     if choice == 'yes':
-        spotify_liked_tracks = ctx.spotify.get_liked_tracks()
+        spotify_liked_tracks = spotify.get_liked_tracks()
 
         spotify_unmapped_liked_tracks_idx = spotify_liked_tracks.index.difference(
             rekordbox_to_spotify_mapping.spotify_id, sort=False
@@ -358,7 +338,7 @@ def rekordbox_to_spotify_maintenance(ctx=None,
 
                 search_string = format_track_for_search(rekordbox_track)
 
-                spotify_tracks = ctx.spotify.search(search_string)
+                spotify_tracks = spotify.search(search_string)
 
                 done = False
                 if len(spotify_tracks) == 0:

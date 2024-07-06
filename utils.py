@@ -191,3 +191,51 @@ def fuzzy_one_to_one_mapping(sequences1, sequences2, cutoff_ratio=0.6):
         'unmatched_indices1': unmatched_indices1,
         'unmatched_indices2': unmatched_indices2
     }
+
+
+
+def list_condition(condition, mode='or'):
+    def _apply_condition_to_list(lst, condition, mode='or'):
+        for el in lst:
+            if condition(el):
+                if mode == 'or':
+                    return True
+            else:
+                if mode == 'and':
+                    return False
+
+        # empty list case
+        return mode == 'and'
+
+    if mode not in ['and', 'or']:
+        raise Exception("Invalid mode '%s'" % mode)
+
+    return lambda lst: _apply_condition_to_list(lst, condition, mode=mode)
+
+
+def artist_name_condition(name_condition, mode='or'):
+    if mode not in ['and', 'or']:
+        raise Exception("Invalid mode '%s'" % mode)
+
+    return lambda row: list_condition(lambda el: name_condition(el['name']))(row.artists)
+
+
+def artist_stats(tracks, count_cutoff=10):
+    artists_to_counts = {}
+
+    def _handle_artists(artists):
+        for artist in artists:
+            artists_to_counts[artist['name']] = artists_to_counts.get(artist['name'], 0) + 1
+
+    tracks.artists.apply(_handle_artists)
+
+    artist_names = list(artists_to_counts)
+    artist_names.sort(key=lambda x: artists_to_counts[x], reverse=True)
+
+    for artist_name in artist_names:
+        count = artists_to_counts[artist_name]
+        if count < count_cutoff:
+            break
+        print('%s: %d' % (artist_name, count))
+
+    return

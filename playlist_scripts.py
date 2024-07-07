@@ -1,11 +1,6 @@
 
-import re
-
 from djlib_config import *
 from utils import *
-
-from local_scripts import *
-
 
 _playlists = {
     'ALL 120':
@@ -33,32 +28,15 @@ _playlists = {
         lambda track: track.BPM <= 110 and track.Class[0] in ['C', 'X'],
 
     'recent':
-        lambda track: track['Date Added'] >= pd.Timestamp.now() - pd.Timedelta(60, 'days')
+        lambda track: track['Date Added'] >= pd.Timestamp.utcnow() - pd.Timedelta(60, 'days')
 }
 
-def djlib_values_sanity_check():
-    djlib_tracks = docs['djlib'].read()
-
-    errors = 0
-
-    bad_class_filter = djlib_tracks.apply(
-        lambda track: not re.match(r'[ABCX][1-5]?', track.Class),
-        axis=1
-    )
-    bad_class_tracks = djlib_tracks.loc[bad_class_filter]
-
-    if len(bad_class_tracks) > 0:
-        errors += 1
-
-        print('%d djilb tracks have a malformed Class field' % len(bad_class_tracks))
-        pretty_print_tracks(bad_class_tracks, indent=' '*4, enum=True)
-
-    return (errors == 0)
 
 def build_playlist(name,
                    condition=None,
-                   rekordbox=False,
-                   spotify=False,
+                   print_tracks=True,
+                   do_rekordbox=False,
+                   do_spotify=False,
                    rekordbox_folder=['managed'],
                    rekordbox_prefix='',
                    rekordbox_overwrite=True,
@@ -76,9 +54,10 @@ def build_playlist(name,
     djlib_playlist = djlib_tracks.loc[tracks_filter]
 
     print("Playlist '%s': %d tracks" % (name, len(djlib_playlist)))
-    pretty_print_tracks(djlib_playlist, indent=' '*4, enum=True)
+    if print_tracks:
+        pretty_print_tracks(djlib_playlist, indent=' '*4, enum=True)
 
-    if rekordbox:
+    if do_rekordbox:
         rekordbox_name = rekordbox_prefix + name
         if rekordbox_folder is None:
             rekordbox_full_name = [rekordbox_name]
@@ -94,7 +73,7 @@ def build_playlist(name,
         rekordbox.create_playlist(rekordbox_full_name, djlib_playlist, overwrite=rekordbox_overwrite)
         rekordbox.write()
 
-    if spotify:
+    if do_spotify:
         rekordbox_to_spotify_mapping = docs['rekordbox_to_spotify'].read()
 
         # remove empty mappings
@@ -143,8 +122,10 @@ def build_playlist(name,
                 len(spotify_ids_to_add)
             ))
 
-            spotify.remove_tracks_from_playlist(spotify_playlist_id, spotify_ids_to_remove)
-            spotify.add_tracks_to_playlist(spotify_playlist_id, spotify_ids_to_add)
+            if len(spotify_ids_to_remove) > 0:
+                spotify.remove_tracks_from_playlist(spotify_playlist_id, spotify_ids_to_remove)
+            if len(spotify_ids_to_add) > 0:
+                spotify.add_tracks_to_playlist(spotify_playlist_id, spotify_ids_to_add)
 
         else:
             print("Creating Spotify playlist '%s' with %d tracks" % (
@@ -153,6 +134,32 @@ def build_playlist(name,
             ))
 
             spotify.add_playlist(spotify_playlist_name)
-            spotify.add_tracks_to_playlist(djlib_playlist_with_spotify.spotify_id)
+            spotify.add_tracks_to_playlist(spotify_playlist_name, djlib_playlist_with_spotify.spotify_id)
+
+    return
+
+
+def playlist_maintenance(do_rekordbox=True, do_spotify=True):
+    # build Main Library on Spotify; it already exists in Rekordbox
+    build_playlist(
+        'Main Library',
+        condition=lambda x: True,
+        print_tracks=False,
+        do_rekordbox=False,
+        do_spotify=True,
+        spotify_overwrite=True
+    )
+
+    # build the class playlists
+    for playlist, condition in _playlists.items():
+        build_playlist(
+            playlist,
+            condition=condition,
+            print_tracks=False,
+            do_rekordbox=do_rekordbox,
+            do_spotify=do_spotify,
+            rekordbox_overwrite=True,
+            spotify_overwrite=True
+        )
 
     return

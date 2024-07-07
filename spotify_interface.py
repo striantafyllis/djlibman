@@ -201,7 +201,7 @@ class SpotifyInterface:
         return playlists.at[playlist_name, 'id']
 
     def add_playlist(self, playlist_name):
-        self._connection.user_playlist_create(user=self._connection.current_user(),
+        self._connection.user_playlist_create(user=self._connection.current_user()['id'],
                                               name=playlist_name,
                                               public=False,
                                               collaborative=False)

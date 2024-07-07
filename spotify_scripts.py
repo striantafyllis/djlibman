@@ -572,3 +572,9 @@ def manage_spotify_queues(
 
     return
 
+def pretty_print_spotify_playlist(playlist_name):
+    tracks = spotify.get_playlist_tracks(playlist_name)
+
+    print("Spotify playlist '%s': %d tracks" % (playlist_name, len(tracks)))
+    pretty_print_tracks(tracks, enum=True)
+    return

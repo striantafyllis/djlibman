@@ -5,6 +5,8 @@ import numpy as np
 from djlib_config import *
 from utils import *
 
+import playlist_scripts
+
 def rekordbox_sanity_checks():
     top_level_playlist_names = ['Main Library', 'back catalog', 'non-DJ']
 
@@ -109,7 +111,27 @@ def djlib_sanity_checks():
 
     return True
 
-def djlib_maintenance():
+
+def djlib_values_sanity_check():
+    djlib_tracks = docs['djlib'].read()
+
+    errors = 0
+
+    bad_class_filter = djlib_tracks.apply(
+        lambda track: not re.match(r'[ABCX][1-5]?', track.Class),
+        axis=1
+    )
+    bad_class_tracks = djlib_tracks.loc[bad_class_filter]
+
+    if len(bad_class_tracks) > 0:
+        errors += 1
+
+        print('%d djilb tracks have a malformed Class field' % len(bad_class_tracks))
+        pretty_print_tracks(bad_class_tracks, indent=' '*4, enum=True)
+
+    return (errors == 0)
+
+def djlib_maintenance(cutoff_ratio=0.3):
     djlib_tracks_changed = False
 
     djlib = docs['djlib']
@@ -158,6 +180,8 @@ def djlib_maintenance():
 
             print('djlib now has %d tracks' % len(djlib_tracks))
 
+            djlib.write(djlib_tracks)
+
     # see if there are any empty rows in djlib
     djlib_tracks_is_empty_row = None
     for column in djlib_user_columns:
@@ -167,68 +191,67 @@ def djlib_maintenance():
         else:
             djlib_tracks_is_empty_row &= column_is_empty
 
+    # fill in empty rows in djlib from the New Tracks sheet
     djlib_tracks_empty_rows = djlib_tracks.loc[djlib_tracks_is_empty_row]
-
     if len(djlib_tracks_empty_rows) == 0:
-        print('No empty rows in djlib; skipping New Tracks sheet')
+        return
+
+    choice = get_user_choice('djlib has %d empty rows; look in New Tracks sheet?' % len(djlib_tracks_empty_rows))
+    if choice != 'yes':
+        return
+
+    new_tracks = new_tracks_sheet.read()
+
+    if len(new_tracks) == 0:
+        print('Nothing in New Tracks sheet')
     else:
-        print('djlib has %d empty rows; looking in New Tracks sheet' % len(djlib_tracks_empty_rows))
-        pretty_print_tracks(djlib_tracks_empty_rows, indent=' '*4, enum=True)
+        new_tracks_unknown_cols = new_tracks.columns.difference(djlib_tracks.columns, sort=False)
 
-        new_tracks = new_tracks_sheet.read()
+        if len(new_tracks_unknown_cols) > 0:
+            sys.stderr.write('New Tracks sheet has unknown columns %s; these will be ignored.\n' %
+                             new_tracks_unknown_cols.to_list())
 
-        if len(new_tracks) == 0:
-            print('Nothing in New Tracks sheet')
+        new_tracks_usable_cols = new_tracks.columns.intersection(djlib_tracks.columns, sort=False)
+
+        if len(new_tracks_usable_cols) == 0:
+            sys.stderr.write('New Tracks sheet has no usable columns; ignoring.\n')
+        elif 'Title' not in new_tracks_usable_cols:
+            sys.stderr.write('New Tracks does not have a Title column; ignoring.\n')
         else:
-            new_tracks_unknown_cols = new_tracks.columns.difference(djlib_tracks.columns, sort=False)
+            new_tracks_usable_cols = new_tracks_usable_cols[new_tracks_usable_cols != 'Title']
 
-            if len(new_tracks_unknown_cols) > 0:
-                sys.stderr.write('New Tracks sheet has unknown columns %s; these will be ignored.\n' %
-                                 new_tracks_unknown_cols.to_list())
+            print('Attempting to create a mapping between %d empty djlib rows and %d New Tracks entries' % (
+                len(djlib_tracks_empty_rows),
+                len(new_tracks)
+            ))
 
-            new_tracks_usable_cols = new_tracks.columns.intersection(djlib_tracks.columns, sort=False)
+            result = fuzzy_one_to_one_mapping(
+                djlib_tracks_empty_rows.Title.apply(format_track_for_search).to_list(),
+                new_tracks.Title.apply(format_track_for_search).to_list(),
+                cutoff_ratio=cutoff_ratio
+            )
 
-            if len(new_tracks_usable_cols) == 0:
-                sys.stderr.write('New Tracks sheet has no usable columns; ignoring.\n')
-            elif 'Title' not in new_tracks_usable_cols:
-                sys.stderr.write('New Tracks does not have a Title column; ignoring.\n')
-            else:
-                new_tracks_usable_cols = new_tracks_usable_cols[new_tracks_usable_cols != 'Title']
+            djlib_tracks_changed = False
+            if len(result['pairs']) > 0:
+                print('Found the following potential mappings:')
 
-                djlib_tracks_idx = []
-                new_tracks_idx = []
-
-                for i in range(len(new_tracks)):
-                    new_track_title = new_tracks.Title.iloc[i]
-                    djlib_tracks_loc = None
-                    for j in range(len(djlib_tracks_empty_rows)):
-                        djlib_title = djlib_tracks_empty_rows.Title.iloc[j]
-                        if new_track_title.upper() in djlib_title.upper():
-                            djlib_tracks_loc = j
-                            break
-
-                    if djlib_tracks_loc is None:
-                        print("No hit for New Tracks title '%s'" % new_track_title)
-                    else:
-                        djlib_tracks_idx.append(djlib_tracks_empty_rows.index[djlib_tracks_loc])
-                        new_tracks_idx.append(new_tracks.index[i])
-
-                if len(new_tracks_idx) == 0:
-                    print('No usable entries found in New Tracks')
-                else:
-                    usable_new_tracks = new_tracks.loc[new_tracks_idx]
-                    print('Found %d usable entries in New Tracks:' % len(usable_new_tracks))
-                    for title in usable_new_tracks.Title:
-                        print('    %s' % title)
-                    choice = get_user_choice('Write to djlib?')
+                for mapping in result['pairs']:
+                    djlib_idx = mapping['index1']
+                    new_track_idx = mapping['index2']
+                    print()
+                    print('djlib: %s' % format_track(djlib_tracks_empty_rows.iloc[djlib_idx]))
+                    print('New Tracks: %s' % new_tracks.iloc[new_track_idx].Title)
+                    print('Match ratio: %.2f' % mapping['ratio'])
+                    choice = get_user_choice('Accept?')
                     if choice == 'yes':
-                        # for col in new_tracks_usable_cols:
-                        #     # the astype conversion is necessary for some columns that are usually empty in New Tracks - e.g. Notes
-                        #     djlib_tracks.loc[djlib_tracks_idx, col] = usable_new_tracks[col].to_numpy()
+                        # an extra maneuver here to do the assignment in one step;
+                        # chained assignment may stop working in future versions of Pandas
+                        djlib_tracks.loc[
+                            djlib_tracks_empty_rows.index[djlib_idx],
+                            new_tracks_usable_cols
+                        ] =\
+                          new_tracks.iloc[new_track_idx][new_tracks_usable_cols]
 
-                        # the to_numpy() call works around the differences in the indices and the types
-                        djlib_tracks.loc[djlib_tracks_idx, new_tracks_usable_cols] =\
-                            usable_new_tracks[new_tracks_usable_cols].to_numpy()
                         djlib_tracks_changed = True
 
     if djlib_tracks_changed:
@@ -393,24 +416,32 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
 
     return
 
+def library_maintenance():
+    if not rekordbox_sanity_checks():
+        return False
 
+    if not djlib_sanity_checks():
+        return False
 
+    if not djlib_values_sanity_check():
+        return False
 
+    djlib_maintenance()
 
+    rekordbox_to_spotify_maintenance()
 
+    choice = get_user_choice('Rebuild Rekordbox playlists?')
+    rebuild_rekordbox = (choice == 'yes')
 
+    choice = get_user_choice('Rebuild Spotify playlists?')
+    rebuild_spotify = (choice == 'yes')
 
+    if rebuild_rekordbox or rebuild_spotify:
+        playlist_scripts.playlist_maintenance(
+            do_rekordbox=rebuild_rekordbox,
+            do_spotify=rebuild_spotify
+        )
 
-
-
-
-
-
-
-
-
-
-
-
+    return
 
 

@@ -28,23 +28,25 @@ def format_track_for_search(track):
     """Creates a search string that's more likely to generate matches out of a
     track's artists and title."""
 
-    if 'artists' in track:
-        artists = ' '.join(artist['name'] for artist in track['artists'])
-    elif 'Artists' in track:
-        artists = track['Artists']
+    if isinstance(track, str):
+        string = track
     else:
-        raise Exception("None of the attributes %s are present in series %s" % (
-            ['artists', 'Artists'],
-            track
-        ))
+        if 'artists' in track:
+            artists = ' '.join(artist['name'] for artist in track['artists'])
+        elif 'Artists' in track:
+            artists = track['Artists']
+        else:
+            raise Exception("None of the attributes %s are present in series %s" % (
+                ['artists', 'Artists'],
+                track
+            ))
 
-    title = get_attrib_or_fail(track, ['Title', 'name'])
+        title = get_attrib_or_fail(track, ['Title', 'name'])
+        string = artists + ' ' + title
 
     # Remove some things that are usually in Rekordbox but not in Spotify
-    title = re.sub(r'(feat\.|featuring)', '', title, flags=re.IGNORECASE)
-    title = re.sub(r'original mix', '', title, flags=re.IGNORECASE)
-
-    string = artists + ' ' + title
+    string = re.sub(r'(feat\.|featuring)', '', string, flags=re.IGNORECASE)
+    string = re.sub(r'original mix', '', string, flags=re.IGNORECASE)
 
     # replace sequences of non-word characters with a single space
     string = re.sub(r'\W+', ' ', string)
@@ -53,8 +55,6 @@ def format_track_for_search(track):
     string = string.lower()
 
     return string
-
-
 
 
 def pretty_print_tracks(tracks, indent='', enum=False):

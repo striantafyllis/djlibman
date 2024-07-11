@@ -289,7 +289,7 @@ def replenish_l1_queue(
     num_tracks_to_add = min(target_size - len(l1_queue_tracks), len(queue_tracks_not_in_l1_queue_idx))
 
     if num_tracks_to_add < len(queue_tracks_not_in_l1_queue_idx):
-        tracks_to_add_idx = random.sample(queue_tracks_not_in_l1_queue_idx, k=num_tracks_to_add)
+        tracks_to_add_idx = random.sample(queue_tracks_not_in_l1_queue_idx.to_list(), k=num_tracks_to_add)
         tracks_to_add = queue_tracks.loc[tracks_to_add_idx]
     else:
         tracks_to_add = queue_tracks.loc[queue_tracks_not_in_l1_queue_idx]

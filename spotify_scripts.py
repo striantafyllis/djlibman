@@ -36,6 +36,7 @@ def sanity_check_disk_queues(queue_tracks=None, queue_history_tracks=None):
 
             print('Queue history now has %d tracks' % len(queue_history_tracks))
 
+    # queue tracks should not be in queue history
     queue_tracks_in_queue_history_idx = queue_tracks.index.intersection(queue_history_tracks.index, sort=False)
     if len(queue_tracks_in_queue_history_idx) > 0:
         print('WARNING: %d queue tracks are in queue history.' % len(queue_tracks_in_queue_history_idx))
@@ -288,7 +289,7 @@ def replenish_l1_queue(
     num_tracks_to_add = min(target_size - len(l1_queue_tracks), len(queue_tracks_not_in_l1_queue_idx))
 
     if num_tracks_to_add < len(queue_tracks_not_in_l1_queue_idx):
-        tracks_to_add_idx = random.choices(queue_tracks_not_in_l1_queue_idx, k=num_tracks_to_add)
+        tracks_to_add_idx = random.sample(queue_tracks_not_in_l1_queue_idx, k=num_tracks_to_add)
         tracks_to_add = queue_tracks.loc[tracks_to_add_idx]
     else:
         tracks_to_add = queue_tracks.loc[queue_tracks_not_in_l1_queue_idx]
@@ -319,9 +320,9 @@ def sanity_check_l1_queue(
         l1_queue_tracks = spotify.get_playlist_tracks(l1_queue_id)
         print('L1 queue: %d tracks' % len(l1_queue_tracks))
 
-    # Make sure all items in the L1 queue are also in the disk queue
     queue_tracks = docs['queue'].read()
 
+    # Make sure all items in the L1 queue are also in the disk queue
     l1_queue_tracks_not_in_queue_idx = l1_queue_tracks.index.difference(queue_tracks.index, sort=False)
     if len(l1_queue_tracks_not_in_queue_idx) > 0:
         print('WARNING: %d tracks are in L1 queue but not in disk queue' % len(l1_queue_tracks_not_in_queue_idx))
@@ -333,20 +334,21 @@ def sanity_check_l1_queue(
 
             l1_queue_tracks = l1_queue_tracks.loc[l1_queue_tracks.index.difference(l1_queue_tracks_not_in_queue_idx, sort=False)]
 
-    # Make sure all items in the L1 queue are not in queue history
-    queue_history_tracks = docs['queue_history'].read()
+            print('L1 queue now has %d tracks' % len(l1_queue_tracks))
 
-    l1_queue_tracks_in_qh_idx = l1_queue_tracks.index.intersection(queue_history_tracks.index, sort=False)
-    if len(l1_queue_tracks_in_qh_idx) > 0:
-        print('WARNING: %d tracks from L1 queue are in queue history' % len(l1_queue_tracks_in_qh_idx))
-        pretty_print_tracks(l1_queue_tracks.loc[l1_queue_tracks_in_qh_idx])
+    # Make sure items in the L1 queue are unique
+    dup_pos = dataframe_duplicate_index_labels(l1_queue_tracks)
+    if len(dup_pos) > 0:
+        print('WARNING: L1 queue has %d duplicate tracks!' % len(dup_pos))
+        pretty_print_tracks(l1_queue_tracks.iloc[dup_pos])
 
-        choice = get_user_choice('Remove from L1 queue?')
+        choice = get_user_choice('Remove? (y/n)')
         if choice == 'yes':
-            spotify.remove_tracks_from_playlist(l1_queue_id, l1_queue_tracks_in_qh_idx)
+            spotify.remove_tracks_from_playlist(l1_queue_id, l1_queue_tracks.index[dup_pos])
 
-            l1_queue_tracks = l1_queue_tracks.loc[l1_queue_tracks.index.difference(l1_queue_tracks_in_qh_idx, sort=False)]
-            print("L1 queue now has %d tracks" % len(l1_queue_tracks))
+            l1_queue_tracks = dataframe_drop_rows_at_positions(l1_queue_tracks, dup_pos)
+
+            print('L1 queue now has %d tracks' % len(l1_queue_tracks))
 
     # Make sure all items in the L1 queue are not liked
     if liked_tracks is None:
@@ -425,6 +427,8 @@ def add_shazam_to_l2_queue(
 
     if shazam_tracks is None:
         shazam_tracks = spotify.get_playlist_tracks(shazam_id)
+
+    shazam_tracks = dataframe_ensure_unique_index(shazam_tracks)
 
     print("'%s' playlist: %d tracks" % (shazam_name, len(shazam_tracks)))
     pretty_print_tracks(shazam_tracks, indent=' '*4, enum=True)
@@ -515,20 +519,13 @@ def sanity_check_l2_queue(
 
     return l2_queue_tracks, liked_tracks
 
-def manage_spotify_queues(
+def queue_maintenance(
         l1_queue_name = 'L1 queue',
         l2_queue_name = 'L2 queue',
         shazam_name = 'My Shazam Tracks',
-        l1_queue_last_listened_track = None,
-        # alias for l1_queue_last_listened_track to save typing
         last_track = None,
-        l1_queue_target_size = 100
+        l1_queue_target_size = 200
 ):
-
-    if l1_queue_last_listened_track is None:
-        l1_queue_last_listened_track = last_track
-    elif last_track is not None:
-        raise Exception('Both last_track and l1_queue_last_listened_track are set')
 
     # Sanity check! Queue and queue history must be disjoint
     sanity_check_disk_queues()
@@ -541,7 +538,7 @@ def manage_spotify_queues(
         l2_queue_name=l2_queue_name,
         l1_queue_id=l1_queue_id,
         l2_queue_id=l2_queue_id,
-        l1_queue_last_listened_track=l1_queue_last_listened_track
+        l1_queue_last_listened_track=last_track
     )
 
     l1_queue_tracks = replenish_l1_queue(

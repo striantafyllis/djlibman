@@ -2,13 +2,8 @@
 
 import sys
 import argparse
-import configparser
-import os
-import os.path
-import readline
 import code
 import time
-import ast
 
 import djlib_config
 

@@ -12,9 +12,6 @@ _playlists = {
     'AB 120':
         lambda track: track.BPM >= 110 and track.Class[0] in ['A', 'B'],
 
-    'CX 120':
-        lambda track: track.BPM >= 110 and track.Class[0] in ['C', 'X'],
-
     'ALL 100':
         lambda track: track.BPM <= 110,
 
@@ -24,11 +21,8 @@ _playlists = {
     'AB 100':
         lambda track: track.BPM <= 110 and track.Class[0] in ['A', 'B'],
 
-    'CX 100':
-        lambda track: track.BPM <= 110 and track.Class[0] in ['C', 'X'],
-
     'recent':
-        lambda track: track['Date Added'] >= pd.Timestamp.utcnow() - pd.Timedelta(60, 'days')
+        lambda track: track['Date Added'] >= pd.Timestamp.utcnow() - pd.Timedelta(60, 'days') and track.Class[0] in ['A', 'B']
 }
 
 
@@ -135,6 +129,8 @@ def build_playlist(name,
 
             spotify.add_playlist(spotify_playlist_name)
             spotify.add_tracks_to_playlist(spotify_playlist_name, djlib_playlist_with_spotify.spotify_id)
+
+    print()
 
     return
 

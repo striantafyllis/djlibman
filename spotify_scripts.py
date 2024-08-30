@@ -157,12 +157,18 @@ def get_playlist_listened_tracks(
             last_listened_track_idx = None
 
             for i in range(len(playlist_tracks)):
-                if playlist_tracks.iloc[i]['name'] == last_listened_track:
+                if playlist_tracks.iloc[i]['name'].upper() == last_listened_track.upper():
                     last_listened_track_idx = i
                     break
 
             if last_listened_track_idx is None:
-                raise Exception("Track '%s' not found in playlist" % last_listened_track)
+                # Try to find it as a prefix
+                for i in range(len(playlist_tracks)):
+                    if playlist_tracks.iloc[i]['name'].upper().startswith(last_listened_track.upper()):
+                        last_listened_track_idx = i
+                        break
+                if last_listened_track_idx is None:
+                    raise Exception(f"Track '{last_listened_track}' not found in playlist")
 
             return playlist_tracks.iloc[:(last_listened_track_idx+1)]
 

@@ -587,3 +587,23 @@ def pretty_print_spotify_playlist(playlist_name):
     print("Spotify playlist '%s': %d tracks" % (playlist_name, len(tracks)))
     pretty_print_tracks(tracks, enum=True)
     return
+
+def shuffle_spotify_playlist(playlist_name):
+    tracks = spotify.get_playlist_tracks(playlist_name)
+
+    new_tracks = random.sample(tracks.index.to_list(), k=len(tracks))
+
+    spotify_playlists = spotify.get_playlists()
+
+    new_playlist_name = playlist_name + ' - shuffled'
+
+    while new_playlist_name in spotify_playlists.index:
+        new_playlist_name += ' - shuffled'
+
+    spotify.create_playlist(new_playlist_name)
+    spotify.add_tracks_to_playlist(new_playlist_name, new_tracks)
+
+    print(f"Created Spotify playlist '{new_playlist_name}' with {len(new_tracks)} tracks")
+
+    return
+

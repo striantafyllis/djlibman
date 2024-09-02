@@ -127,7 +127,7 @@ def build_playlist(name,
                 len(djlib_playlist_with_spotify)
             ))
 
-            spotify.add_playlist(spotify_playlist_name)
+            spotify.create_playlist(spotify_playlist_name)
             spotify.add_tracks_to_playlist(spotify_playlist_name, djlib_playlist_with_spotify.spotify_id)
 
     print()

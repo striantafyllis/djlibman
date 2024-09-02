@@ -68,7 +68,6 @@ def python_shell(shell_locals):
     return
 
 
-
 def main():
     parser = argparse.ArgumentParser(
         prog='djlibman.py',

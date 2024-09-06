@@ -336,7 +336,7 @@ def sanity_check_l1_queue(
     # Make sure all items in the L1 queue are also in the disk queue
     l1_queue_tracks_not_in_queue_idx = l1_queue_tracks.index.difference(queue_tracks.index, sort=False)
     if len(l1_queue_tracks_not_in_queue_idx) > 0:
-        print('WARNING: %d tracks are in %s but not in disk queue' % (l1_queue_name, len(l1_queue_tracks_not_in_queue_idx)))
+        print(f'WARNING: {len(l1_queue_tracks_not_in_queue_idx)} tracks are in {l1_queue_name} but not in disk queue')
         pretty_print_tracks(l1_queue_tracks.loc[l1_queue_tracks_not_in_queue_idx])
 
         choice = get_user_choice('Remove?')

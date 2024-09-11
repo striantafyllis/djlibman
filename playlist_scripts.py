@@ -22,7 +22,10 @@ _playlists = {
         lambda track: track.BPM <= 110 and track.Class[0] in ['A', 'B'],
 
     'recent':
-        lambda track: track['Date Added'] >= pd.Timestamp.utcnow() - pd.Timedelta(60, 'days') and track.Class[0] in ['A', 'B']
+        lambda track: track['Date Added'] >= pd.Timestamp.utcnow() - pd.Timedelta(60, 'days') and track.Class[0] in ['A', 'B'],
+
+    'progressive':
+        lambda track: 'PROGRESSIVE' in map(lambda x: x.upper(), track.Flavors)
 }
 
 

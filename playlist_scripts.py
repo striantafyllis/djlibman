@@ -25,7 +25,7 @@ _playlists = {
         lambda track: track['Date Added'] >= pd.Timestamp.utcnow() - pd.Timedelta(60, 'days') and track.Class[0] in ['A', 'B'],
 
     'progressive':
-        lambda track: 'PROGRESSIVE' in map(lambda x: x.upper(), track.Flavors)
+        lambda track: 'PROGRESSIVE' in map(lambda x: x.upper(), track.Flavors) and track.Class[0] in ['A', 'B']
 }
 
 

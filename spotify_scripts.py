@@ -202,7 +202,7 @@ def move_l1_queue_listened_tracks_to_l2(
     print('%s: %d tracks' % (l1_queue_name, len(l1_queue_tracks)))
 
     if l1_queue_tracks.empty:
-        return l1_queue_tracks, None
+        return l1_queue_tracks, None, None
 
     l2_queue_tracks = spotify.get_playlist_tracks(l2_queue_id)
     print('%s: %d tracks' % (l2_queue_name, len(l2_queue_tracks)))
@@ -216,10 +216,10 @@ def move_l1_queue_listened_tracks_to_l2(
     print()
     choice = get_user_choice('Is this correct?')
     if choice != 'yes':
-        return l1_queue_tracks, l2_queue_tracks, None
+        return l1_queue_tracks, l2_queue_tracks, None, None
 
     if len(listened_tracks) == 0:
-        return l1_queue_tracks, l2_queue_tracks, None
+        return l1_queue_tracks, l2_queue_tracks, None, None
 
     # find how many of the listened tracks are liked
     liked_tracks = spotify.get_liked_tracks()
@@ -289,7 +289,8 @@ def replenish_l1_queue(
     tracks_to_add = target_size - len(l1_queue_tracks)
 
     # only replenish the default L1 queue - not random playlists - from the disk queue
-    if l1_queue_name == DEFAULT_L1_QUEUE:
+    # if l1_queue_name == DEFAULT_L1_QUEUE:
+    if True:
         choice = get_user_choice('Add up to %d new tracks to %s?' % (tracks_to_add, l1_queue_name))
         if choice == 'yes':
             queue_tracks = docs['queue'].read()

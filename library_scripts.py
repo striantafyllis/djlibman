@@ -131,6 +131,8 @@ def djlib_values_sanity_check():
 
     return (errors == 0)
 
+automatic_accept_threshold = 0.9
+
 def djlib_maintenance(cutoff_ratio=0.3):
     djlib_tracks_changed = False
 
@@ -242,7 +244,11 @@ def djlib_maintenance(cutoff_ratio=0.3):
                     print('djlib: %s' % format_track(djlib_tracks_empty_rows.iloc[djlib_idx]))
                     print('New Tracks: %s' % new_tracks.iloc[new_track_idx].Title)
                     print('Match ratio: %.2f' % mapping['ratio'])
-                    choice = get_user_choice('Accept?')
+                    if mapping['ratio'] >= automatic_accept_threshold:
+                        print('Accepted automatically')
+                        choice = 'yes'
+                    else:
+                        choice = get_user_choice('Accept?')
                     if choice == 'yes':
                         # an extra maneuver here to do the assignment in one step;
                         # chained assignment may stop working in future versions of Pandas
@@ -255,7 +261,9 @@ def djlib_maintenance(cutoff_ratio=0.3):
                         djlib_tracks_changed = True
 
     if djlib_tracks_changed:
-        djlib.write(djlib_tracks)
+        choice = get_user_choice('Proceed with djlib edits?')
+        if choice == 'yes':
+            djlib.write(djlib_tracks)
 
     return
 
@@ -328,7 +336,12 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
                     print('Rekordbox: %s' % format_track(rekordbox_track))
                     print('Spotify: %s' % format_track(spotify_track))
                     print('Match ratio: %.2f' % mapping['ratio'])
-                    choice = get_user_choice('Accept?')
+                    if mapping['ratio'] >= automatic_accept_threshold:
+                        print('Accepted automatically')
+                        choice = 'yes'
+                    else:
+                        choice = get_user_choice('Accept?')
+
                     if choice == 'yes':
                         mapping_row = pd.Series({
                             'rekordbox_id': rekordbox_track.TrackID,
@@ -342,11 +355,13 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
                         rekordbox_to_spotify_mapping.loc[rekordbox_track.TrackID] = mapping_row
                         rekordbox_mapped_ids.append(rekordbox_track.TrackID)
 
-            rekordbox_to_spotify.write(rekordbox_to_spotify_mapping)
-            rekordbox_unmapped_tracks = rekordbox_unmapped_tracks.loc[
-                rekordbox_unmapped_tracks.index.difference(
-                    rekordbox_mapped_ids, sort=False)
-            ]
+            choice = get_user_choice('Proceed with rekordbox to spotify mapping?')
+            if choice == 'yes':
+                rekordbox_to_spotify.write(rekordbox_to_spotify_mapping)
+                rekordbox_unmapped_tracks = rekordbox_unmapped_tracks.loc[
+                    rekordbox_unmapped_tracks.index.difference(
+                        rekordbox_mapped_ids, sort=False)
+                ]
 
     if len(rekordbox_unmapped_tracks) > 0:
         print('%d Rekordbox main playlist tracks are still unmapped' % len(rekordbox_unmapped_tracks))

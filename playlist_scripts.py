@@ -42,16 +42,19 @@ _playlists = {
         lambda track: track['Date Added'] >= pd.Timestamp.utcnow() - pd.Timedelta(60, 'days') and is_class(track, 'A', 'B'),
 
     'progressive':
-        lambda track: has_value(track.Flavors, 'Progressive') and is_class(track, 'A', 'B'),
+        lambda track: has_value(track.Flavors, 'Progressive') and has_value(track.Playlists, 'knocks') and is_class(track, 'A', 'B'),
 
     'afro':
-        lambda track: has_value(track.Flavors, 'Afro') and is_class(track, 'A', 'B'),
+        lambda track: has_value(track.Flavors, 'Afro') and has_value(track.Playlists, 'knocks') and is_class(track, 'A', 'B'),
 
     'middle eastern':
-        lambda track: has_value(track.Flavors, 'Middle Eastern', 'Balkan', 'North Med') and is_class(track, 'A', 'B'),
+        lambda track: has_value(track.Flavors, 'Middle Eastern', 'Balkan', 'North Med') and has_value(track.Playlists, 'knocks') and is_class(track, 'A', 'B'),
 
     'latin':
-        lambda track: has_value(track.Flavors, 'Latin') and is_class(track, 'A', 'B'),
+        lambda track: has_value(track.Flavors, 'Latin') and has_value(track.Playlists, 'knocks') and is_class(track, 'A', 'B'),
+
+    'feels':
+        lambda track: has_value(track.Playlists, 'feels') and is_class(track, 'A', 'B')
 }
 
 def build_playlist(name,

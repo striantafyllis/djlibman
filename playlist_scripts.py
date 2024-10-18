@@ -2,32 +2,57 @@
 from djlib_config import *
 from utils import *
 
+def is_class(track, *classes):
+    for clss in classes:
+        if track.Class.startswith(clss):
+            return True
+
+    return False
+
+def has_value(list_field, *values):
+    values = [v.upper() for v in values]
+
+    for list_el in list_field:
+        if list_el.upper() in values:
+            return True
+
+    return False
+
+
 _playlists = {
     'ALL 120':
-        lambda track: track.BPM >= 110,
+        lambda track: track.BPM >= 113,
 
     'A 120':
-        lambda track: track.BPM >= 110 and track.Class[0] == 'A',
+        lambda track: track.BPM >= 113 and is_class(track, 'A'),
 
     'AB 120':
-        lambda track: track.BPM >= 110 and track.Class[0] in ['A', 'B'],
+        lambda track: track.BPM >= 113 and is_class(track, 'A', 'B'),
 
     'ALL 100':
-        lambda track: track.BPM <= 110,
+        lambda track: track.BPM < 113,
 
     'A 100':
-        lambda track: track.BPM <= 110 and track.Class[0] == 'A',
+        lambda track: track.BPM < 113 and is_class(track, 'A'),
 
     'AB 100':
-        lambda track: track.BPM <= 110 and track.Class[0] in ['A', 'B'],
+        lambda track: track.BPM < 113 and is_class(track, 'A', 'B'),
 
     'recent':
-        lambda track: track['Date Added'] >= pd.Timestamp.utcnow() - pd.Timedelta(60, 'days') and track.Class[0] in ['A', 'B'],
+        lambda track: track['Date Added'] >= pd.Timestamp.utcnow() - pd.Timedelta(60, 'days') and is_class(track, 'A', 'B'),
 
     'progressive':
-        lambda track: 'PROGRESSIVE' in map(lambda x: x.upper(), track.Flavors) and track.Class[0] in ['A', 'B']
-}
+        lambda track: has_value(track.Flavors, 'Progressive') and is_class(track, 'A', 'B'),
 
+    'afro':
+        lambda track: has_value(track.Flavors, 'Afro') and is_class(track, 'A', 'B'),
+
+    'middle eastern':
+        lambda track: has_value(track.Flavors, 'Middle Eastern', 'Balkan', 'North Med') and is_class(track, 'A', 'B'),
+
+    'latin':
+        lambda track: has_value(track.Flavors, 'Latin') and is_class(track, 'A', 'B'),
+}
 
 def build_playlist(name,
                    condition=None,

@@ -9,8 +9,11 @@ def is_class(track, *classes):
 
     return False
 
-def has_value(list_field, *values):
-    values = [v.upper() for v in values]
+def has_value(list_field, values):
+    if isinstance(values, str):
+        values = [values.upper()]
+    else:
+        values = [v.upper() for v in values]
 
     for list_el in list_field:
         if list_el.upper() in values:
@@ -18,43 +21,79 @@ def has_value(list_field, *values):
 
     return False
 
+def build_condition(
+        must_be_danceable=True,
+        must_be_ambient=False,
+        must_be_song=False,
+        allow_uptempo=True,
+        allow_downtempo=False,
+        allow_B=True,
+        allow_CX=False,
+        flavors=None
+):
+    def _condition(track):
+        if must_be_danceable:
+            if not track.Danceable:
+                return False
+        if must_be_ambient:
+            if not track.Ambient:
+                return False
+        if must_be_song:
+            if not track.Song:
+                return False
+        if not allow_uptempo:
+            if track.BPM > DOWNTEMPO_CUTOFF:
+                return False
+        if not allow_downtempo:
+            if track.BPM <= DOWNTEMPO_CUTOFF:
+                return False
+        if not allow_B:
+            if is_class(track, 'B'):
+                return False
+        if not allow_CX:
+            if not is_class(track, 'A', 'B'):
+                return False
+        if flavors is not None:
+            if not has_value(track.Flavors, flavors):
+                return False
+        return True
+
+    return _condition
+
+
+DOWNTEMPO_CUTOFF = 112
+
 
 _playlist_conditions = {
-    'ALL 120':
-        lambda track: track.BPM >= 113,
+    'Danceable A':
+        build_condition(allow_B=False),
 
-    'A 120':
-        lambda track: track.BPM >= 113 and is_class(track, 'A'),
+    'Danceable AB':
+        build_condition(),
 
-    'AB 120':
-        lambda track: track.BPM >= 113 and is_class(track, 'A', 'B'),
+    'Danceable Downtempo A':
+        build_condition(allow_uptempo=False, allow_downtempo=True, allow_B=False),
 
-    'ALL 100':
-        lambda track: track.BPM < 113,
+    'Danceable Downtempo AB':
+        build_condition(allow_uptempo=False, allow_downtempo=True),
 
-    'A 100':
-        lambda track: track.BPM < 113 and is_class(track, 'A'),
+    'Ambient':
+        build_condition(must_be_danceable=False, must_be_ambient=True),
 
-    'AB 100':
-        lambda track: track.BPM < 113 and is_class(track, 'A', 'B'),
-
-    'recent':
+    'Recent':
         lambda track: track['Date Added'] >= pd.Timestamp.utcnow() - pd.Timedelta(60, 'days') and is_class(track, 'A', 'B'),
 
-    'progressive':
-        lambda track: has_value(track.Flavors, 'Progressive') and has_value(track.Playlists, 'knocks') and is_class(track, 'A', 'B'),
+    'Progressive':
+        build_condition(flavors='Progressive'),
 
-    'afro':
-        lambda track: has_value(track.Flavors, 'Afro') and has_value(track.Playlists, 'knocks') and is_class(track, 'A', 'B'),
+    'Afro':
+        build_condition(flavors='Afro'),
 
-    'middle eastern':
-        lambda track: has_value(track.Flavors, 'Middle Eastern', 'Balkan', 'North Med') and has_value(track.Playlists, 'knocks') and is_class(track, 'A', 'B'),
+    'Middle Eastern':
+        build_condition(flavors=['Middle Eastern', 'Balkan', 'North Med']),
 
-    'latin':
-        lambda track: has_value(track.Flavors, 'Latin') and has_value(track.Playlists, 'knocks') and is_class(track, 'A', 'B'),
-
-    'feels':
-        lambda track: has_value(track.Playlists, 'feels') and is_class(track, 'A', 'B')
+    'Latin':
+        build_condition(flavors='Latin')
 }
 
 def create_playlist_from_condition(
@@ -80,15 +119,17 @@ def create_playlist_from_condition(
 
     track_ids_df = djlib_tracks.loc[tracks_filter]
 
-    create_playlist(track_ids_df,
-                    print_tracks,
-                    do_rekordbox,
-                    do_spotify,
-                    rekordbox_folder,
-                    rekordbox_prefix,
-                    rekordbox_overwrite,
-                    spotify_prefix,
-                    spotify_overwrite)
+    create_playlist(
+        name,
+        track_ids_df,
+        print_tracks,
+        do_rekordbox,
+        do_spotify,
+        rekordbox_folder,
+        rekordbox_prefix,
+        rekordbox_overwrite,
+        spotify_prefix,
+        spotify_overwrite)
 
     return
 
@@ -239,14 +280,15 @@ def create_spotify_playlist(
 
 def playlist_maintenance(do_rekordbox=True, do_spotify=True):
     # build Main Library on Spotify; it already exists in Rekordbox
-    create_playlist_from_condition(
-        'Main Library',
-        condition=lambda x: True,
-        print_tracks=False,
-        do_rekordbox=False,
-        do_spotify=True,
-        spotify_overwrite=True
-    )
+    if do_spotify:
+        create_playlist_from_condition(
+            'Main Library',
+            condition=lambda x: True,
+            print_tracks=False,
+            do_rekordbox=False,
+            do_spotify=True,
+            spotify_overwrite=True
+        )
 
     # build the class playlists
     for playlist, condition in _playlist_conditions.items():

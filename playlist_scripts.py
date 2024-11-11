@@ -216,12 +216,17 @@ def create_spotify_playlist(
         ~pd.isna(rekordbox_to_spotify_mapping.spotify_id)
     ]
 
-    spotify_ids_df = track_ids_df.merge(
-        rekordbox_to_spotify_mapping,
-        how='inner',
-        left_index=True,
-        right_index=True
-    )
+    if isinstance(track_ids_df, pd.DataFrame):
+        spotify_ids_df = track_ids_df.merge(
+            rekordbox_to_spotify_mapping,
+            how='inner',
+            left_index=True,
+            right_index=True
+        )
+    elif isinstance(track_ids_df, pd.Index):
+        spotify_ids_df = rekordbox_to_spotify_mapping.loc[track_ids_df]
+    else:
+        raise ValueError(f'Invalid track_ids_df type: {type(track_ids_df)}')
 
     if len(spotify_ids_df) < len(track_ids_df):
         print('%d tracks are missing Spotify mappings; omitting.' % (
@@ -274,6 +279,59 @@ def create_spotify_playlist(
 
         spotify.create_playlist(spotify_playlist_name)
         spotify.add_tracks_to_playlist(spotify_playlist_name, spotify_ids_df.spotify_id)
+
+    return
+
+def create_spotify_playlist_from_rekordbox(
+        spotify_name,
+        rekordbox_name,
+        print_tracks=True,
+        spotify_prefix='DJ ',
+        spotify_overwrite=True
+):
+    track_ids_df = rekordbox.get_playlist_tracks(rekordbox_name)
+
+    create_spotify_playlist(
+        spotify_name,
+        track_ids_df,
+        print_tracks=print_tracks,
+        spotify_prefix=spotify_prefix,
+        spotify_overwrite=spotify_overwrite
+    )
+
+    return
+
+def create_rekordbox_playlist_from_spotify(
+        rekordbox_name,
+        spotify_name,
+        folder=['managed'],
+        prefix='',
+        overwrite=True):
+
+    spotify_tracks = spotify.get_playlist_tracks(spotify_name)
+
+    rekordbox_to_spotify_mapping = docs['rekordbox_to_spotify'].read()
+
+    rekordbox_ids_df = rekordbox_to_spotify_mapping.merge(
+        spotify_tracks,
+        how='inner',
+        left_on='spotify_id',
+        right_index=True
+    )
+
+    if len(rekordbox_ids_df) < len(spotify_tracks):
+        print(f'*** WARNING! *** {len(spotify_tracks) - len(rekordbox_ids_df)} Spotify tracks are missing Rekordbox IDs! Omitting.')
+        choice = get_user_choice('Continue?')
+        if choice != 'yes':
+            return
+
+    create_rekordbox_playlist(
+        rekordbox_name,
+        rekordbox_ids_df,
+        folder=folder,
+        prefix=prefix,
+        overwrite=overwrite
+    )
 
     return
 

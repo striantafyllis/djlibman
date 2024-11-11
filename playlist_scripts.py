@@ -27,6 +27,7 @@ def build_condition(
         must_be_song=False,
         allow_uptempo=True,
         allow_downtempo=False,
+        allow_A=True,
         allow_B=True,
         allow_CX=False,
         flavors=None
@@ -46,6 +47,9 @@ def build_condition(
                 return False
         if not allow_downtempo:
             if track.BPM <= DOWNTEMPO_CUTOFF:
+                return False
+        if not allow_A:
+            if is_class(track, 'A'):
                 return False
         if not allow_B:
             if is_class(track, 'B'):

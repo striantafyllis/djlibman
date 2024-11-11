@@ -7,8 +7,6 @@ import numpy as np
 from pandas import Timestamp
 
 from internal_utils import *
-from utils import *
-
 
 # some basic conversion functions
 

@@ -445,18 +445,7 @@ def djlib_spotify_likes_maintenance():
     djlib = docs['djlib']
     djlib_tracks = djlib.read()
 
-    rekordbox_to_spotify_mapping = docs['rekordbox_to_spotify'].read()
-
-    # remove empty mappings
-    rekordbox_to_spotify_mapping = rekordbox_to_spotify_mapping.loc[
-        ~pd.isna(rekordbox_to_spotify_mapping.spotify_id)
-    ]
-    djlib_tracks_with_spotify_id = djlib_tracks.merge(
-        right=rekordbox_to_spotify_mapping,
-        how='inner',
-        left_index=True,
-        right_index=True
-    )[djlib_tracks.columns.to_list() + ['spotify_id']]
+    djlib_tracks_with_spotify_id = add_spotify_ids(djlib_tracks, include_missing_ids=False)
 
     djlib_tracks_without_spotify_id = len(djlib_tracks) - len(djlib_tracks_with_spotify_id)
     if djlib_tracks_without_spotify_id > 0:

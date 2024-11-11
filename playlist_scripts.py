@@ -186,15 +186,18 @@ def create_rekordbox_playlist(
     prefix='',
     overwrite=True):
 
-    rekordbox_name = prefix + name
-    if folder is None:
-        rekordbox_full_name = [rekordbox_name]
-    elif isinstance(folder, str):
-        rekordbox_full_name = [folder, rekordbox_name]
-    elif isinstance(folder, list):
-        rekordbox_full_name = folder + [rekordbox_name]
+    if isinstance(name, str):
+        rekordbox_name = prefix + name
+        if folder is None:
+            rekordbox_full_name = [rekordbox_name]
+        elif isinstance(folder, str):
+            rekordbox_full_name = [folder, rekordbox_name]
+        elif isinstance(folder, list):
+            rekordbox_full_name = folder + [rekordbox_name]
+        else:
+            raise ValueError(folder)
     else:
-        raise ValueError(folder)
+        rekordbox_full_name=name
 
     print(f'Creating Rekordbox playlist {rekordbox_full_name}: {len(track_ids_df)} tracks')
     if print_tracks:
@@ -213,22 +216,10 @@ def create_spotify_playlist(
         spotify_prefix='DJ ',
         spotify_overwrite=True
 ):
-    rekordbox_to_spotify_mapping = docs['rekordbox_to_spotify'].read()
-
-    # remove empty mappings
-    rekordbox_to_spotify_mapping = rekordbox_to_spotify_mapping.loc[
-        ~pd.isna(rekordbox_to_spotify_mapping.spotify_id)
-    ]
-
     if isinstance(track_ids_df, pd.DataFrame):
-        spotify_ids_df = track_ids_df.merge(
-            rekordbox_to_spotify_mapping,
-            how='inner',
-            left_index=True,
-            right_index=True
-        )
+        spotify_ids_df = add_spotify_ids(track_ids_df, include_missing_ids=False)
     elif isinstance(track_ids_df, pd.Index):
-        spotify_ids_df = rekordbox_to_spotify_mapping.loc[track_ids_df]
+        spotify_ids_df = translate_to_spotify_ids(track_ids_df, include_missing_ids=False)
     else:
         raise ValueError(f'Invalid track_ids_df type: {type(track_ids_df)}')
 
@@ -336,6 +327,111 @@ def create_rekordbox_playlist_from_spotify(
         prefix=prefix,
         overwrite=overwrite
     )
+
+    return
+
+def create_rekordbox_playlist_from_diff(
+        new_playlist_name,
+        orig_playlist_name,
+        remove_playlists=[],
+        remove_unliked_tracks=True,
+        print_tracks=True,
+        overwrite=True
+):
+    orig_tracks = rekordbox.get_playlist_tracks(orig_playlist_name)
+    print(f'Original playlist {orig_playlist_name}: {len(orig_tracks)} tracks')
+
+    if remove_unliked_tracks:
+        orig_tracks_with_spotify_id = add_spotify_ids(orig_tracks, include_missing_ids=False)
+
+        print('Getting Spotify liked tracks...')
+        spotify_liked_tracks = spotify.get_liked_tracks()
+
+        liked_orig_tracks_idx = orig_tracks_with_spotify_id.merge(
+            right=spotify_liked_tracks,
+            how='inner',
+            left_on='spotify_id',
+            right_index=True
+        ).index
+
+        unliked_orig_tracks_idx = orig_tracks.index.difference(liked_orig_tracks_idx)
+
+        if len(unliked_orig_tracks_idx) > 0:
+            print(f'Removing {len(unliked_orig_tracks_idx)} tracks because they are not liked on Spotify')
+            if print_tracks:
+                pretty_print_tracks(
+                    orig_tracks.loc[unliked_orig_tracks_idx],
+                    indent=' '*4, enum=True)
+
+            orig_tracks = orig_tracks.loc[liked_orig_tracks_idx]
+        else:
+            print('All tracks are liked on Spotify')
+
+    for remove_playlist in remove_playlists:
+        if isinstance(remove_playlist, list):
+            print(f'Removing tracks in Rekordbox playlist {remove_playlist}...')
+
+            remove_playlist_tracks = rekordbox.get_playlist_tracks(remove_playlist)
+
+            orig_tracks_not_in_remove_playlist_idx = orig_tracks.index.difference(
+                remove_playlist_tracks.index
+            )
+            orig_tracks_in_remove_playlist_idx = orig_tracks.index.difference(
+                orig_tracks_not_in_remove_playlist_idx
+            )
+
+            if len(orig_tracks_in_remove_playlist_idx) > 0:
+                print(f'Removing {len(orig_tracks_in_remove_playlist_idx)} because '
+                      f'they are in Rekordbox playlist {remove_playlist}')
+                if print_tracks:
+                    pretty_print_tracks(
+                        orig_tracks.loc[orig_tracks_in_remove_playlist_idx],
+                        indent=' ' * 4, enum=True)
+
+                orig_tracks = orig_tracks.loc[orig_tracks_not_in_remove_playlist_idx]
+            else:
+                print(f'No common tracks with Rekordbox playlist {remove_playlist}')
+
+        elif isinstance(remove_playlist, str):
+            print(f'Removing tracks in Spotify playlist {remove_playlist}...')
+
+            spotify_playlist_tracks = spotify.get_playlist_tracks(remove_playlist)
+
+            orig_tracks_with_spotify_id = add_spotify_ids(orig_tracks, include_missing_ids=False)
+
+            orig_tracks_in_spotify_playlist_idx = orig_tracks_with_spotify_id.merge(
+                right=spotify_playlist_tracks,
+                how='inner',
+                left_on='spotify_id',
+                right_index=True
+            ).index
+
+            if len(orig_tracks_in_spotify_playlist_idx) > 0:
+                print(f'Removing {len(orig_tracks_in_spotify_playlist_idx)} because '
+                      f'they are in Spotify playlist {remove_playlist}')
+                if print_tracks:
+                    pretty_print_tracks(
+                        orig_tracks.loc[orig_tracks_in_spotify_playlist_idx],
+                        indent=' ' * 4, enum=True
+                    )
+
+                orig_tracks = orig_tracks.loc[
+                    orig_tracks.index.difference(orig_tracks_in_spotify_playlist_idx)
+                ]
+            else:
+                print(f'No common tracks with Spotify playlist {remove_playlist}')
+
+        else:
+            raise ValueError(f'Invalid playlist type: {type(remove_playlist)}')
+
+        create_rekordbox_playlist(
+            new_playlist_name,
+            orig_tracks,
+            print_tracks=print_tracks,
+            folder=None,
+            prefix='',
+            overwrite=overwrite
+        )
 
     return
 

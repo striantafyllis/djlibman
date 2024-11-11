@@ -7,7 +7,6 @@ import sys
 import pandas as pd
 
 from internal_utils import *
-from utils import *
 
 # Rename some Rekordbox attributes
 _attrib_rename = {

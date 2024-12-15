@@ -216,10 +216,10 @@ def move_l1_queue_listened_tracks_to_l2(
     print()
     choice = get_user_choice('Is this correct?')
     if choice != 'yes':
-        return l1_queue_tracks, l2_queue_tracks, None, None
+        return l1_queue_tracks, l2_queue_tracks, None
 
     if len(listened_tracks) == 0:
-        return l1_queue_tracks, l2_queue_tracks, None, None
+        return l1_queue_tracks, l2_queue_tracks, None
 
     # find how many of the listened tracks are liked
     liked_tracks = spotify.get_liked_tracks()
@@ -242,7 +242,7 @@ def move_l1_queue_listened_tracks_to_l2(
                   (len(listened_liked_tracks_idx) - len(listened_liked_tracks_not_in_l2_idx), l2_queue_name))
             choice = get_user_choice('Continue?')
             if choice != 'yes':
-                return l1_queue_tracks, l2_queue_tracks, liked_tracks
+                return l1_queue_tracks, l2_queue_tracks, liked_tracks, None
 
         if len(listened_liked_tracks_not_in_l2_idx) > 0:
             choice = get_user_choice('Add %d tracks to %s?' % (len(listened_liked_tracks_not_in_l2_idx), l2_queue_name))

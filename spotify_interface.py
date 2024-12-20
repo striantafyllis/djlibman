@@ -6,6 +6,7 @@ from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
 import numpy as np
 
+import cache
 from internal_utils import *
 
 _MAX_ITEMS_PER_REQUEST = 50
@@ -60,7 +61,9 @@ _TRACK_COLUMNS = {
     # 'uri'
 }
 
-BASE_62 = re.compile(r'^[0-9A-Za-z]+$')
+_BASE_62 = re.compile(r'^[0-9A-Za-z]+$')
+
+_TTL = 60
 
 def _batch_result(request_func, start=0, stop=None, stop_condition=None, use_offset=True):
     """Stop condition is inclusive"""
@@ -167,6 +170,8 @@ class SpotifyInterface:
                                                             client_secret=self._client_secret,
                                                             redirect_uri=self._redirect_uri))
 
+        self._cache = cache.Cache()
+
         return
 
 
@@ -178,22 +183,20 @@ class SpotifyInterface:
     def get_user_id(self):
         return self._connection.current_user()['id']
 
-    def get_playlists(self, start=0, stop=None, stop_condition=None, raw=False):
-        results = _batch_result(
-            lambda limit, offset: self._connection.current_user_playlists(limit, offset),
-            start, stop, stop_condition
-        )
+    def get_playlists(self):
+        def body():
+            results = _batch_result(
+                lambda limit, offset: self._connection.current_user_playlists(limit, offset))
 
-        if raw:
-            return results
+            df = pd.DataFrame.from_records(results)
+            df = df.set_index(df.name)
 
-        df = pd.DataFrame.from_records(results)
-        df = df.set_index(df.name)
+            return df
 
-        return df
+        self._cache.look_up_or_get(body, _TTL, 'playlists')
 
     def get_playlist_id(self, playlist_name):
-        playlists = self.get_playlists(stop_condition=lambda item: item['name'] == playlist_name)
+        playlists = self.get_playlists()
 
         if playlist_name not in playlists.index:
             raise Exception("Spotify playlist '%s' not found" % playlist_name)
@@ -205,68 +208,59 @@ class SpotifyInterface:
                                               name=playlist_name,
                                               public=False,
                                               collaborative=False)
+        self._cache.invalidate('playlists')
         return
 
     def _get_playlist_id_if_necessary(self, playlist_name_or_id):
         # Spotify playlist IDs are base-62 numbers and they are usually about 22 digits long
-        if len(playlist_name_or_id) > 20 and BASE_62.match(playlist_name_or_id):
+        if len(playlist_name_or_id) > 20 and _BASE_62.match(playlist_name_or_id):
             return playlist_name_or_id
 
         # the string is a playlist name
         return self.get_playlist_id(playlist_name_or_id)
 
-    def get_playlist_tracks(self, playlist_name_or_id, start=0, stop=None, stop_condition=None,
-                            up_to_track=None, raw=False):
-        if up_to_track is not None:
-            assert stop is None
-            stop_condition = lambda item: item['track']['name'] == up_to_track
-
+    def get_playlist_tracks(self, playlist_name_or_id):
         playlist_id = self._get_playlist_id_if_necessary(playlist_name_or_id)
 
-        results = _batch_result(
-            lambda limit, offset: self._connection.playlist_items(
-                playlist_id=playlist_id,
-                limit=limit, offset=offset
-            ),
-            start, stop, stop_condition)
+        def body():
+            results = _batch_result(
+                lambda limit, offset: self._connection.playlist_items(
+                    playlist_id=playlist_id,
+                    limit=limit, offset=offset
+                ))
 
-        if raw:
-            return results
+            results = _postprocess_tracks(results)
 
-        results = _postprocess_tracks(results)
+            df = pd.DataFrame.from_records(results)
+            if not df.empty:
+                df = df.set_index(df.id)
 
-        df = pd.DataFrame.from_records(results)
-        if not df.empty:
-            df = df.set_index(df.id)
+            return df
 
-        return df
+        self._cache.look_up_or_get(body, _TTL, 'playlist_tracks', playlist_id)
 
-    def get_liked_tracks(self, start=0, stop=None, stop_condition=None, raw=False):
-        results = _batch_result(
-            lambda limit, offset: self._connection.current_user_saved_tracks(
-                limit=limit, offset=offset
-            ),
-            start, stop, stop_condition)
+    def get_liked_tracks(self):
+        def body():
+            results = _batch_result(
+                lambda limit, offset: self._connection.current_user_saved_tracks(
+                    limit=limit, offset=offset
+                ))
 
-        if raw:
-            return results
+            results = _postprocess_tracks(results)
 
-        results = _postprocess_tracks(results)
+            df = pd.DataFrame.from_records(results)
+            if not df.empty:
+                df = df.set_index(df.id)
 
-        df = pd.DataFrame.from_records(results)
-        if not df.empty:
-            df = df.set_index(df.id)
+            return df
 
-        return df
+        self._cache.look_up_or_get(body, _TTL, 'liked_tracks')
 
-    def get_recently_played_tracks(self, raw=False):
+    def get_recently_played_tracks(self):
         """Access the last played tracks, up to 50; Spotify doesn't give us access to more."""
         result = self._connection.current_user_recently_played()
 
         results = result['items']
-
-        if raw:
-            return results
 
         results = _postprocess_tracks(results)
 
@@ -338,6 +332,8 @@ class SpotifyInterface:
 
         print("Added %d new tracks to playlist '%s'" % (len(tracks), playlist_name_or_id))
 
+        self._cache.invalidate('playlist_tracks', playlist_id)
+
         return
 
     def remove_tracks_from_playlist(self, playlist_name_or_id, tracks):
@@ -350,6 +346,8 @@ class SpotifyInterface:
             lambda x: self._connection.playlist_remove_all_occurrences_of_items(playlist_id=playlist_id, items=x),
             tracks
         )
+
+        self._cache.invalidate('playlist_tracks', playlist_id)
 
         return
 
@@ -375,6 +373,8 @@ class SpotifyInterface:
 
         print('Added %d liked tracks' % len(new_tracks))
 
+        self._cache.invalidate('liked_tracks')
+
         return
 
     def remove_liked_tracks(self, tracks):
@@ -386,9 +386,6 @@ class SpotifyInterface:
             tracks
         )
 
+        self._cache.invalidate('liked_tracks')
+
         return
-
-
-
-
-

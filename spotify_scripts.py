@@ -216,10 +216,10 @@ def move_l1_queue_listened_tracks_to_l2(
     print()
     choice = get_user_choice('Is this correct?')
     if choice != 'yes':
-        return l1_queue_tracks, l2_queue_tracks, None
+        return
 
     if len(listened_tracks) == 0:
-        return l1_queue_tracks, l2_queue_tracks, None
+        return
 
     # find how many of the listened tracks are liked
     liked_tracks = spotify.get_liked_tracks()
@@ -242,7 +242,7 @@ def move_l1_queue_listened_tracks_to_l2(
                   (len(listened_liked_tracks_idx) - len(listened_liked_tracks_not_in_l2_idx), l2_queue_name))
             choice = get_user_choice('Continue?')
             if choice != 'yes':
-                return l1_queue_tracks, l2_queue_tracks, liked_tracks, None
+                return
 
         if len(listened_liked_tracks_not_in_l2_idx) > 0:
             choice = get_user_choice('Add %d tracks to %s?' % (len(listened_liked_tracks_not_in_l2_idx), l2_queue_name))
@@ -268,8 +268,7 @@ def move_l1_queue_listened_tracks_to_l2(
         l1_queue_tracks = l1_queue_tracks.loc[l1_queue_tracks.index.difference(listened_tracks.index, sort=False)]
         print('%s now has %d tracks' % (l1_queue_name, len(l1_queue_tracks)))
 
-    return l1_queue_tracks, l2_queue_tracks, liked_tracks
-
+    return
 
 def replenish_l1_queue(
         l1_queue_name=_DEFAULT_L1_QUEUE,
@@ -317,20 +316,17 @@ def replenish_l1_queue(
 
             print(f'{l1_queue_name} now has {len(l1_queue_tracks)} tracks')
 
-    return l1_queue_tracks
+    return
 
 def sanity_check_l1_queue(
         l1_queue_name=_DEFAULT_L1_QUEUE,
-        l1_queue_id=None,
-        l1_queue_tracks=None,
-        liked_tracks=None):
+        l1_queue_id=None):
 
     if l1_queue_id is None:
         l1_queue_id = spotify.get_playlist_id(l1_queue_name)
 
-    if l1_queue_tracks is None:
-        l1_queue_tracks = spotify.get_playlist_tracks(l1_queue_id)
-        print('%s: %d tracks' % (l1_queue_name, len(l1_queue_tracks)))
+    l1_queue_tracks = spotify.get_playlist_tracks(l1_queue_id)
+    print('%s: %d tracks' % (l1_queue_name, len(l1_queue_tracks)))
 
     queue_tracks = docs['queue'].read()
 
@@ -363,9 +359,8 @@ def sanity_check_l1_queue(
             print('%s now has %d tracks' % (l1_queue_name, len(l1_queue_tracks)))
 
     # Make sure all items in the L1 queue are not liked
-    if liked_tracks is None:
-        liked_tracks = spotify.get_liked_tracks()
-        print('Spotify Liked Tracks: %d tracks' % len(liked_tracks))
+    liked_tracks = spotify.get_liked_tracks()
+    print('Spotify Liked Tracks: %d tracks' % len(liked_tracks))
 
     l1_queue_liked_tracks_idx = l1_queue_tracks.index.intersection(liked_tracks.index, sort=False)
 
@@ -378,16 +373,13 @@ def sanity_check_l1_queue(
         if choice == 'yes':
             spotify.remove_liked_tracks(l1_queue_liked_tracks_idx)
 
-    liked_tracks = liked_tracks.loc[liked_tracks.index.difference(l1_queue_liked_tracks_idx, sort=False)]
-
-    return l1_queue_tracks, liked_tracks
+    return
 
 
 def add_to_l2_queue(
         tracks=[],
         l2_queue_name=_DEFAULT_L2_QUEUE,
-        l2_queue_id=None,
-        l2_queue_tracks=None):
+        l2_queue_id=None):
 
     tracks = dataframe_ensure_unique_index(tracks)
     print('Adding %d tracks to %s' % (len(tracks), l2_queue_name))
@@ -398,9 +390,8 @@ def add_to_l2_queue(
     if l2_queue_id is None:
         l2_queue_id = spotify.get_playlist_id(l2_queue_name)
 
-    if l2_queue_tracks is None:
-        l2_queue_tracks = spotify.get_playlist_tracks(l2_queue_id)
-        print('%s: %d tracks' % (l2_queue_name, len(l2_queue_tracks)))
+    l2_queue_tracks = spotify.get_playlist_tracks(l2_queue_id)
+    print('%s: %d tracks' % (l2_queue_name, len(l2_queue_tracks)))
 
     new_tracks_idx = tracks.index.difference(l2_queue_tracks.index, sort=False)
 
@@ -414,8 +405,6 @@ def add_to_l2_queue(
 
     spotify.add_tracks_to_playlist(l2_queue_id, new_tracks_idx, check_for_duplicates=False)
 
-    l2_queue_tracks = pd.concat([l2_queue_tracks, new_tracks])
-
     choice = get_user_choice('Add tracks to queue history?')
     if choice == 'yes':
         add_to_queue_history(new_tracks)
@@ -424,22 +413,19 @@ def add_to_l2_queue(
     if choice == 'yes':
         remove_from_queue(new_tracks, warn_for_missing=False)
 
-    return l2_queue_tracks
+    return
 
 
 def add_shazam_to_l2_queue(
         shazam_name = 'My Shazam Tracks',
         shazam_id=None,
-        shazam_tracks=None,
         l2_queue_name=_DEFAULT_L2_QUEUE,
-        l2_queue_id=None,
-        l2_queue_tracks=None):
+        l2_queue_id=None):
 
     if shazam_id is None:
         shazam_id = spotify.get_playlist_id(shazam_name)
 
-    if shazam_tracks is None:
-        shazam_tracks = spotify.get_playlist_tracks(shazam_id)
+    shazam_tracks = spotify.get_playlist_tracks(shazam_id)
 
     shazam_tracks = dataframe_ensure_unique_index(shazam_tracks)
 
@@ -447,13 +433,13 @@ def add_shazam_to_l2_queue(
     pretty_print_tracks(shazam_tracks, indent=' '*4, enum=True)
 
     if len(shazam_tracks) == 0:
-        return l2_queue_tracks
+        return
 
     choice = get_user_choice("Add to %s?" % l2_queue_name)
     if choice != 'yes':
-        return l2_queue_tracks
+        return
 
-    l2_queue_tracks = add_to_l2_queue(
+    add_to_l2_queue(
         shazam_tracks,
         l2_queue_name=l2_queue_name,
         l2_queue_id=l2_queue_id,
@@ -464,27 +450,23 @@ def add_shazam_to_l2_queue(
     if choice == 'yes':
         spotify.remove_tracks_from_playlist(shazam_id, shazam_tracks.index)
 
-    return l2_queue_tracks
+    return
 
 
 def sanity_check_l2_queue(
         l2_queue_name=_DEFAULT_L2_QUEUE,
         l2_queue_id=None,
-        l2_queue_tracks=None,
-        liked_tracks=None
 ):
 
-    if l2_queue_tracks is None:
-        if l2_queue_id is None:
-            l2_queue_id = spotify.get_playlist_id(l2_queue_name)
+    if l2_queue_id is None:
+        l2_queue_id = spotify.get_playlist_id(l2_queue_name)
 
-        l2_queue_tracks = spotify.get_playlist_tracks(l2_queue_id)
-        print('%s: %d tracks' % (l2_queue_name, len(l2_queue_tracks)))
+    l2_queue_tracks = spotify.get_playlist_tracks(l2_queue_id)
+    print('%s: %d tracks' % (l2_queue_name, len(l2_queue_tracks)))
 
     # Make sure all items in the L2 queue are already liked
-    if liked_tracks is None:
-        liked_tracks = spotify.get_liked_tracks()
-        print('Spotify Liked Tracks: %d tracks' % len(liked_tracks))
+    liked_tracks = spotify.get_liked_tracks()
+    print('Spotify Liked Tracks: %d tracks' % len(liked_tracks))
 
     l2_queue_unliked_tracks_idx = l2_queue_tracks.index.difference(liked_tracks.index, sort=False)
 
@@ -530,7 +512,7 @@ def sanity_check_l2_queue(
             queue = queue.loc[queue.index.difference(l2_queue_tracks.index, sort=False)]
             docs['queue'].write(queue)
 
-    return l2_queue_tracks, liked_tracks
+    return
 
 def queue_maintenance(
         l1_queue_name = _DEFAULT_L1_QUEUE,
@@ -546,7 +528,7 @@ def queue_maintenance(
     l1_queue_id = spotify.get_playlist_id(l1_queue_name)
     l2_queue_id = spotify.get_playlist_id(l2_queue_name)
 
-    l1_queue_tracks, l2_queue_tracks, liked_tracks = move_l1_queue_listened_tracks_to_l2(
+    move_l1_queue_listened_tracks_to_l2(
         l1_queue_name=l1_queue_name,
         l2_queue_name=l2_queue_name,
         l1_queue_id=l1_queue_id,
@@ -554,30 +536,23 @@ def queue_maintenance(
         l1_queue_last_listened_track=last_track
     )
 
-    l1_queue_tracks = replenish_l1_queue(
+    replenish_l1_queue(
         l1_queue_name=l1_queue_name,
         l1_queue_id=l1_queue_id,
-        l1_queue_tracks=l1_queue_tracks,
         target_size=l1_queue_target_size)
 
-    l2_queue_tracks = add_shazam_to_l2_queue(
+    add_shazam_to_l2_queue(
         shazam_name=shazam_name,
         l2_queue_name=l2_queue_name,
-        l2_queue_id=l2_queue_id,
-        l2_queue_tracks=l2_queue_tracks
-       )
+        l2_queue_id=l2_queue_id       )
 
-    l1_queue_tracks, liked_tracks = sanity_check_l1_queue(
+    sanity_check_l1_queue(
         l1_queue_name=l1_queue_name,
-        l1_queue_id=l1_queue_id,
-        l1_queue_tracks=l1_queue_tracks,
-        liked_tracks=liked_tracks)
+        l1_queue_id=l1_queue_id)
 
-    l2_queue_tracks, liked_tracks = sanity_check_l2_queue(
+    sanity_check_l2_queue(
         l2_queue_name=l2_queue_name,
-        l2_queue_id=l2_queue_id,
-        l2_queue_tracks=l2_queue_tracks,
-        liked_tracks=liked_tracks
+        l2_queue_id=l2_queue_id
     )
 
     return
@@ -607,4 +582,3 @@ def shuffle_spotify_playlist(playlist_name):
     print(f"Created Spotify playlist '{new_playlist_name}' with {len(new_tracks)} tracks")
 
     return
-

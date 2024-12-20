@@ -43,10 +43,10 @@ def build_condition(
             if not track.Song:
                 return False
         if not allow_uptempo:
-            if track.BPM > DOWNTEMPO_CUTOFF:
+            if track.BPM > _DOWNTEMPO_CUTOFF:
                 return False
         if not allow_downtempo:
-            if track.BPM <= DOWNTEMPO_CUTOFF:
+            if track.BPM <= _DOWNTEMPO_CUTOFF:
                 return False
         if not allow_A:
             if is_class(track, 'A'):
@@ -65,7 +65,7 @@ def build_condition(
     return _condition
 
 
-DOWNTEMPO_CUTOFF = 112
+_DOWNTEMPO_CUTOFF = 112
 
 
 _playlist_conditions = {

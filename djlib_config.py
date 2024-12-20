@@ -15,19 +15,19 @@ rekordbox = None
 google = None
 spotify = None
 docs = {}
-backups = 0
+_backups = 0
 
 def init(config_file=None):
     global rekordbox
     global google
     global spotify
     global docs
-    global backups
+    global _backups
 
     if config_file is None:
         potential_config_files = [
             os.path.join(os.environ['HOME'], '.djlib', 'config'),
-            os.path.join(os.environ['HOME'], 'djlib_config'),
+            os.path.join(os.environ['HOME'], '.djlib_config'),
             './config'
         ]
 
@@ -48,7 +48,7 @@ def init(config_file=None):
         if section_name == 'general':
             for field in section.keys():
                 if field == 'backups':
-                    backups = section.getint('backups')
+                    _backups = section.getint('backups')
                 elif field.startswith('pandas.'):
                     pd.set_option(field[7:], section.getint(field))
                 else:
@@ -56,19 +56,19 @@ def init(config_file=None):
 
         elif section_name == 'rekordbox':
             kwargs = {}
-            rekordbox_backups = backups
+            rekordbox_backups = _backups
 
             rekordbox_xml = section['rekordbox_xml']
             if 'backups' in section:
                 rekordbox_backups = section.getint('backups')
             else:
-                rekordbox_backups = backups
+                rekordbox_backups = _backups
 
             for field in section.keys():
                 if field not in ['rekordbox_xml', 'backups']:
                     raise Exception('Unknown field in config section %s: %s' % (section_name, field))
 
-            rekordbox = rekordbox_interface.RekordboxInterface(rekordbox_xml, backups)
+            rekordbox = rekordbox_interface.RekordboxInterface(rekordbox_xml, rekordbox_backups)
 
         elif section.name == 'google':
             google = google_interface.GoogleInterface(section)
@@ -101,17 +101,18 @@ def init(config_file=None):
 
 
 def _add_doc(name, type, **kwargs):
+    global google
     global docs
-    global backups
+    global _backups
 
     if name in docs:
         raise Exception("Duplicate doc name: '%s'" % name)
 
     if type == 'google_sheet':
-        if self.google is None:
+        if google is None:
             raise Exception("Cannot add Google sheet '%s'; no Google connection specified" % name)
 
-        doc = google_interface.GoogleSheet(self.google, **kwargs)
+        doc = google_interface.GoogleSheet(google, **kwargs)
     else:
         if 'path' not in kwargs:
             raise Exception("Cannot add file document '%s'; no path specified" % name)
@@ -119,7 +120,7 @@ def _add_doc(name, type, **kwargs):
         del kwargs['path']
 
         if 'backups' not in kwargs:
-            kwargs['backups'] = backups
+            kwargs['backups'] = _backups
 
         if type == 'excel':
             doc = file_interface.ExcelSheet(path, **kwargs)

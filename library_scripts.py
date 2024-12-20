@@ -131,7 +131,7 @@ def djlib_values_sanity_check():
 
     return (errors == 0)
 
-automatic_accept_threshold = 0.9
+_automatic_accept_threshold = 0.9
 
 def djlib_maintenance(cutoff_ratio=0.3):
     djlib_tracks_changed = False
@@ -244,7 +244,7 @@ def djlib_maintenance(cutoff_ratio=0.3):
                     print('djlib: %s' % format_track(djlib_tracks_empty_rows.iloc[djlib_idx]))
                     print('New Tracks: %s' % new_tracks.iloc[new_track_idx].Title)
                     print('Match ratio: %.2f' % mapping['ratio'])
-                    if mapping['ratio'] >= automatic_accept_threshold:
+                    if mapping['ratio'] >= _automatic_accept_threshold:
                         print('Accepted automatically')
                         choice = 'yes'
                     else:
@@ -336,7 +336,7 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
                     print('Rekordbox: %s' % format_track(rekordbox_track))
                     print('Spotify: %s' % format_track(spotify_track))
                     print('Match ratio: %.2f' % mapping['ratio'])
-                    if mapping['ratio'] >= automatic_accept_threshold:
+                    if mapping['ratio'] >= _automatic_accept_threshold:
                         print('Accepted automatically')
                         choice = 'yes'
                     else:

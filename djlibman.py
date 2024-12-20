@@ -11,19 +11,15 @@ import djlib_config
 import pandas as pd
 import numpy as np
 
-def test_func():
-    print('Test')
-    return 'Test'
+_should_quit = False
 
-should_quit = False
-
-def quit():
-    global should_quit
-    should_quit = True
+def _quit():
+    global _should_quit
+    _should_quit = True
 
 
-def python_shell(shell_locals):
-    global should_quit
+def _python_shell(shell_locals):
+    global _should_quit
 
     ic = code.InteractiveConsole(shell_locals)
 
@@ -40,7 +36,7 @@ def python_shell(shell_locals):
     ps2 = "... "
 
     more = False
-    while not should_quit:
+    while not _should_quit:
         try:
             if more:
                 prompt = ps2
@@ -68,7 +64,22 @@ def python_shell(shell_locals):
     return
 
 
-def main():
+def _init(config_file=None):
+    djlib_config.init(config_file)
+
+    # import everything from scripts
+    import scripts
+    globals().update(scripts.__dict__)
+
+    # import all doc names from djlib_config, except the ones that conflict with
+    # existing variables
+    for key, value in djlib_config.__dict__.items():
+        if key not in globals():
+            globals()[key] = value
+
+    return
+
+def _main():
     parser = argparse.ArgumentParser(
         prog='djlibman.py',
         description='Organizes a DJ library between Rekordbox, Spotify, YouTube, google sheets and CSVs'
@@ -79,25 +90,21 @@ def main():
 
     config_file = args.config
 
-    djlib_config.init(config_file)
+    _init(config_file)
 
     # build the local vars of the console
     # this is the equivalent of 'import * from ...'
 
     shell_locals = {}
-    shell_locals.update(djlib_config.__dict__)
-
-    import scripts
-    shell_locals.update(scripts.__dict__)
-
-    # finally, add all the globals; this gives us all the functions etc.
-    # by doing this last, any conflicting document names will be overridden
     shell_locals.update(globals())
 
     # drop into a shell
-    python_shell(shell_locals)
+    _python_shell(shell_locals)
 
     return 0
 
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(_main())
+else:
+    _init()
+

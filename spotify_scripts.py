@@ -183,12 +183,12 @@ def get_playlist_listened_tracks(
 
     return playlist_tracks.loc[playlist_tracks.index.intersection(listened_tracks.index, sort=False)]
 
-DEFAULT_L1_QUEUE = 'L1 queue'
-DEFAULT_L2_QUEUE = 'L2 queue'
+_DEFAULT_L1_QUEUE = 'L1 queue'
+_DEFAULT_L2_QUEUE = 'L2 queue'
 
 def move_l1_queue_listened_tracks_to_l2(
-        l1_queue_name=DEFAULT_L1_QUEUE,
-        l2_queue_name=DEFAULT_L2_QUEUE,
+        l1_queue_name=_DEFAULT_L1_QUEUE,
+        l2_queue_name=_DEFAULT_L2_QUEUE,
         l1_queue_id=None,
         l2_queue_id=None,
         l1_queue_last_listened_track=None):
@@ -272,7 +272,7 @@ def move_l1_queue_listened_tracks_to_l2(
 
 
 def replenish_l1_queue(
-        l1_queue_name=DEFAULT_L1_QUEUE,
+        l1_queue_name=_DEFAULT_L1_QUEUE,
         l1_queue_id=None,
         l1_queue_tracks=None,
         target_size=200):
@@ -320,7 +320,7 @@ def replenish_l1_queue(
     return l1_queue_tracks
 
 def sanity_check_l1_queue(
-        l1_queue_name=DEFAULT_L1_QUEUE,
+        l1_queue_name=_DEFAULT_L1_QUEUE,
         l1_queue_id=None,
         l1_queue_tracks=None,
         liked_tracks=None):
@@ -385,7 +385,7 @@ def sanity_check_l1_queue(
 
 def add_to_l2_queue(
         tracks=[],
-        l2_queue_name=DEFAULT_L2_QUEUE,
+        l2_queue_name=_DEFAULT_L2_QUEUE,
         l2_queue_id=None,
         l2_queue_tracks=None):
 
@@ -431,7 +431,7 @@ def add_shazam_to_l2_queue(
         shazam_name = 'My Shazam Tracks',
         shazam_id=None,
         shazam_tracks=None,
-        l2_queue_name=DEFAULT_L2_QUEUE,
+        l2_queue_name=_DEFAULT_L2_QUEUE,
         l2_queue_id=None,
         l2_queue_tracks=None):
 
@@ -468,7 +468,7 @@ def add_shazam_to_l2_queue(
 
 
 def sanity_check_l2_queue(
-        l2_queue_name=DEFAULT_L2_QUEUE,
+        l2_queue_name=_DEFAULT_L2_QUEUE,
         l2_queue_id=None,
         l2_queue_tracks=None,
         liked_tracks=None
@@ -533,8 +533,8 @@ def sanity_check_l2_queue(
     return l2_queue_tracks, liked_tracks
 
 def queue_maintenance(
-        l1_queue_name = DEFAULT_L1_QUEUE,
-        l2_queue_name = DEFAULT_L2_QUEUE,
+        l1_queue_name = _DEFAULT_L1_QUEUE,
+        l2_queue_name = _DEFAULT_L2_QUEUE,
         shazam_name = 'My Shazam Tracks',
         last_track = None,
         l1_queue_target_size = 200

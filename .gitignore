@@ -7,3 +7,4 @@ code_examples/grammar/*.interp
 code_examples/grammar/*.tokens
 code_examples/grammar/*.py
 /buffer
+/djlibman.log

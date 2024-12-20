@@ -196,7 +196,7 @@ class SpotifyInterface:
 
             return df
 
-        self._cache.look_up_or_get(body, _TTL, 'playlists')
+        return self._cache.look_up_or_get(body, _TTL, 'playlists')
 
     def get_playlist_id(self, playlist_name):
         playlists = self.get_playlists()
@@ -240,7 +240,7 @@ class SpotifyInterface:
 
             return df
 
-        self._cache.look_up_or_get(body, _TTL, 'playlist_tracks', playlist_id)
+        return self._cache.look_up_or_get(body, _TTL, 'playlist_tracks', playlist_id)
 
     def get_liked_tracks(self):
         def body():
@@ -257,7 +257,7 @@ class SpotifyInterface:
 
             return df
 
-        self._cache.look_up_or_get(body, _TTL, 'liked_tracks')
+        return self._cache.look_up_or_get(body, _TTL, 'liked_tracks')
 
     def get_recently_played_tracks(self):
         """Access the last played tracks, up to 50; Spotify doesn't give us access to more."""

@@ -239,7 +239,7 @@ def move_l1_queue_listened_tracks_to_l2(
                 return
 
         if len(listened_liked_tracks_not_in_l2_idx) > 0:
-            choice = get_user_choice(f'Add {len(listened_liked_tracks_not_in_l2_idx)} tracks to{l2_queue_name} ?')
+            choice = get_user_choice(f'Add {len(listened_liked_tracks_not_in_l2_idx)} tracks to {l2_queue_name} ?')
             if choice == 'yes':
                 spotify.add_tracks_to_playlist(l2_queue_id, listened_liked_tracks_not_in_l2_idx,
                                                    # avoid duplicate check since we've already done it

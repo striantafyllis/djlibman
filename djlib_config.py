@@ -3,6 +3,7 @@ import os
 import os.path
 import configparser
 import ast
+import logging
 
 import pandas as pd
 
@@ -16,6 +17,9 @@ google = None
 spotify = None
 docs = {}
 _backups = 0
+
+_log_file = './djlibman.log'
+_log_level = logging.INFO
 
 def init(config_file=None):
     global rekordbox
@@ -48,16 +52,19 @@ def init(config_file=None):
         if section_name == 'general':
             for field in section.keys():
                 if field == 'backups':
-                    _backups = section.getint('backups')
+                    _backups = section.getint(field)
+                elif field == 'logfile':
+                    _log_file = section.get(field)
+                    if _log_file.upper() == 'CONSOLE':
+                        _log_file = None
+                elif field == 'loglevel':
+                    _log_file = getattr(logging, section.get(field).upper())
                 elif field.startswith('pandas.'):
                     pd.set_option(field[7:], section.getint(field))
                 else:
                     raise Exception('Unknown field in config section %s: %s' % (section_name, field))
 
         elif section_name == 'rekordbox':
-            kwargs = {}
-            rekordbox_backups = _backups
-
             rekordbox_xml = section['rekordbox_xml']
             if 'backups' in section:
                 rekordbox_backups = section.getint('backups')

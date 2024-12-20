@@ -1,5 +1,6 @@
 import os
 import re
+import logging
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
@@ -8,6 +9,8 @@ import numpy as np
 
 import cache
 from internal_utils import *
+
+logger = logging.getLogger(__name__)
 
 _MAX_ITEMS_PER_REQUEST = 50
 

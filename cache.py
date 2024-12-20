@@ -1,6 +1,8 @@
 
 import time
+import logging
 
+logger = logging.getLogger(__name__)
 
 class Cache:
     def __init__(self):
@@ -8,15 +10,20 @@ class Cache:
         return
 
     def look_up(self, *keys):
-        entry = self._cache.get(tuple(keys))
+        key = tuple(keys)
+
+        entry = self._cache.get(key)
 
         if entry is None:
+            logger.debug('Miss: %s', key)
             return None
 
         if time.time() > entry['timestamp'] + entry['ttl']:
-            del self._cache[tuple(keys)]
+            logger.debug('Expired entry: %s', key)
+            del self._cache[key]
             return None
 
+        logger.debug('Hit: %s', key)
         return entry['value']
 
     def store(self, value, ttl, *keys):

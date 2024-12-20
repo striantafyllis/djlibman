@@ -1,45 +1,44 @@
 
 import random
 
-from djlib_config import *
 from utils import *
 
 def sanity_check_disk_queues(queue_tracks=None, queue_history_tracks=None):
     if queue_tracks is None:
         queue_tracks = docs['queue'].read()
-        print('Queue: %d tracks' % len(queue_tracks))
+        print(f'Queue: {len(queue_tracks)} tracks')
     if queue_history_tracks is None:
         queue_history_tracks = docs['queue_history'].read()
-        print('Queue history: %d tracks' % len(queue_history_tracks))
+        print(f'Queue history: {len(queue_history_tracks)} tracks')
 
     # entries in the queue should be unique
     dup_pos = dataframe_duplicate_index_labels(queue_tracks)
     if len(dup_pos) > 0:
-        print('WARNING: Queue has %d duplicate tracks!' % len(dup_pos))
+        print(f'WARNING: Queue has {len(dup_pos)} duplicate tracks!')
         pretty_print_tracks(queue_tracks.iloc[dup_pos], indent=' '*4, enum=True)
-        choice = get_user_choice('Remove? (y/n)')
+        choice = get_user_choice('Remove?')
         if choice == 'yes':
             queue_tracks = dataframe_drop_rows_at_positions(queue_tracks, dup_pos)
             docs['queue'].write(queue_tracks)
 
-            print('Queue now has %d tracks' % len(queue_tracks))
+            print(f'Queue now has {len(queue_tracks)} tracks')
 
     # entries in queue history should be unique
     dup_pos = dataframe_duplicate_index_labels(queue_history_tracks)
     if len(dup_pos) > 0:
-        print('WARNING: Queue history has %d duplicate tracks!' % len(dup_pos))
+        print(f'WARNING: Queue history has {len(dup_pos)} duplicate tracks!')
         pretty_print_tracks(queue_history_tracks.iloc[dup_pos], indent=' ' * 4, enum=True)
-        choice = get_user_choice('Remove? (y/n)')
+        choice = get_user_choice('Remove?')
         if choice == 'yes':
             queue_history_tracks = dataframe_drop_rows_at_positions(queue_history_tracks, dup_pos)
             docs['queue_history'].write(queue_history_tracks)
 
-            print('Queue history now has %d tracks' % len(queue_history_tracks))
+            print(f'Queue history now has {len(queue_history_tracks)} tracks')
 
     # queue tracks should not be in queue history
     queue_tracks_in_queue_history_idx = queue_tracks.index.intersection(queue_history_tracks.index, sort=False)
     if len(queue_tracks_in_queue_history_idx) > 0:
-        print('WARNING: %d queue tracks are in queue history.' % len(queue_tracks_in_queue_history_idx))
+        print(f'WARNING: {len(queue_tracks_in_queue_history_idx)} queue tracks are in queue history.')
         pretty_print_tracks(
             queue_tracks.loc[queue_tracks_in_queue_history_idx],
             indent=' '*4,
@@ -52,7 +51,7 @@ def sanity_check_disk_queues(queue_tracks=None, queue_history_tracks=None):
 
             docs['queue'].write(queue_tracks)
 
-            print('Queue now has %d tracks' % len(queue_tracks))
+            print(f'Queue now has {len(queue_tracks)} tracks')
 
     print()
 
@@ -65,7 +64,7 @@ def add_to_queue_history(new_tracks):
 
     queue_history = docs['queue_history']
     queue_history_tracks = queue_history.read()
-    print('Queue history: %d tracks' % len(queue_history_tracks))
+    print(f'Queue history: {len(queue_history_tracks)} tracks')
 
     if queue_history_tracks.index.name != 'id':
         raise Exception('queue_history not indexed by ID')
@@ -76,7 +75,7 @@ def add_to_queue_history(new_tracks):
     else:
         for column in queue_history_tracks.columns:
             if column not in new_tracks.columns:
-                raise Exception("New items are missing column '%s'" % column)
+                raise Exception(f"New items are missing column '{column}'")
 
     # this takes care of extra columns, columns in different order etc.
     new_tracks = new_tracks[queue_history_tracks.columns]
@@ -88,27 +87,28 @@ def add_to_queue_history(new_tracks):
 
     unique_new_ids = new_history_ids.difference(queue_history_tracks.index, sort=False)
 
-    print('Received %d new items, of which %d already exist; adding %d new items' % (
-        len(new_tracks),
-        len(new_tracks) - len(unique_new_ids),
-        len(unique_new_ids)))
+    print(f'Received {len(new_tracks)} new items, of which '
+          f'{len(new_tracks) - len(unique_new_ids)} already exist; '
+          f'adding {len(unique_new_ids)} new items')
 
     new_history = pd.concat([queue_history_tracks, new_tracks.loc[unique_new_ids]])
     queue_history.write(new_history)
-    print('Queue history now has %d tracks' % len(new_history))
+    print(f'Queue history now has {len(new_history)} tracks')
 
     return
 
 
 def remove_from_queue(listened_tracks=[], warn_for_missing=True):
     queue_tracks = docs['queue'].read()
-    print('Queue: %d tracks' % len(queue_tracks))
+    print(f'Queue: {len(queue_tracks)} tracks')
 
     remaining_queue_tracks_idx = queue_tracks.index.difference(listened_tracks.index, sort=False)
 
     if warn_for_missing and len(remaining_queue_tracks_idx) + len(listened_tracks) > len(queue_tracks):
-        print('WARNING: %d listened tracks were already removed from the queue' %
-              (len(remaining_queue_tracks_idx) + len(listened_tracks) - len(queue_tracks)))
+        print(
+            f'WARNING: '
+            f'{len(remaining_queue_tracks_idx) + len(listened_tracks) - len(queue_tracks)} '
+            f'listened tracks were already removed from the queue')
         choice = get_user_choice('Continue?')
         if choice != 'yes':
             return
@@ -121,7 +121,7 @@ def remove_from_queue(listened_tracks=[], warn_for_missing=True):
 
     queue_tracks = queue_tracks.loc[remaining_queue_tracks_idx]
     docs['queue'].write(queue_tracks)
-    print('Queue now has %d tracks' % len(queue_tracks))
+    print(f'Queue now has {len(queue_tracks)} tracks')
 
     return
 
@@ -143,10 +143,9 @@ def get_playlist_listened_tracks(
     if last_listened_track is not None:
         if isinstance(last_listened_track, int):
             if last_listened_track > len(playlist_tracks):
-                raise Exception('Playlist last listened track is %d; playlist has only %d tracks' % (
-                    last_listened_track,
-                    len(playlist_tracks)
-                ))
+                raise Exception(
+                    f'Playlist last listened track is {last_listened_track}; '
+                    f'playlist has only {len(playlist_tracks)} tracks')
 
             return playlist_tracks.iloc[:last_listened_track]
 
@@ -172,7 +171,7 @@ def get_playlist_listened_tracks(
 
             return playlist_tracks.iloc[:(last_listened_track_idx+1)]
 
-        raise Exception("Invalid type for last_listened_track: %s" % type(last_listened_track))
+        raise Exception(f"Invalid type for last_listened_track: {type(last_listened_track)}")
 
     print('WARNING: Attempting to determine listened tracks through the listening history; this may miss some tracks.')
     choice = get_user_choice('Continue?')
@@ -189,29 +188,25 @@ _DEFAULT_L2_QUEUE = 'L2 queue'
 def move_l1_queue_listened_tracks_to_l2(
         l1_queue_name=_DEFAULT_L1_QUEUE,
         l2_queue_name=_DEFAULT_L2_QUEUE,
-        l1_queue_id=None,
-        l2_queue_id=None,
         l1_queue_last_listened_track=None):
 
-    if l1_queue_id is None:
-        l1_queue_id = spotify.get_playlist_id(l1_queue_name)
-    if l2_queue_id is None:
-        l2_queue_id = spotify.get_playlist_id(l2_queue_name)
+    l1_queue_id = spotify.get_playlist_id(l1_queue_name)
+    l2_queue_id = spotify.get_playlist_id(l2_queue_name)
 
     l1_queue_tracks = spotify.get_playlist_tracks(l1_queue_id)
-    print('%s: %d tracks' % (l1_queue_name, len(l1_queue_tracks)))
+    print(f'{l1_queue_name}: {len(l1_queue_tracks)} tracks')
 
     if l1_queue_tracks.empty:
         return l1_queue_tracks, None, None
 
     l2_queue_tracks = spotify.get_playlist_tracks(l2_queue_id)
-    print('%s: %d tracks' % (l2_queue_name, len(l2_queue_tracks)))
+    print(f'{l2_queue_name}: {len(l2_queue_tracks)} tracks')
 
     listened_tracks = get_playlist_listened_tracks(
         playlist_tracks=l1_queue_tracks,
         last_listened_track=l1_queue_last_listened_track)
 
-    print('%s: %d listened tracks' % (l1_queue_name, len(listened_tracks)))
+    print(f'{l1_queue_name}: {len(listened_tracks)} listened tracks')
     pretty_print_tracks(listened_tracks, indent=' ' * 4, enum=True)
     print()
     choice = get_user_choice('Is this correct?')
@@ -223,14 +218,11 @@ def move_l1_queue_listened_tracks_to_l2(
 
     # find how many of the listened tracks are liked
     liked_tracks = spotify.get_liked_tracks()
-    print('Spotify Liked Tracks: %d tracks' % len(liked_tracks))
+    print(f'Spotify Liked Tracks: {len(liked_tracks)} tracks')
 
     listened_liked_tracks_idx = listened_tracks.index.intersection(liked_tracks.index, sort=False)
-    print('%s: %d of the %d listened tracks are liked' % (
-        l1_queue_name,
-        len(listened_liked_tracks_idx),
-        len(listened_tracks)
-    ))
+    print(f'{l1_queue_name}: {len(listened_liked_tracks_idx)} of the '
+          f'{len(listened_tracks)} listened tracks are liked')
     pretty_print_tracks(listened_tracks.loc[listened_liked_tracks_idx], indent=' ' * 4, enum=True)
     print()
 
@@ -238,35 +230,37 @@ def move_l1_queue_listened_tracks_to_l2(
         listened_liked_tracks_not_in_l2_idx = listened_liked_tracks_idx.difference(l2_queue_tracks.index,
                                                                                    sort=False)
         if len(listened_liked_tracks_not_in_l2_idx) < len(listened_liked_tracks_idx):
-            print('WARNING: %d of these tracks are already in %s' %
-                  (len(listened_liked_tracks_idx) - len(listened_liked_tracks_not_in_l2_idx), l2_queue_name))
+            print(
+                f'WARNING: '
+                f'{len(listened_liked_tracks_idx) - len(listened_liked_tracks_not_in_l2_idx)} '
+                f'of these tracks are already in {l2_queue_name}')
             choice = get_user_choice('Continue?')
             if choice != 'yes':
                 return
 
         if len(listened_liked_tracks_not_in_l2_idx) > 0:
-            choice = get_user_choice('Add %d tracks to %s?' % (len(listened_liked_tracks_not_in_l2_idx), l2_queue_name))
+            choice = get_user_choice(f'Add {len(listened_liked_tracks_not_in_l2_idx)} tracks to{l2_queue_name} ?')
             if choice == 'yes':
                 spotify.add_tracks_to_playlist(l2_queue_id, listened_liked_tracks_not_in_l2_idx,
                                                    # avoid duplicate check since we've already done it
                                                    check_for_duplicates=False)
 
                 l2_queue_tracks = pd.concat([l2_queue_tracks, l1_queue_tracks.loc[listened_liked_tracks_not_in_l2_idx]])
-                print('%s now has %d tracks' % (l2_queue_name, len(l2_queue_tracks)))
+                print(f'{l2_queue_name} now has {len(l2_queue_tracks)} tracks')
 
-    choice = get_user_choice('Add %d listened tracks to queue history?' % len(listened_tracks))
+    choice = get_user_choice(f'Add {len(listened_tracks)} listened tracks to queue history?')
     if choice == 'yes':
         add_to_queue_history(listened_tracks)
 
-    choice = get_user_choice('Remove %d listened tracks from queue?' % len(listened_tracks))
+    choice = get_user_choice(f'Remove {len(listened_tracks)} listened tracks from queue?')
     if choice == 'yes':
         remove_from_queue(listened_tracks)
 
-    choice = get_user_choice('Remove %d listened tracks from %s?' % (len(listened_tracks), l1_queue_name))
+    choice = get_user_choice(f'Remove {len(listened_tracks)} listened tracks from {l1_queue_name}?')
     if choice == 'yes':
         spotify.remove_tracks_from_playlist(l1_queue_id, listened_tracks.index)
         l1_queue_tracks = l1_queue_tracks.loc[l1_queue_tracks.index.difference(listened_tracks.index, sort=False)]
-        print('%s now has %d tracks' % (l1_queue_name, len(l1_queue_tracks)))
+        print(f'{l1_queue_name} now has {len(l1_queue_tracks)} tracks')
 
     return
 
@@ -290,10 +284,10 @@ def replenish_l1_queue(
     # only replenish the default L1 queue - not random playlists - from the disk queue
     # if l1_queue_name == DEFAULT_L1_QUEUE:
     if True:
-        choice = get_user_choice('Add up to %d new tracks to %s?' % (tracks_to_add, l1_queue_name))
+        choice = get_user_choice(f'Add up to {tracks_to_add} new tracks to {l1_queue_name}?')
         if choice == 'yes':
             queue_tracks = docs['queue'].read()
-            print('Queue: %d tracks' % len(queue_tracks))
+            print(f'Queue: {len(queue_tracks)} tracks')
 
             queue_tracks_not_in_l1_queue_idx = queue_tracks.index.difference(l1_queue_tracks.index, sort=False)
 
@@ -326,7 +320,7 @@ def sanity_check_l1_queue(
         l1_queue_id = spotify.get_playlist_id(l1_queue_name)
 
     l1_queue_tracks = spotify.get_playlist_tracks(l1_queue_id)
-    print('%s: %d tracks' % (l1_queue_name, len(l1_queue_tracks)))
+    print(f'{l1_queue_name}: {len(l1_queue_tracks)} tracks')
 
     queue_tracks = docs['queue'].read()
 
@@ -342,30 +336,29 @@ def sanity_check_l1_queue(
 
             l1_queue_tracks = l1_queue_tracks.loc[l1_queue_tracks.index.difference(l1_queue_tracks_not_in_queue_idx, sort=False)]
 
-            print('%s now has %d tracks' % (l1_queue_name, len(l1_queue_tracks)))
+            print(f'{l1_queue_name} now has {len(l1_queue_tracks)} tracks')
 
     # Make sure items in the L1 queue are unique
     dup_pos = dataframe_duplicate_index_labels(l1_queue_tracks)
     if len(dup_pos) > 0:
-        print('WARNING: %s has %d duplicate tracks!' % (l1_queue_name, len(dup_pos)))
+        print(f'WARNING: {l1_queue_name} has {len(dup_pos)} duplicate tracks!')
         pretty_print_tracks(l1_queue_tracks.iloc[dup_pos])
 
-        choice = get_user_choice('Remove? (y/n)')
+        choice = get_user_choice('Remove?')
         if choice == 'yes':
             spotify.remove_tracks_from_playlist(l1_queue_id, l1_queue_tracks.index[dup_pos])
 
             l1_queue_tracks = dataframe_drop_rows_at_positions(l1_queue_tracks, dup_pos)
 
-            print('%s now has %d tracks' % (l1_queue_name, len(l1_queue_tracks)))
+            print(f'{l1_queue_name} now has {len(l1_queue_tracks)} tracks')
 
     # Make sure all items in the L1 queue are not liked
     liked_tracks = spotify.get_liked_tracks()
-    print('Spotify Liked Tracks: %d tracks' % len(liked_tracks))
 
     l1_queue_liked_tracks_idx = l1_queue_tracks.index.intersection(liked_tracks.index, sort=False)
 
     if len(l1_queue_liked_tracks_idx) > 0:
-        print('WARNING: %d %s tracks are already liked' % (len(l1_queue_liked_tracks_idx), l1_queue_name))
+        print(f'WARNING: {len(l1_queue_liked_tracks_idx)} {l1_queue_name} tracks are already liked')
         pretty_print_tracks(l1_queue_tracks.loc[l1_queue_liked_tracks_idx], indent=' '*4, enum=True)
         print()
 
@@ -378,28 +371,23 @@ def sanity_check_l1_queue(
 
 def add_to_l2_queue(
         tracks=[],
-        l2_queue_name=_DEFAULT_L2_QUEUE,
-        l2_queue_id=None):
+        l2_queue_name=_DEFAULT_L2_QUEUE):
 
     tracks = dataframe_ensure_unique_index(tracks)
-    print('Adding %d tracks to %s' % (len(tracks), l2_queue_name))
+    print(f'Adding {len(tracks)} tracks to {l2_queue_name}')
 
     if len(tracks) == 0:
         return
 
-    if l2_queue_id is None:
-        l2_queue_id = spotify.get_playlist_id(l2_queue_name)
+    l2_queue_id = spotify.get_playlist_id(l2_queue_name)
 
     l2_queue_tracks = spotify.get_playlist_tracks(l2_queue_id)
-    print('%s: %d tracks' % (l2_queue_name, len(l2_queue_tracks)))
+    print(f'{l2_queue_name}: {len(l2_queue_tracks)} tracks')
 
     new_tracks_idx = tracks.index.difference(l2_queue_tracks.index, sort=False)
 
-    print('%d tracks are already in %s; adding remaining %d tracks' % (
-        len(tracks) - len(new_tracks_idx),
-        l2_queue_name,
-        len(new_tracks_idx)
-    ))
+    print(f'{len(tracks) - len(new_tracks_idx)} tracks are already in {l2_queue_name}; '
+          f'adding remaining {len(new_tracks_idx)} tracks')
     new_tracks = tracks.loc[new_tracks_idx]
     pretty_print_tracks(new_tracks)
 
@@ -429,24 +417,21 @@ def add_shazam_to_l2_queue(
 
     shazam_tracks = dataframe_ensure_unique_index(shazam_tracks)
 
-    print("'%s' playlist: %d tracks" % (shazam_name, len(shazam_tracks)))
+    print(f"'{shazam_name}' playlist: {len(shazam_tracks)} tracks")
     pretty_print_tracks(shazam_tracks, indent=' '*4, enum=True)
 
     if len(shazam_tracks) == 0:
         return
 
-    choice = get_user_choice("Add to %s?" % l2_queue_name)
+    choice = get_user_choice(f"Add to {l2_queue_name}?")
     if choice != 'yes':
         return
 
     add_to_l2_queue(
         shazam_tracks,
-        l2_queue_name=l2_queue_name,
-        l2_queue_id=l2_queue_id,
-        l2_queue_tracks=l2_queue_tracks
-    )
+        l2_queue_name=l2_queue_name)
 
-    choice = get_user_choice("Remove tracks from '%s'?" % shazam_name)
+    choice = get_user_choice(f"Remove tracks from '{shazam_name}'?")
     if choice == 'yes':
         spotify.remove_tracks_from_playlist(shazam_id, shazam_tracks.index)
 
@@ -462,16 +447,16 @@ def sanity_check_l2_queue(
         l2_queue_id = spotify.get_playlist_id(l2_queue_name)
 
     l2_queue_tracks = spotify.get_playlist_tracks(l2_queue_id)
-    print('%s: %d tracks' % (l2_queue_name, len(l2_queue_tracks)))
+    print(f'{l2_queue_name}: {len(l2_queue_tracks)} tracks')
 
     # Make sure all items in the L2 queue are already liked
     liked_tracks = spotify.get_liked_tracks()
-    print('Spotify Liked Tracks: %d tracks' % len(liked_tracks))
+    print(f'Spotify Liked Tracks: {len(liked_tracks)} tracks')
 
     l2_queue_unliked_tracks_idx = l2_queue_tracks.index.difference(liked_tracks.index, sort=False)
 
     if len(l2_queue_unliked_tracks_idx) > 0:
-        print('%d %s tracks are not in Liked Tracks' % (len(l2_queue_unliked_tracks_idx), l2_queue_name))
+        print(f'{len(l2_queue_unliked_tracks_idx)} {l2_queue_name} tracks are not in Liked Tracks')
         l2_queue_unliked_tracks = l2_queue_tracks.loc[l2_queue_unliked_tracks_idx]
         pretty_print_tracks(l2_queue_unliked_tracks)
         choice = get_user_choice('Add?')
@@ -488,7 +473,7 @@ def sanity_check_l2_queue(
     if len(l2_queue_not_in_queue_history_idx) > 0:
         l2_queue_not_in_queue_history = l2_queue_tracks.loc[l2_queue_not_in_queue_history_idx]
 
-        print('%d %s tracks are not in queue history' % (len(l2_queue_not_in_queue_history_idx), l2_queue_name))
+        print(f'{len(l2_queue_not_in_queue_history_idx)} {l2_queue_name} tracks are not in queue history')
         pretty_print_tracks(l2_queue_not_in_queue_history)
         choice = get_user_choice('Add?')
 
@@ -504,7 +489,7 @@ def sanity_check_l2_queue(
     if len(l2_queue_in_queue_idx) > 0:
         l2_queue_in_queue = l2_queue_tracks.loc[l2_queue_in_queue_idx]
 
-        print('%d %s tracks are in the queue' % (len(l2_queue_in_queue_idx), l2_queue_name))
+        print(f'{len(l2_queue_in_queue_idx)} {l2_queue_name} tracks are in the queue')
         pretty_print_tracks(l2_queue_in_queue)
         choice = get_user_choice('Remove?')
 
@@ -525,42 +510,32 @@ def queue_maintenance(
     # Sanity check! Queue and queue history must be disjoint
     sanity_check_disk_queues()
 
-    l1_queue_id = spotify.get_playlist_id(l1_queue_name)
-    l2_queue_id = spotify.get_playlist_id(l2_queue_name)
-
     move_l1_queue_listened_tracks_to_l2(
         l1_queue_name=l1_queue_name,
         l2_queue_name=l2_queue_name,
-        l1_queue_id=l1_queue_id,
-        l2_queue_id=l2_queue_id,
         l1_queue_last_listened_track=last_track
     )
 
     replenish_l1_queue(
         l1_queue_name=l1_queue_name,
-        l1_queue_id=l1_queue_id,
         target_size=l1_queue_target_size)
 
     add_shazam_to_l2_queue(
         shazam_name=shazam_name,
-        l2_queue_name=l2_queue_name,
-        l2_queue_id=l2_queue_id       )
+        l2_queue_name=l2_queue_name)
 
     sanity_check_l1_queue(
-        l1_queue_name=l1_queue_name,
-        l1_queue_id=l1_queue_id)
+        l1_queue_name=l1_queue_name)
 
     sanity_check_l2_queue(
-        l2_queue_name=l2_queue_name,
-        l2_queue_id=l2_queue_id
-    )
+        l2_queue_name=l2_queue_name)
 
     return
 
 def pretty_print_spotify_playlist(playlist_name):
     tracks = spotify.get_playlist_tracks(playlist_name)
 
-    print("Spotify playlist '%s': %d tracks" % (playlist_name, len(tracks)))
+    print(f"Spotify playlist '{playlist_name}': {len(tracks)} tracks")
     pretty_print_tracks(tracks, enum=True)
     return
 

@@ -4,6 +4,7 @@ import sys
 import argparse
 import code
 import time
+import logging
 
 import djlib_config
 
@@ -67,6 +68,13 @@ def _python_shell(shell_locals):
 def _init(config_file=None):
     djlib_config.init(config_file)
 
+    logging_args = {
+        'level': djlib_config._log_level
+    }
+    if djlib_config._log_file is not None:
+        logging_args['filename'] = djlib_config._log_file
+    logging.basicConfig(**logging_args)
+
     # import everything from scripts
     import scripts
     globals().update(scripts.__dict__)
@@ -74,7 +82,7 @@ def _init(config_file=None):
     # import all doc names from djlib_config, except the ones that conflict with
     # existing variables
     for key, value in djlib_config.__dict__.items():
-        if key not in globals():
+        if key not in globals() and not key.startswith('_'):
             globals()[key] = value
 
     return

@@ -27,6 +27,8 @@ def init(config_file=None):
     global spotify
     global docs
     global _backups
+    global _log_file
+    global _log_level
 
     if config_file is None:
         potential_config_files = [
@@ -58,7 +60,7 @@ def init(config_file=None):
                     if _log_file.upper() == 'CONSOLE':
                         _log_file = None
                 elif field == 'loglevel':
-                    _log_file = getattr(logging, section.get(field).upper())
+                    _log_level = getattr(logging, section.get(field).upper())
                 elif field.startswith('pandas.'):
                     pd.set_option(field[7:], section.getint(field))
                 else:

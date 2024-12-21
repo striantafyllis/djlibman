@@ -69,21 +69,21 @@ def _init(config_file=None):
     djlib_config.init(config_file)
 
     logging_args = {
-        'level': djlib_config._log_level
+        'level': djlib_config._log_level,
+        'format': '%(asctime)s %(name)s:%(levelname)s: %(message)s',
+        'force': True
     }
     if djlib_config._log_file is not None:
         logging_args['filename'] = djlib_config._log_file
     logging.basicConfig(**logging_args)
 
+    logger = logging.getLogger(__name__)
+
+    logger.info('Logging started')
+
     # import everything from scripts
     import scripts
     globals().update(scripts.__dict__)
-
-    # import all doc names from djlib_config, except the ones that conflict with
-    # existing variables
-    for key, value in djlib_config.__dict__.items():
-        if key not in globals() and not key.startswith('_'):
-            globals()[key] = value
 
     return
 

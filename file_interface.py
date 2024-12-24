@@ -6,7 +6,7 @@ import numpy as np
 # needed for calls to eval() on csvs etc.
 from pandas import Timestamp
 
-from internal_utils import *
+from general_utils import *
 
 # some basic conversion functions
 

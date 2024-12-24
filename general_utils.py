@@ -1,4 +1,8 @@
 
+"""
+Utility functions dependent only on Python libraries
+"""
+
 import re
 import os
 import os.path

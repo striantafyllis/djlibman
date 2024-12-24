@@ -1,6 +1,6 @@
 
 from djlib_config import *
-from utils import *
+from djlibman_utils import *
 from playlist_scripts import *
 
 def retire_playlists_field():

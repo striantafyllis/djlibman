@@ -11,7 +11,7 @@ from googleapiclient.discovery import build
 # from googleapiclient.errors import HttpError
 from google.auth.exceptions import RefreshError
 
-from internal_utils import *
+from general_utils import *
 
 _SCOPES = 'https://www.googleapis.com/auth/drive'
 

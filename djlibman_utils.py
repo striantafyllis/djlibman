@@ -1,6 +1,8 @@
+"""
+Utility functions that depend on the djlibman infrastructure
+"""
 
-
-from internal_utils import *
+from general_utils import *
 from djlib_config import *
 
 

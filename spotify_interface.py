@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 
 import cache
-from internal_utils import *
+from general_utils import *
 
 logger = logging.getLogger(__name__)
 

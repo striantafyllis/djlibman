@@ -1,6 +1,6 @@
 
 from djlib_config import *
-from utils import *
+from djlibman_utils import *
 
 def is_class(track, *classes):
     for clss in classes:

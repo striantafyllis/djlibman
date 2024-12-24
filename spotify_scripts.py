@@ -3,13 +3,25 @@ import random
 
 from utils import *
 
-def sanity_check_disk_queues(queue_tracks=None, queue_history_tracks=None):
-    if queue_tracks is None:
-        queue_tracks = docs['queue'].read()
-        print(f'Queue: {len(queue_tracks)} tracks')
-    if queue_history_tracks is None:
-        queue_history_tracks = docs['queue_history'].read()
-        print(f'Queue history: {len(queue_history_tracks)} tracks')
+def _get_library_tracks():
+    """A quick and dirty way to get tracks in the Rekordbox library: read rekordbox_to_spotify,
+       throw away the rekordbox part and reindex"""
+
+    rekordbox_to_spotify_tracks = docs['rekordbox_to_spotify'].read()
+
+    library_tracks = rekordbox_to_spotify_tracks[
+        rekordbox_to_spotify_tracks.columns.drop('rekordbox_id')
+    ].rename(columns={'spotify_id': 'id'}
+             ).set_index(keys='id', drop=False)
+
+    return library_tracks
+
+def sanity_check_disk_queues():
+    queue_tracks = docs['queue'].read()
+    print(f'Queue: {len(queue_tracks)} tracks')
+
+    queue_history_tracks = docs['queue_history'].read()
+    print(f'Queue history: {len(queue_history_tracks)} tracks')
 
     # entries in the queue should be unique
     dup_pos = dataframe_duplicate_index_labels(queue_tracks)
@@ -53,47 +65,14 @@ def sanity_check_disk_queues(queue_tracks=None, queue_history_tracks=None):
 
             print(f'Queue now has {len(queue_tracks)} tracks')
 
+    # library tracks should be in queue history and should not be in queue
+    library_tracks = _get_library_tracks()
+
+    library_tracks_not_in_queue_history_idx = library_tracks.index.difference(queue_history_tracks.index, sort=False)
+
+    add_to_doc('queue_history', 'library', library_tracks)
+
     print()
-
-    return
-
-
-def add_to_queue_history(new_tracks):
-    if len(new_tracks) == 0:
-        return
-
-    queue_history = docs['queue_history']
-    queue_history_tracks = queue_history.read()
-    print(f'Queue history: {len(queue_history_tracks)} tracks')
-
-    if queue_history_tracks.index.name != 'id':
-        raise Exception('queue_history not indexed by ID')
-
-    if not isinstance(new_tracks, pd.DataFrame):
-        new_tracks = pd.DataFrame(new_tracks, columns=queue_history.columns)
-        new_tracks = new_tracks.set_index(new_tracks[queue_history.index.name])
-    else:
-        for column in queue_history_tracks.columns:
-            if column not in new_tracks.columns:
-                raise Exception(f"New items are missing column '{column}'")
-
-    # this takes care of extra columns, columns in different order etc.
-    new_tracks = new_tracks[queue_history_tracks.columns]
-
-    if new_tracks.index.name == 'id':
-        new_history_ids = new_tracks.index
-    else:
-        new_history_ids = pd.Index(new_tracks.id)
-
-    unique_new_ids = new_history_ids.difference(queue_history_tracks.index, sort=False)
-
-    print(f'Received {len(new_tracks)} new items, of which '
-          f'{len(new_tracks) - len(unique_new_ids)} already exist; '
-          f'adding {len(unique_new_ids)} new items')
-
-    new_history = pd.concat([queue_history_tracks, new_tracks.loc[unique_new_ids]])
-    queue_history.write(new_history)
-    print(f'Queue history now has {len(new_history)} tracks')
 
     return
 
@@ -248,9 +227,7 @@ def move_l1_queue_listened_tracks_to_l2(
                 l2_queue_tracks = pd.concat([l2_queue_tracks, l1_queue_tracks.loc[listened_liked_tracks_not_in_l2_idx]])
                 print(f'{l2_queue_name} now has {len(l2_queue_tracks)} tracks')
 
-    choice = get_user_choice(f'Add {len(listened_tracks)} listened tracks to queue history?')
-    if choice == 'yes':
-        add_to_queue_history(listened_tracks)
+    add_to_doc('queue_history', 'listened tracks', listened_tracks)
 
     choice = get_user_choice(f'Remove {len(listened_tracks)} listened tracks from queue?')
     if choice == 'yes':
@@ -370,11 +347,12 @@ def sanity_check_l1_queue(
 
 
 def add_to_l2_queue(
-        tracks=[],
+        tracks_name,
+        tracks,
         l2_queue_name=_DEFAULT_L2_QUEUE):
 
     tracks = dataframe_ensure_unique_index(tracks)
-    print(f'Adding {len(tracks)} tracks to {l2_queue_name}')
+    print(f'Adding {len(tracks)} {tracks_name} tracks to {l2_queue_name}')
 
     if len(tracks) == 0:
         return
@@ -393,9 +371,7 @@ def add_to_l2_queue(
 
     spotify.add_tracks_to_playlist(l2_queue_id, new_tracks_idx, check_for_duplicates=False)
 
-    choice = get_user_choice('Add tracks to queue history?')
-    if choice == 'yes':
-        add_to_queue_history(new_tracks)
+    add_to_doc('queue_history', tracks_name, tracks)
 
     choice = get_user_choice('Remove tracks from queue?')
     if choice == 'yes':
@@ -403,12 +379,10 @@ def add_to_l2_queue(
 
     return
 
-
 def add_shazam_to_l2_queue(
         shazam_name = 'My Shazam Tracks',
         shazam_id=None,
-        l2_queue_name=_DEFAULT_L2_QUEUE,
-        l2_queue_id=None):
+        l2_queue_name=_DEFAULT_L2_QUEUE):
 
     if shazam_id is None:
         shazam_id = spotify.get_playlist_id(shazam_name)

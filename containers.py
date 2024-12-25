@@ -9,12 +9,15 @@ import numpy as np
 import pandas as pd
 
 from general_utils import *
-from djlib_config import *
+# from djlib_config import *
+
+import djlib_config
 
 class Container(object):
     """Root of the hierarchy; abstract class"""
     def __init__(self, name: str):
         self._name = name
+        self._df = None
         return
 
     def _read(self) -> pd.DataFrame:
@@ -23,15 +26,16 @@ class Container(object):
     def _write_back(self, df: pd.DataFrame) -> None:
         raise NotImplementedError()
 
-    def _refresh(self):
-        self._df = self._read()
+    def _ensure_df(self):
+        if self._df is None:
+            self._df = self._read()
         return
 
     def get_name(self) -> str:
         return self._name
 
     def get_df(self) -> pd.DataFrame:
-        self._refresh()
+        self._ensure_df()
         return self._df
 
     def write(self) -> None:
@@ -42,7 +46,7 @@ class Container(object):
         return
 
     def _reconcile_ids(self, other_df):
-        self._refresh()
+        self._ensure_df()
 
         if self._df.index.name == other_df.index.name:
             return
@@ -51,7 +55,7 @@ class Container(object):
             if other_df.index.name in ['id', 'spotify_id']:
                 pass
             elif other_df.index.name in ['TrackID', 'rekordbox_id']:
-                rekordbox_to_spotify_mapping = docs['rekordbox_to_spotify'].read()
+                rekordbox_to_spotify_mapping = djlib_config.docs['rekordbox_to_spotify'].read()
 
                 # remove empty mappings
                 rekordbox_to_spotify_mapping = rekordbox_to_spotify_mapping.loc[
@@ -62,7 +66,7 @@ class Container(object):
                     rekordbox_to_spotify_mapping = rekordbox_to_spotify_mapping.rename(
                         columns={'spotify_id': self._df.index.name})
 
-                other_df.merge(
+                other_df = other_df.merge(
                     right=rekordbox_to_spotify_mapping,
                     how='inner',
                     left_index=True,
@@ -87,7 +91,7 @@ class Container(object):
                     rekordbox_to_spotify_mapping = rekordbox_to_spotify_mapping.rename(
                         columns={'rekordbox_id': self._df.index.name})
 
-                other_df.merge(
+                other_df = other_df.merge(
                     right=rekordbox_to_spotify_mapping,
                     how='inner',
                     left_index=True,
@@ -113,7 +117,7 @@ class Container(object):
         return other_df
 
     def deduplicate(self) -> None:
-        self._refresh()
+        self._ensure_df()
 
         print(f'Deduplicating {self.get_name()}...')
 
@@ -124,23 +128,21 @@ class Container(object):
             if choice == 'yes':
                 self._df = dataframe_drop_rows_at_positions(self._df, dup_pos)
 
-            self.write()
-
         return
 
     def append(self, other: 'Container') -> None:
-        self._refresh()
-        other._refresh()
+        self._ensure_df()
+        other._ensure_df()
 
         if len(other._df) == 0:
             return
 
-        other_df = self._reconcile_ids(other.df)
+        other_df = self._reconcile_ids(other._df)
         other_df = self._reconcile_columns(other_df)
 
-        other_unique = dataframe_ensure_unique_index(other._df)
+        other_unique = dataframe_ensure_unique_index(other_df)
 
-        num_dups = len(other._df) - len(other_unique)
+        num_dups = len(other_df) - len(other_unique)
 
         if len(self._df) == 0:
             self._df = other_unique
@@ -181,14 +183,13 @@ class Container(object):
         choice = get_user_choice('Proceed?')
         if choice == 'yes':
             self._df = new_df
-            self.write()
             print(f'{self.get_name()} now has {len(self._df)} entries')
 
         return
 
     def remove(self, other: 'Container') -> None:
-        self._refresh()
-        other._refresh()
+        self._ensure_df()
+        other._ensure_df()
 
         other_df = self._reconcile_ids(other._df)
 
@@ -227,14 +228,13 @@ class Container(object):
         choice = get_user_choice('Proceed?')
         if choice == 'yes':
             self._df = self._df.loc[new_idx]
-            self.write()
 
         return
 
 class Doc(Container):
     def __init__(self, name: str):
         super(Doc, self).__init__(f"doc {name}")
-        self._doc = docs[name]
+        self._doc = djlib_config.docs[name]
         return
 
     def _read(self):
@@ -251,10 +251,10 @@ class SpotifyPlaylist(Container):
         return
 
     def _read(self):
-        return spotify.get_playlist_tracks(self._playlist_name)
+        return djlib_config.spotify.get_playlist_tracks(self._playlist_name)
 
     def _write_back(self, df):
-        spotify.replace_playlist_tracks(self._playlist_name, df)
+        djlib_config.spotify.replace_playlist_tracks(self._playlist_name, df)
         return
 
 class RekordboxPlaylist(Container):
@@ -264,10 +264,10 @@ class RekordboxPlaylist(Container):
         return
 
     def _read(self):
-        return rekordbox.get_playlist_tracks(self._playlist_name)
+        return djlib_config.rekordbox.get_playlist_tracks(self._playlist_name)
 
     def _write_back(self, df):
-        rekordbox.create_playlist(self._playlist_name, df, overwrite=True)
+        djlib_config.rekordbox.create_playlist(self._playlist_name, df, overwrite=True)
         return
 
 

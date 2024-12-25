@@ -152,5 +152,3 @@ def delete_backups():
         if isinstance(doc, file_interface.FileDoc):
             doc.delete_backups()
     return
-
-

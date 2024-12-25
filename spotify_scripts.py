@@ -1,60 +1,33 @@
 
 import random
 
-from djlibman_utils import *
-
-def _get_library_tracks():
-    """A quick and dirty way to get tracks in the Rekordbox library: read rekordbox_to_spotify,
-       throw away the rekordbox part and reindex"""
-
-    rekordbox_to_spotify_tracks = docs['rekordbox_to_spotify'].read()
-
-    library_tracks = rekordbox_to_spotify_tracks[
-        rekordbox_to_spotify_tracks.columns.drop('rekordbox_id')
-    ].rename(columns={'spotify_id': 'id'}
-             ).set_index(keys='id', drop=False)
-
-    return library_tracks
+from containers import *
 
 def sanity_check_disk_queues():
-    queue_tracks = docs['queue'].read()
-    print(f'Queue: {len(queue_tracks)} tracks')
+    queue = Doc('queue')
+    print(f'Queue: {len(queue.get_df())} tracks')
 
-    queue_history_tracks = docs['queue_history'].read()
-    print(f'Queue history: {len(queue_history_tracks)} tracks')
+    queue_history = Doc('queue_history')
+    print(f'Queue history: {len(queue_history.get_df())} tracks')
+
+    library = RekordboxPlaylist('Main Library')
+    print(f'Library: {len(library.get_df())} tracks')
 
     # entries in the queue should be unique
-    deduplicate_doc('queue')
+    queue.deduplicate()
 
     # entries in queue history should be unique
-    deduplicate_doc('queue_history')
+    queue_history.deduplicate()
 
     # queue tracks should not be in queue history
-    queue_tracks_in_queue_history_idx = queue_tracks.index.intersection(queue_history_tracks.index, sort=False)
-    if len(queue_tracks_in_queue_history_idx) > 0:
-        print(f'WARNING: {len(queue_tracks_in_queue_history_idx)} queue tracks are in queue history.')
-        pretty_print_tracks(
-            queue_tracks.loc[queue_tracks_in_queue_history_idx],
-            indent=' '*4,
-            enum=True
-        )
-        choice = get_user_choice('Remove?')
-
-        if choice == 'yes':
-            queue_tracks = queue_tracks.loc[queue_tracks.index.difference(queue_history_tracks.index, sort=False)]
-
-            docs['queue'].write(queue_tracks)
-
-            print(f'Queue now has {len(queue_tracks)} tracks')
+    queue.remove(queue_history)
 
     # library tracks should be in queue history and should not be in queue
-    library_tracks = _get_library_tracks()
+    queue_history.append(library)
+    queue.remove(library)
 
-    library_tracks_not_in_queue_history_idx = library_tracks.index.difference(queue_history_tracks.index, sort=False)
-
-    add_to_doc('queue_history', 'library', library_tracks)
-
-    print()
+    queue.write()
+    queue_history.write()
 
     return
 
@@ -209,7 +182,7 @@ def move_l1_queue_listened_tracks_to_l2(
                 l2_queue_tracks = pd.concat([l2_queue_tracks, l1_queue_tracks.loc[listened_liked_tracks_not_in_l2_idx]])
                 print(f'{l2_queue_name} now has {len(l2_queue_tracks)} tracks')
 
-    add_to_doc('queue_history', 'listened tracks', listened_tracks)
+    # add_to_doc('queue_history', 'listened tracks', listened_tracks)
 
     choice = get_user_choice(f'Remove {len(listened_tracks)} listened tracks from queue?')
     if choice == 'yes':
@@ -353,7 +326,7 @@ def add_to_l2_queue(
 
     spotify.add_tracks_to_playlist(l2_queue_id, new_tracks_idx, check_for_duplicates=False)
 
-    add_to_doc('queue_history', tracks_name, tracks)
+    # add_to_doc('queue_history', tracks_name, tracks)
 
     choice = get_user_choice('Remove tracks from queue?')
     if choice == 'yes':

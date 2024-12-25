@@ -12,6 +12,8 @@ import djlib_config
 import pandas as pd
 import numpy as np
 
+from scripts import *
+
 _should_quit = False
 
 def _quit():
@@ -82,8 +84,8 @@ def _init(config_file=None):
     logger.info('Logging started')
 
     # import everything from scripts
-    import scripts
-    globals().update(scripts.__dict__)
+    # import scripts
+    # globals().update(scripts.__dict__)
 
     return
 

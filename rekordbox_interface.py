@@ -295,9 +295,6 @@ class RekordboxInterface:
         return
 
 
-
-
-
     def write(self):
         if self._xml is None:
             raise Exception('Cannot write Rekordbox XML before reading')

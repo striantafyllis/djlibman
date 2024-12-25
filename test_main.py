@@ -1,10 +1,10 @@
 
 from djlibman import *
 
-def main():
-    # import djlibman
 
-    pass
+def main():
+    sanity_check_disk_queues()
+    return
 
 if __name__ == '__main__':
     main()

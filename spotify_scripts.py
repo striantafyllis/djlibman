@@ -24,28 +24,10 @@ def sanity_check_disk_queues():
     print(f'Queue history: {len(queue_history_tracks)} tracks')
 
     # entries in the queue should be unique
-    dup_pos = dataframe_duplicate_index_labels(queue_tracks)
-    if len(dup_pos) > 0:
-        print(f'WARNING: Queue has {len(dup_pos)} duplicate tracks!')
-        pretty_print_tracks(queue_tracks.iloc[dup_pos], indent=' '*4, enum=True)
-        choice = get_user_choice('Remove?')
-        if choice == 'yes':
-            queue_tracks = dataframe_drop_rows_at_positions(queue_tracks, dup_pos)
-            docs['queue'].write(queue_tracks)
-
-            print(f'Queue now has {len(queue_tracks)} tracks')
+    deduplicate_doc('queue')
 
     # entries in queue history should be unique
-    dup_pos = dataframe_duplicate_index_labels(queue_history_tracks)
-    if len(dup_pos) > 0:
-        print(f'WARNING: Queue history has {len(dup_pos)} duplicate tracks!')
-        pretty_print_tracks(queue_history_tracks.iloc[dup_pos], indent=' ' * 4, enum=True)
-        choice = get_user_choice('Remove?')
-        if choice == 'yes':
-            queue_history_tracks = dataframe_drop_rows_at_positions(queue_history_tracks, dup_pos)
-            docs['queue_history'].write(queue_history_tracks)
-
-            print(f'Queue history now has {len(queue_history_tracks)} tracks')
+    deduplicate_doc('queue_history')
 
     # queue tracks should not be in queue history
     queue_tracks_in_queue_history_idx = queue_tracks.index.intersection(queue_history_tracks.index, sort=False)

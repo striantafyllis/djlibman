@@ -37,6 +37,21 @@ def translate_to_spotify_ids(rekordbox_ids, include_missing_ids=False):
 
     return spotify_ids_df
 
+def deduplicate_doc(doc_name: str):
+    doc = docs[doc_name]
+
+    doc_entries = doc.read()
+
+    dup_pos = dataframe_duplicate_index_labels(doc_entries)
+    if len(dup_pos) > 0:
+        print(f'WARNING: {doc_name} has {len(dup_pos)} duplicate entries!')
+        choice = get_user_choice('Remove?')
+        if choice == 'yes':
+            doc_entries = dataframe_drop_rows_at_positions(doc_entries, dup_pos)
+            docs[doc_name].write(doc_entries)
+
+    return
+
 
 def add_to_doc(doc_name: str, new_entries_name: str, new_entries: pd.DataFrame):
     if len(new_entries) == 0:

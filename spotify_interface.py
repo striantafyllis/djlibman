@@ -121,13 +121,24 @@ def _batch_result(request_func, start=0, stop=None, stop_condition=None, use_off
 def _batch_request(request, items, result_field=None):
     start = 0
 
+    if isinstance(request, tuple):
+        first_request, subsequent_request = request
+    else:
+        first_request = request
+        subsequent_request = request
+
     results = [] if result_field is not None else None
 
+    is_first = True
     while start < len(items):
         end = min(start + _MAX_ITEMS_PER_REQUEST, len(items))
 
         batch = list(items[start:end])
-        result = request(batch)
+        if is_first:
+            result = first_request(batch)
+        else:
+            result = subsequent_request(batch)
+        is_first = False
 
         if result_field is not None:
             results += result[result_field]
@@ -338,6 +349,26 @@ class SpotifyInterface:
         self._cache.invalidate('playlist_tracks', playlist_id)
 
         return
+
+    def replace_tracks_in_playlist(self, playlist_name_or_id, tracks):
+        playlist_id = self._get_playlist_id_if_necessary(playlist_name_or_id)
+
+        if isinstance(tracks, pd.DataFrame):
+            tracks = tracks.id
+
+        _batch_request(
+            (lambda x: self._connection.playlist_replace_items(playlist_id, x),
+             lambda x: self._connection.playlist_add_items(playlist_id, x)
+             ),
+            tracks
+        )
+
+        print("Added %d new tracks to playlist '%s'" % (len(tracks), playlist_name_or_id))
+
+        self._cache.invalidate('playlist_tracks', playlist_id)
+
+        return
+
 
     def remove_tracks_from_playlist(self, playlist_name_or_id, tracks):
         playlist_id = self._get_playlist_id_if_necessary(playlist_name_or_id)

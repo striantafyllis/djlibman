@@ -1,9 +1,8 @@
 
 from djlibman import *
 
-
 def main():
-    sanity_check_disk_queues()
+    print(djlib_config.spotify_queues)
     return
 
 if __name__ == '__main__':

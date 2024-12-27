@@ -130,14 +130,52 @@ class Container(object):
 
         return
 
-    def append(self, other: 'Container') -> None:
+    def _get_set_operation_result(self, other, operation):
         self._ensure_df()
-        other._ensure_df()
 
-        if len(other._df) == 0:
+        if isinstance(other, pd.Index):
+            other_idx = other
+        else:
+            if isinstance(other, Container):
+                other_df = other.get_df()
+            elif isinstance(other, pd.DataFrame):
+                other_df = other
+            else:
+                raise ValueError(f'Invalid argument type: {type(other)}')
+
+            other_df = self._reconcile_ids(other_df)
+
+            other_idx = other_df.index
+
+        # continue here
+
+        if operation == 'intersection':
+            new_idx = self._df.index.intersection(other_idx, sort=False)
+        elif operation == 'difference':
+            new_idx = self._df.index.difference(other_idx, sort=False)
+
+        return self.df.loc[new_idx]
+
+    def get_intersection(self, other):
+        return self._get_set_operation_result(other, 'intersection')
+
+    def get_difference(self, other):
+        return self._get_set_operation_result(other, 'difference')
+
+    def append(self, other) -> None:
+        self._ensure_df()
+
+        if isinstance(other, Container):
+            other_df = other.get_df()
+        elif isinstance(other, pd.DataFrame):
+            other_df = other
+        else:
+            raise ValueError(f'Invalid argument type: {type(other)}')
+
+        if len(other_df) == 0:
             return
 
-        other_df = self._reconcile_ids(other._df)
+        other_df = self._reconcile_ids(other_df)
         other_df = self._reconcile_columns(other_df)
 
         other_unique = dataframe_ensure_unique_index(other_df)
@@ -187,17 +225,31 @@ class Container(object):
 
         return
 
-    def remove(self, other: 'Container') -> None:
+    def remove(self, other) -> None:
         self._ensure_df()
-        other._ensure_df()
 
-        other_df = self._reconcile_ids(other._df)
+        if isinstance(other, pd.Index):
+            other_idx = other
+        else:
+            if isinstance(other, Container):
+                other_df = other.get_df()
+            elif isinstance(other, pd.DataFrame):
+                other_df = other
+            else:
+                raise ValueError(f'Invalid argument type: {type(other)}')
 
-        other_unique = dataframe_ensure_unique_index(other._df)
+            if len(other_df) == 0:
+                return
 
-        num_dups = len(other._df) - len(other_unique)
+            other_df = self._reconcile_ids(other_df)
 
-        new_idx = self._df.index.difference(other_unique.index, sort=False)
+            other_idx = other_df.index
+
+        other_unique = other_idx.unique()
+
+        num_dups = len(other_idx) - len(other_unique)
+
+        new_idx = self._df.index.difference(other_unique, sort=False)
 
         num_removed = len(self._df) - len(new_idx)
         num_absent = len(other_unique) - num_removed
@@ -255,6 +307,30 @@ class SpotifyPlaylist(Container):
 
     def _write_back(self, df):
         djlib_config.spotify.replace_playlist_tracks(self._playlist_name, df)
+        return
+
+class SpotifyLiked(Container):
+    def __init__(self):
+        super(SpotifyLiked, self).__init__('Spotify Liked Tracks')
+        return
+
+    def _read(self):
+        return djlib_config.spotify.get_liked_tracks()
+
+    def _write_back(self, df):
+        liked_tracks = djlib_config.spotify.get_liked_tracks()
+
+        tracks_to_add = df.index.difference(liked_tracks.index, sort=False)
+        tracks_to_remove = liked_tracks.index.difference(df.index, sort=False)
+
+        if len(tracks_to_add) > 0:
+            print(f'Adding {len(tracks_to_add)} Spotify Liked Tracks')
+            djlib_config.spotify.add_liked_tracks(tracks_to_add)
+
+        if len(tracks_to_remove) > 0:
+            print(f'Removing {len(tracks_to_remove)} Spotify Liked Tracks')
+            djlib_config.spotify.remove_liked_tracks(tracks_to_remove)
+
         return
 
 class RekordboxPlaylist(Container):

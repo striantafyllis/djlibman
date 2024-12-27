@@ -4,6 +4,7 @@ import os.path
 import configparser
 import ast
 import logging
+import re
 
 import pandas as pd
 
@@ -17,6 +18,7 @@ google = None
 spotify = None
 docs = {}
 _backups = 0
+spotify_queues = []
 
 _log_file = './djlibman.log'
 _log_level = logging.INFO
@@ -25,6 +27,7 @@ def init(config_file=None):
     global rekordbox
     global google
     global spotify
+    global spotify_queues
     global docs
     global _backups
     global _log_file
@@ -84,6 +87,25 @@ def init(config_file=None):
 
         elif section.name == 'spotify':
             spotify = spotify_interface.SpotifyInterface(section)
+
+        elif section.name == 'spotify_queues':
+            for field in section.keys():
+                m = re.match(r'level([1-9][0-9]*)', field)
+                if m is None:
+                    raise ValueError(f"Config section [spotify_queues]: bad field name '{field}'")
+
+                level = int(m.group(1))
+
+                if len(spotify_queues) + 1 != level:
+                    raise ValueError(f"Config section [spotify_queues]: level "
+                                     f"{level} encountered after level {len(spotify_queues)}")
+
+                value = section.get(field)
+
+                if value.startswith('[') or value.startswith("'"):
+                    value = ast.literal_eval(value)
+
+                spotify_queues.append(value)
 
         elif section_name.startswith('docs.'):
             name = section_name[5:]

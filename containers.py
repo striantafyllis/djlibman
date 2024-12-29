@@ -18,6 +18,7 @@ class Container(object):
     def __init__(self, name: str):
         self._name = name
         self._df = None
+        self._changed = False
         return
 
     def _read(self) -> pd.DataFrame:
@@ -42,7 +43,11 @@ class Container(object):
         if self._df is None:
             raise Exception('Nothing to write')
 
+        if not self._changed:
+            return
+
         self._write_back(self._df)
+        self._changed = False
         return
 
     def _reconcile_ids(self, other_df):
@@ -127,6 +132,7 @@ class Container(object):
             choice = get_user_choice('Remove?')
             if choice == 'yes':
                 self._df = dataframe_drop_rows_at_positions(self._df, dup_pos)
+                self._changed = True
 
         return
 
@@ -222,6 +228,7 @@ class Container(object):
         if choice == 'yes':
             self._df = new_df
             print(f'{self.get_name()} now has {len(self._df)} entries')
+            self._changed = True
 
         return
 
@@ -280,6 +287,7 @@ class Container(object):
         choice = get_user_choice('Proceed?')
         if choice == 'yes':
             self._df = self._df.loc[new_idx]
+            self._changed = True
 
         return
 

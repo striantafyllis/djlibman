@@ -66,7 +66,7 @@ _TRACK_COLUMNS = {
 
 _BASE_62 = re.compile(r'^[0-9A-Za-z]+$')
 
-_TTL = 60
+_TTL = 600
 
 def _batch_result(request_func, start=0, stop=None, stop_condition=None, use_offset=True):
     """Stop condition is inclusive"""
@@ -118,7 +118,7 @@ def _batch_result(request_func, start=0, stop=None, stop_condition=None, use_off
     return all_items
 
 
-def _batch_request(request, items, result_field=None):
+def _batch_request(request, items, result_field=None, run_at_least_once=False):
     start = 0
 
     if isinstance(request, tuple):
@@ -130,6 +130,10 @@ def _batch_request(request, items, result_field=None):
     results = [] if result_field is not None else None
 
     is_first = True
+
+    if len(items) == 0 and run_at_least_once:
+        first_request([])
+
     while start < len(items):
         end = min(start + _MAX_ITEMS_PER_REQUEST, len(items))
 
@@ -210,7 +214,7 @@ class SpotifyInterface:
         return self._cache.look_up_or_get(body, _TTL, 'playlists')
 
     def playlist_exists(self, playlist_name):
-        return playlist_name in self.get_playlists()
+        return playlist_name in self.get_playlists().index
 
     def get_playlist_id(self, playlist_name):
         playlists = self.get_playlists()
@@ -218,7 +222,14 @@ class SpotifyInterface:
         if playlist_name not in playlists.index:
             raise Exception("Spotify playlist '%s' not found" % playlist_name)
 
-        return playlists.at[playlist_name, 'id']
+        playlist_id = playlists.at[playlist_name, 'id']
+
+        if isinstance(playlist_id, pd.Series):
+            raise Exception(f"There are '{len(playlist_id)}' playlists with name '{playlist_name}'")
+        elif not isinstance(playlist_id, str):
+            assert False
+
+        return playlist_id
 
     def create_playlist(self, playlist_name):
         self._connection.user_playlist_create(user=self._connection.current_user()['id'],
@@ -363,10 +374,11 @@ class SpotifyInterface:
             (lambda x: self._connection.playlist_replace_items(playlist_id, x),
              lambda x: self._connection.playlist_add_items(playlist_id, x)
              ),
-            tracks
+            tracks,
+            run_at_least_once=True
         )
 
-        print("Added %d new tracks to playlist '%s'" % (len(tracks), playlist_name_or_id))
+        print(f"Replaced contents of playlist '{playlist_name_or_id}' with {len(tracks)} tracks")
 
         self._cache.invalidate('playlist_tracks', playlist_id)
 

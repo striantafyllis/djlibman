@@ -105,6 +105,14 @@ def init(config_file=None):
                 if value.startswith('[') or value.startswith("'"):
                     value = ast.literal_eval(value)
 
+                if not isinstance(value, list):
+                    value = [value]
+
+                for v in value:
+                    if not isinstance(v, str):
+                        raise ValueError(f"Config section [spotify_queues]: invalid value type "
+                                         f"{type(v)}")
+
                 spotify_queues.append(value)
 
         elif section_name.startswith('docs.'):
@@ -195,4 +203,4 @@ def get_default_spotify_queue_at_level(level):
     if level > len(spotify_queues):
         raise ValueError(f"Spotify queue level {level} does not exist")
 
-    return spotify_queues[level-1]
+    return spotify_queues[level-1][0]

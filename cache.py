@@ -45,6 +45,6 @@ class Cache:
 
         value = func()
 
-        self.store(value, ttl, keys)
+        self.store(value, ttl, *keys)
 
         return value

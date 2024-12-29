@@ -2,7 +2,7 @@
 from djlibman import *
 
 def main():
-    print(djlib_config.spotify_queues)
+    queue_maintenance()
     return
 
 if __name__ == '__main__':

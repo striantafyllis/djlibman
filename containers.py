@@ -27,7 +27,7 @@ class Container(object):
 
         return
 
-    def _exists(self):
+    def _check_existence(self):
         raise NotImplementedError()
 
     def _read(self) -> pd.DataFrame:
@@ -78,7 +78,7 @@ class Container(object):
         self._ensure_df()
 
         if self._df.index.name == other_df.index.name:
-            return
+            return other_df
 
         if self._df.index.name in ['id', 'spotify_id']:
             if other_df.index.name in ['id', 'spotify_id']:
@@ -184,7 +184,7 @@ class Container(object):
         elif operation == 'difference':
             new_idx = self._df.index.difference(other_idx, sort=False)
 
-        return self.df.loc[new_idx]
+        return self._df.loc[new_idx]
 
     def get_intersection(self, other):
         return self._get_set_operation_result(other, 'intersection')
@@ -197,8 +197,10 @@ class Container(object):
 
         if isinstance(other, Container):
             other_df = other.get_df()
+            other_name = other.get_name()
         elif isinstance(other, pd.DataFrame):
             other_df = other
+            other_name = None
         else:
             raise ValueError(f'Invalid argument type: {type(other)}')
 
@@ -225,7 +227,9 @@ class Container(object):
 
             new_df = pd.concat([self._df, genuinely_new_entries])
 
-        status_str = f'{self.get_name()}: adding {other.get_name()}:'
+        status_str = f'{self.get_name()}:'
+        if other_name is not None:
+            status_str += f' adding {other_name}:'
         if num_added == 0:
             status_str += ' nothing to add'
         else:
@@ -235,7 +239,7 @@ class Container(object):
             status_str += ' (omitting'
 
             if num_dups != 0:
-                status_str += ' {num_dups} duplicate entries'
+                status_str += f' {num_dups} duplicate entries'
             if num_already_present != 0:
                 if num_dups != 0:
                     status_str += ' and'
@@ -264,8 +268,10 @@ class Container(object):
         else:
             if isinstance(other, Container):
                 other_df = other.get_df()
+                other_name = other.get_name()
             elif isinstance(other, pd.DataFrame):
                 other_df = other
+                other_name = None
             else:
                 raise ValueError(f'Invalid argument type: {type(other)}')
 
@@ -285,7 +291,9 @@ class Container(object):
         num_removed = len(self._df) - len(new_idx)
         num_absent = len(other_unique) - num_removed
 
-        status_str = f'{self.get_name()}: removing {other.get_name()}:'
+        status_str = f'{self.get_name()}:'
+        if other_name is not None:
+            status_str += f' removing {other.get_name()}:'
         if num_removed == 0:
             status_str += ' nothing to remove'
         else:
@@ -322,7 +330,7 @@ class Container(object):
         print(f'{self.get_name()}: truncating, removing {len(self)} entries')
         choice = get_user_choice('Proceed?')
         if choice == 'yes':
-            self._df = self._df.loc[pd.Index()]
+            self._df = self._df[0:0]
             self._changed = True
 
         return
@@ -333,7 +341,7 @@ class Doc(Container):
         self._doc = djlib_config.docs[name]
         return
 
-    def _exists(self):
+    def _check_existence(self):
         return True
 
     def _read(self):
@@ -351,7 +359,7 @@ class SpotifyPlaylist(Container):
             modify=modify, create=create, overwrite=overwrite)
         return
 
-    def _exists(self):
+    def _check_existence(self):
         return djlib_config.spotify.playlist_exists(self._playlist_name)
 
     def _read(self):
@@ -360,7 +368,7 @@ class SpotifyPlaylist(Container):
     def _write_back(self, df):
         if not self._exists:
             djlib_config.spotify.create_playlist(self._playlist_name)
-        djlib_config.spotify.replace_playlist_tracks(self._playlist_name, df)
+        djlib_config.spotify.replace_tracks_in_playlist(self._playlist_name, df)
         return
 
 class SpotifyLiked(Container):
@@ -368,7 +376,7 @@ class SpotifyLiked(Container):
         super(SpotifyLiked, self).__init__('Spotify Liked Tracks', modify=True, create=False, overwrite=False)
         return
 
-    def _exists(self):
+    def _check_existence(self):
         return True
 
     def _read(self):
@@ -398,7 +406,7 @@ class RekordboxPlaylist(Container):
             modify=modify, create=create, overwrite=overwrite)
         return
 
-    def _exists(self):
+    def _check_existence(self):
         return djlib_config.rekordbox.playlist_exists(self._playlist_name)
 
     def _read(self):

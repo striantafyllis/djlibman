@@ -73,9 +73,9 @@ def get_playlist_listened_tracks(
 
 
 def promote_tracks_in_spotify_queues(
-        promote_queue_name,
-        promote_target_name,
-        last_track):
+        last_track,
+        promote_queue_name=None,
+        promote_target_name=None):
 
     if promote_queue_name is None:
         promote_queue_level = 1
@@ -128,6 +128,7 @@ def promote_tracks_in_spotify_queues(
 
     print(f'Removing listened tracks from {promote_queue_name}...')
     promote_queue.remove(listened_tracks)
+    promote_queue.write()
 
     if promote_queue_level == 1:
         print(f'Removing listened tracks from disk queue...')
@@ -181,6 +182,9 @@ def sanity_check_spotify_queue(spotify_queue_name, is_level_1=False):
     spotify_queue = SpotifyPlaylist(spotify_queue_name)
     print(f'{spotify_queue_name}: {len(spotify_queue)} tracks')
 
+    if len(spotify_queue) == 0:
+        return
+
     # Make sure items in the queue are unique
     spotify_queue.deduplicate()
 
@@ -225,6 +229,7 @@ def sanity_check_spotify_queue(spotify_queue_name, is_level_1=False):
         choice = get_user_choice('Unlike?')
         if choice == 'yes':
             spotify_liked.remove(queue_liked_tracks)
+            spotify_liked.write()
 
     spotify_queue.write()
 
@@ -232,9 +237,9 @@ def sanity_check_spotify_queue(spotify_queue_name, is_level_1=False):
 
 
 def queue_maintenance(
+        last_track=None,
         promote_queue_name=None,
-        promote_target_name=None,
-        last_track=None
+        promote_target_name=None
 ):
     # Sanity check! Queue and queue history must be disjoint
     sanity_check_disk_queues()
@@ -243,7 +248,7 @@ def queue_maintenance(
         if promote_queue_name is not None or promote_target_name is not None:
             raise ValueError('promote_queue or promote_target is specified without last_track')
     else:
-        promote_tracks_in_spotify_queues(promote_queue_name, promote_target_name)
+        promote_tracks_in_spotify_queues(last_track, promote_queue_name, promote_target_name)
 
     shazam = SpotifyPlaylist('My Shazam Tracks', create=True)
     if len(shazam) > 0:

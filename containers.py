@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 
 from general_utils import *
-# from djlib_config import *
 
 import djlib_config
 
@@ -51,6 +50,9 @@ class Container(object):
     def get_df(self) -> pd.DataFrame:
         self._ensure_df()
         return self._df
+
+    def __len__(self):
+        return len(self.get_df())
 
     def set_df(self, df: pd.DataFrame) -> None:
         if self._exists and not self._overwrite:
@@ -293,7 +295,7 @@ class Container(object):
             status_str += ' (omitting'
 
             if num_dups != 0:
-                status_str += ' {num_dups} duplicate entries'
+                status_str += f' {num_dups} duplicate entries'
             if num_absent != 0:
                 if num_dups != 0:
                     status_str += ' and'
@@ -309,6 +311,18 @@ class Container(object):
         choice = get_user_choice('Proceed?')
         if choice == 'yes':
             self._df = self._df.loc[new_idx]
+            self._changed = True
+
+        return
+
+    def truncate(self):
+        if len(self) == 0:
+            return
+
+        print(f'{self.get_name()}: truncating, removing {len(self)} entries')
+        choice = get_user_choice('Proceed?')
+        if choice == 'yes':
+            self._df = self._df.loc[pd.Index()]
             self._changed = True
 
         return

@@ -15,11 +15,21 @@ import djlib_config
 
 class Container(object):
     """Root of the hierarchy; abstract class"""
-    def __init__(self, name: str):
+    def __init__(self, name: str, modify=True, create=False, overwrite=False):
         self._name = name
         self._df = None
         self._changed = False
+        self._exists = self._check_existence()
+        self._modify = modify
+        self._overwrite = overwrite
+
+        if not self._exists and not create:
+            raise RuntimeError(f'{name} does not exist')
+
         return
+
+    def _exists(self):
+        raise NotImplementedError()
 
     def _read(self) -> pd.DataFrame:
         raise NotImplementedError()
@@ -29,7 +39,10 @@ class Container(object):
 
     def _ensure_df(self):
         if self._df is None:
-            self._df = self._read()
+            if self._exists:
+                self._df = self._read()
+            else:
+                self._df = pd.DataFrame()
         return
 
     def get_name(self) -> str:
@@ -39,9 +52,18 @@ class Container(object):
         self._ensure_df()
         return self._df
 
+    def set_df(self, df: pd.DataFrame) -> None:
+        if self._exists and not self._overwrite:
+            raise RuntimeError(f'{self._name} cannot be replaced')
+        self._df = df
+        return
+
     def write(self) -> None:
         if self._df is None:
             raise Exception('Nothing to write')
+
+        if not self._modify:
+            raise RuntimeError(f'{self._name} cannot be written back')
 
         if not self._changed:
             return
@@ -292,10 +314,13 @@ class Container(object):
         return
 
 class Doc(Container):
-    def __init__(self, name: str):
-        super(Doc, self).__init__(f"doc {name}")
+    def __init__(self, name: str, overwrite=False):
+        super(Doc, self).__init__(f"doc {name}", overwrite=overwrite, create=False, modify=True)
         self._doc = djlib_config.docs[name]
         return
+
+    def _exists(self):
+        return True
 
     def _read(self):
         return self._doc.read()
@@ -305,22 +330,32 @@ class Doc(Container):
         return
 
 class SpotifyPlaylist(Container):
-    def __init__(self, name: str):
-        super(SpotifyPlaylist, self).__init__(f"Spotify playlist {name}")
+    def __init__(self, name: str, modify=True, create=False, overwrite=False):
         self._playlist_name = name
+        super(SpotifyPlaylist, self).__init__(
+            f"Spotify playlist {name}",
+            modify=modify, create=create, overwrite=overwrite)
         return
+
+    def _exists(self):
+        return djlib_config.spotify.playlist_exists(self._playlist_name)
 
     def _read(self):
         return djlib_config.spotify.get_playlist_tracks(self._playlist_name)
 
     def _write_back(self, df):
+        if not self._exists:
+            djlib_config.spotify.create_playlist(self._playlist_name)
         djlib_config.spotify.replace_playlist_tracks(self._playlist_name, df)
         return
 
 class SpotifyLiked(Container):
     def __init__(self):
-        super(SpotifyLiked, self).__init__('Spotify Liked Tracks')
+        super(SpotifyLiked, self).__init__('Spotify Liked Tracks', modify=True, create=False, overwrite=False)
         return
+
+    def _exists(self):
+        return True
 
     def _read(self):
         return djlib_config.spotify.get_liked_tracks()
@@ -342,10 +377,15 @@ class SpotifyLiked(Container):
         return
 
 class RekordboxPlaylist(Container):
-    def __init__(self, name: str):
-        super(RekordboxPlaylist, self).__init__(f"Rekordbox playlist {name}")
+    def __init__(self, name: str, modify=True, create=False, overwrite=False):
         self._playlist_name = name
+        super(RekordboxPlaylist, self).__init__(
+            f"Rekordbox playlist {name}",
+            modify=modify, create=create, overwrite=overwrite)
         return
+
+    def _exists(self):
+        return djlib_config.rekordbox.playlist_exists(self._playlist_name)
 
     def _read(self):
         return djlib_config.rekordbox.get_playlist_tracks(self._playlist_name)

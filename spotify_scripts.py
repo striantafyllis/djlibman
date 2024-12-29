@@ -1,6 +1,7 @@
 
 import random
 
+import djlib_config
 from containers import *
 
 def sanity_check_disk_queues():
@@ -72,16 +73,16 @@ def get_playlist_listened_tracks(
 
 
 def promote_tracks_in_spotify_queues(
-        queue1_name,
-        queue2_name,
+        promote_queue_name,
+        promote_target_name,
         last_track,
         is_level_1=False):
-    queue1 = SpotifyPlaylist(queue1_name)
-    queue2 = SpotifyPlaylist(queue2_name)
+    queue1 = SpotifyPlaylist(promote_queue_name)
+    queue2 = SpotifyPlaylist(promote_target_name)
 
     listened_tracks = get_playlist_listened_tracks(queue1, last_track)
 
-    print(f'{queue1_name}: {len(listened_tracks)} listened tracks')
+    print(f'{promote_queue_name}: {len(listened_tracks)} listened tracks')
     pretty_print_tracks(listened_tracks, indent=' ' * 4, enum=True)
     print()
     choice = get_user_choice('Is this correct?')
@@ -97,13 +98,13 @@ def promote_tracks_in_spotify_queues(
     listened_liked_tracks_idx = listened_tracks.index.intersection(liked.get_df().index, sort=False)
     listened_liked_tracks = listened_tracks.loc[listened_liked_tracks_idx]
 
-    print(f'{queue1_name}: {len(listened_liked_tracks)} of the '
+    print(f'{promote_queue_name}: {len(listened_liked_tracks)} of the '
           f'{len(listened_tracks)} listened tracks are liked')
     pretty_print_tracks(listened_liked_tracks, indent=' ' * 4, enum=True)
     print()
 
     if len(listened_liked_tracks) > 0:
-        print(f'Adding liked tracks to {queue2_name}...')
+        print(f'Adding liked tracks to {promote_target_name}...')
         queue2.append(listened_liked_tracks)
         queue2.write()
 
@@ -111,7 +112,7 @@ def promote_tracks_in_spotify_queues(
         liked.remove(listened_liked_tracks)
         liked.write()
 
-    print(f'Removing listened tracks from {queue1_name}...')
+    print(f'Removing listened tracks from {promote_queue_name}...')
     queue1.remove(listened_tracks)
 
     if is_level_1:
@@ -120,10 +121,10 @@ def promote_tracks_in_spotify_queues(
         queue.remove(listened_tracks)
         queue.write()
 
-        print(f'Adding listened tracks to queue history...')
-        queue_history = Doc('queue_history')
-        queue_history.append(listened_tracks)
-        queue_history.write()
+    print(f'Adding listened tracks to queue history...')
+    queue_history = Doc('queue_history')
+    queue_history.append(listened_tracks)
+    queue_history.write()
 
     return
 
@@ -170,21 +171,29 @@ def sanity_check_spotify_queue(spotify_queue_name, is_level_1=False):
         # Make sure all items in the L1 queue are also in the disk queue
         disk_queue = Doc('queue')
 
-        tracks_not_in_disk_queue_idx = spotify_queue.get_df().index.difference(
-            disk_queue.get_df().index, sort=False)
+        tracks_not_in_disk_queue = spotify_queue.get_difference(disk_queue)
 
-        if len(tracks_not_in_disk_queue_idx) > 0:
-            print(f'WARNING: {len(tracks_not_in_disk_queue_idx)} tracks are in {spotify_queue_name} '
+        if len(tracks_not_in_disk_queue) > 0:
+            print(f'WARNING: {len(tracks_not_in_disk_queue)} tracks are in {spotify_queue_name} '
                   f'but not in disk queue')
             choice = get_user_choice('Remove?')
             if choice == 'yes':
-                spotify_queue.remove(tracks_not_in_disk_queue_idx)
-                spotify_queue.write()
+                spotify_queue.remove(tracks_not_in_disk_queue)
 
-    # Make sure items in the L1 queue are unique
+    # Make sure items in the queue are unique
     spotify_queue.deduplicate()
 
-    # Make sure all items in the L1 queue are not liked
+    # Make sure items in the queue are not already in the library
+    library = RekordboxPlaylist('Main Library')
+
+    queue_tracks_in_library = spotify_queue.get_intersection(library)
+    if len(queue_tracks_in_library) > 0:
+        print(f'WARNING: {len(queue_tracks_in_library)} tracks are already in the library')
+        choice = get_user_choice('Remove?')
+        if choice == 'yes':
+            spotify_queue.remove(queue_tracks_in_library)
+
+    # Make sure all items in the queue are not liked
     spotify_liked = SpotifyLiked()
 
     queue_liked_tracks = spotify_queue.get_intersection(spotify_liked)
@@ -203,31 +212,36 @@ def sanity_check_spotify_queue(spotify_queue_name, is_level_1=False):
     return
 
 
-def queue_maintenance():
-    # TODO continue here
-
+def queue_maintenance(
+        promote_queue=None,
+        promote_target=None,
+        last_track=None
+):
     # Sanity check! Queue and queue history must be disjoint
     sanity_check_disk_queues()
 
-    # move_l1_queue_listened_tracks_to_l2(
-    #     l1_queue_name=l1_queue_name,
-    #     l2_queue_name=l2_queue_name,
-    #     l1_queue_last_listened_track=last_track
-    # )
-    #
-    # replenish_l1_queue(
-    #     l1_queue_name=l1_queue_name,
-    #     target_size=l1_queue_target_size)
-    #
-    # add_shazam_to_l2_queue(
-    #     shazam_name=shazam_name,
-    #     l2_queue_name=l2_queue_name)
-    #
-    # sanity_check_l1_queue(
-    #     l1_queue_name=l1_queue_name)
-    #
-    # sanity_check_l2_queue(
-    #     l2_queue_name=l2_queue_name)
+    if last_track is None:
+        if promote_queue is not None or promote_target is not None:
+            raise ValueError('promote_queue or promote_target is specified without last_track')
+    else:
+        if promote_queue is None:
+            promote_queue_level = 1
+            promote_queue = djlib_config.get_default_spotify_queue_at_level(1)
+        else:
+            promote_queue_level = djlib_config.get_spotify_queue_level(promote_queue)
+
+        if promote_target is None:
+            promote_target = djlib_config.get_default_spotify_queue_at_level(promote_queue_level+1)
+        else:
+            promote_target_level = djlib_config.get_spotify_queue_level(promote_target)
+            if promote_target_level != promote_queue_level+1:
+                raise ValueError(f"Promote queue '{promote_queue}' is at level {promote_queue_level} "
+                                 f"but promote target '{promote_target}' is at level {promote_target_level}")
+        promote_tracks_in_spotify_queues(promote_queue, promote_target, promote_queue_level==1)
+
+    for i, level in enumerate(djlib_config.spotify_queues):
+        for spotify_queue in level:
+            sanity_check_spotify_queue(spotify_queue, i==0)
 
     return
 
@@ -239,20 +253,16 @@ def pretty_print_spotify_playlist(playlist_name):
     return
 
 def shuffle_spotify_playlist(playlist_name):
-    # tracks = spotify.get_playlist_tracks(playlist_name)
-    #
-    # new_tracks = random.sample(tracks.index.to_list(), k=len(tracks))
-    #
-    # spotify_playlists = spotify.get_playlists()
-    #
-    # new_playlist_name = playlist_name + ' - shuffled'
-    #
-    # while new_playlist_name in spotify_playlists.index:
-    #     new_playlist_name += ' - shuffled'
-    #
-    # spotify.create_playlist(new_playlist_name)
-    # spotify.add_tracks_to_playlist(new_playlist_name, new_tracks)
-    #
-    # print(f"Created Spotify playlist '{new_playlist_name}' with {len(new_tracks)} tracks")
+    playlist = SpotifyPlaylist(playlist_name)
+    new_playlist = SpotifyPlaylist(playlist_name + ' - shuffled', create=True, overwrite=False)
+
+    tracks = playlist.get_df()
+
+    new_tracks_idx = random.sample(tracks.index.to_list(), k=len(tracks))
+
+    new_tracks = tracks.loc[new_tracks_idx]
+
+    new_playlist.set_df(new_tracks)
+    new_playlist.write()
 
     return

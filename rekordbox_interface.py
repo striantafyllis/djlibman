@@ -82,6 +82,10 @@ class RekordboxInterface:
         self._refresh()
         return RekordboxInterface._reduce_playlist(self._playlists)
 
+    def playlist_exists(self, playlist_name):
+        self._refresh()
+        return playlist_name in self.get_playlist_names()
+
     def pretty_print_playlist_names(self):
         pretty_print(self.get_playlist_names())
 

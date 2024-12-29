@@ -209,6 +209,9 @@ class SpotifyInterface:
 
         return self._cache.look_up_or_get(body, _TTL, 'playlists')
 
+    def playlist_exists(self, playlist_name):
+        return playlist_name in self.get_playlists()
+
     def get_playlist_id(self, playlist_name):
         playlists = self.get_playlists()
 

@@ -174,3 +174,25 @@ def delete_backups():
         if isinstance(doc, file_interface.FileDoc):
             doc.delete_backups()
     return
+
+def all_spotify_queues():
+    all_queues = []
+    for level in spotify_queues:
+        all_queues += level
+
+    return all_queues
+
+def get_spotify_queue_level(queue_name):
+    for i, level in enumerate(spotify_queues):
+        if queue_name in level:
+            return i+1
+
+    raise ValueError(f"Unknown Spotify queue '{queue_name}'")
+
+def get_default_spotify_queue_at_level(level):
+    if level <= 0:
+        raise ValueError(f'Invalid Spotify queue level {level}')
+    if level > len(spotify_queues):
+        raise ValueError(f"Spotify queue level {level} does not exist")
+
+    return spotify_queues[level-1]

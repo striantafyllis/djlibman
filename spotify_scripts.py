@@ -8,8 +8,8 @@ def sanity_check_disk_queues():
     queue = Doc('queue')
     print(f'Queue: {len(queue)} tracks')
 
-    queue_history = Doc('queue_history')
-    print(f'Queue history: {len(queue_history)} tracks')
+    listening_history = Doc('listening_history')
+    print(f'Listening history: {len(listening_history)} tracks')
 
     library = RekordboxPlaylist('Main Library')
     print(f'Library: {len(library)} tracks')
@@ -17,18 +17,18 @@ def sanity_check_disk_queues():
     # entries in the queue should be unique
     queue.deduplicate()
 
-    # entries in queue history should be unique
-    queue_history.deduplicate()
+    # entries in listening history should be unique
+    listening_history.deduplicate()
 
-    # queue tracks should not be in queue history
-    queue.remove(queue_history)
+    # queue tracks should not be in listening history
+    queue.remove(listening_history)
 
-    # library tracks should be in queue history and should not be in queue
-    queue_history.append(library)
+    # library tracks should be in listening history and should not be in queue
+    listening_history.append(library)
     queue.remove(library)
 
     queue.write()
-    queue_history.write()
+    listening_history.write()
 
     return
 
@@ -136,10 +136,10 @@ def promote_tracks_in_spotify_queues(
         queue.remove(listened_tracks)
         queue.write()
 
-    print(f'Adding listened tracks to queue history...')
-    queue_history = Doc('queue_history')
-    queue_history.append(listened_tracks)
-    queue_history.write()
+    print(f'Adding listened tracks to listening history...')
+    listening_history = Doc('listening_history')
+    listening_history.append(listened_tracks)
+    listening_history.write()
 
     return
 
@@ -201,10 +201,10 @@ def sanity_check_spotify_queue(spotify_queue_name, is_level_1=False):
             if choice == 'yes':
                 spotify_queue.remove(tracks_not_in_disk_queue)
     else:
-        # Make sure all items in the L2+ queues are already in the queue history
-        queue_history = Doc('queue_history')
-        queue_history.append(spotify_queue)
-        queue_history.write()
+        # Make sure all items in the L2+ queues are already in the listening history
+        listening_history = Doc('listening_history')
+        listening_history.append(spotify_queue)
+        listening_history.write()
 
     # Make sure items in the queue are not already in the library
     library = RekordboxPlaylist('Main Library')
@@ -241,7 +241,7 @@ def queue_maintenance(
         promote_queue_name=None,
         promote_target_name=None
 ):
-    # Sanity check! Queue and queue history must be disjoint
+    # Sanity check! Queue and listening history must be disjoint
     sanity_check_disk_queues()
 
     if last_track is None:
@@ -287,5 +287,36 @@ def shuffle_spotify_playlist(playlist_name):
 
     new_playlist.set_df(new_tracks)
     new_playlist.write()
+
+    return
+
+def add_to_queue(tracks):
+    """Adds tracks to the disk queue. The tracks have to be either a Container or a DataFrame."""
+
+    tracks_wrapper = Wrapper(tracks)
+
+    print(f'Attempting to add {len(tracks_wrapper)} tracks to the disk queue...')
+
+    if len(tracks_wrapper) == 0:
+        return
+
+    listening_history = Doc('listening_history')
+
+    tracks_wrapper.remove(listening_history)
+
+    if len(tracks_wrapper) == 0:
+        return
+
+    queue = Doc('queue', index_name='id')
+    queue.append(tracks_wrapper)
+    queue.write()
+
+    choice = get_user_choice('Add to L1 queue also?')
+    if choice == 'yes':
+        l1_queue_name = djlib_config.get_default_spotify_queue_at_level(1)
+
+        l1_queue = SpotifyPlaylist(l1_queue_name)
+        l1_queue.append(tracks_wrapper)
+        l1_queue.write()
 
     return

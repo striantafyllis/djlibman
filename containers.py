@@ -4,6 +4,7 @@ Wraps our various dataframe-like data objects - docs. Spotify playlists, Rekordb
 - into objects that you can manipulate and write back. These data objects can be added to each other,
 subtracted from each other etc.
 """
+from typing import Union
 
 import numpy as np
 import pandas as pd
@@ -26,6 +27,9 @@ class Container(object):
             raise RuntimeError(f'{name} does not exist')
 
         return
+
+    def _get_index_name(self):
+        raise NotImplementedError()
 
     def _check_existence(self):
         raise NotImplementedError()
@@ -77,10 +81,17 @@ class Container(object):
     def _reconcile_ids(self, other_df):
         self._ensure_df()
 
-        if self._df.index.name == other_df.index.name:
+        if len(other_df) == 0:
+            return
+
+        this_index_name = self._df.index.name
+        if this_index_name is None and len(self._df) == 0:
+            this_index_name = self._get_index_name()
+
+        if this_index_name == other_df.index.name:
             return other_df
 
-        if self._df.index.name in ['id', 'spotify_id']:
+        if this_index_name in ['id', 'spotify_id']:
             if other_df.index.name in ['id', 'spotify_id']:
                 pass
             elif other_df.index.name in ['TrackID', 'rekordbox_id']:
@@ -91,9 +102,9 @@ class Container(object):
                     ~pd.isna(rekordbox_to_spotify_mapping.spotify_id)
                 ]
 
-                if self._df.index.name != 'spotify_id':
+                if this_index_name != 'spotify_id':
                     rekordbox_to_spotify_mapping = rekordbox_to_spotify_mapping.rename(
-                        columns={'spotify_id': self._df.index.name})
+                        columns={'spotify_id': this_index_name})
 
                 other_df = other_df.merge(
                     right=rekordbox_to_spotify_mapping,
@@ -102,10 +113,10 @@ class Container(object):
                     right_index=True
                 )
 
-                other_df = other_df.set_index(keys=self._df.index.name, drop=False)
+                other_df = other_df.set_index(keys=this_index_name, drop=False)
             else:
                 raise ValueError(f"Unknown other index {other_df.index.name}")
-        elif self._df.index.name in ['TrackID', 'rekordbox_id']:
+        elif this_index_name in ['TrackID', 'rekordbox_id']:
             if other_df.index.name in ['TrackID', 'rekordbox_id']:
                 pass
             elif other_df.index.name in ['id', 'spotify_id']:
@@ -116,9 +127,9 @@ class Container(object):
                     ~pd.isna(rekordbox_to_spotify_mapping.spotify_id)
                 ]
 
-                if self._df.index.name != 'rekordbox_id':
+                if this_index_name != 'rekordbox_id':
                     rekordbox_to_spotify_mapping = rekordbox_to_spotify_mapping.rename(
-                        columns={'rekordbox_id': self._df.index.name})
+                        columns={'rekordbox_id': this_index_name})
 
                 other_df = other_df.merge(
                     right=rekordbox_to_spotify_mapping,
@@ -127,11 +138,11 @@ class Container(object):
                     right_on='spotify_id'
                 )
 
-                other_df = other_df.set_index(keys=self._df.index.name, drop=False)
+                other_df = other_df.set_index(keys=this_index_name, drop=False)
             else:
                 raise ValueError(f"Unknown other index {other_df.index.name}")
         else:
-            raise ValueError(f"Unknown index {self._df.index.name}")
+            raise ValueError(f"Unknown index {this_index_name}")
 
         return other_df
 
@@ -336,9 +347,10 @@ class Container(object):
         return
 
 class Doc(Container):
-    def __init__(self, name: str, overwrite=False):
+    def __init__(self, name: str, overwrite=False, index_name=None):
         super(Doc, self).__init__(f"doc {name}", overwrite=overwrite, create=False, modify=True)
         self._doc = djlib_config.docs[name]
+        self._index_name = None
         return
 
     def _check_existence(self):
@@ -351,6 +363,11 @@ class Doc(Container):
         self._doc.write(df)
         return
 
+    def _get_index_name(self):
+        if self._index_name is None:
+            raise RuntimeError(f'{self.get_name()} is empty and a default index name has not been provided')
+        return self._index_name
+
 class SpotifyPlaylist(Container):
     def __init__(self, name: str, modify=True, create=False, overwrite=False):
         self._playlist_name = name
@@ -358,6 +375,9 @@ class SpotifyPlaylist(Container):
             f"Spotify playlist {name}",
             modify=modify, create=create, overwrite=overwrite)
         return
+
+    def _get_index_name(self):
+        return 'id'
 
     def _check_existence(self):
         return djlib_config.spotify.playlist_exists(self._playlist_name)
@@ -375,6 +395,9 @@ class SpotifyLiked(Container):
     def __init__(self):
         super(SpotifyLiked, self).__init__('Spotify Liked Tracks', modify=True, create=False, overwrite=False)
         return
+
+    def _get_index_name(self):
+        return 'id'
 
     def _check_existence(self):
         return True
@@ -406,6 +429,9 @@ class RekordboxPlaylist(Container):
             modify=modify, create=create, overwrite=overwrite)
         return
 
+    def _get_index_name(self):
+        return 'TrackID'
+
     def _check_existence(self):
         return djlib_config.rekordbox.playlist_exists(self._playlist_name)
 
@@ -416,9 +442,50 @@ class RekordboxPlaylist(Container):
         djlib_config.rekordbox.create_playlist(self._playlist_name, df, overwrite=True)
         return
 
+class Wrapper(Container):
+    def __init__(self, contents: Union[Container, pd.DataFrame], name=None, index_name=None):
+        if isinstance(contents, Container):
+            if name is None:
+                name = contents.get_name()
+            if index_name is None:
+                index_name = contents._get_index_name()
+        elif isinstance(contents, pd.DataFrame):
+            pass
+        else:
+            raise ValueError(f'Invalid wrapper contents type: {type(contents)}')
 
+        this_name = 'Wrapper'
+        if name is not None:
+            this_name += '(' + name + ')'
 
+        super(Wrapper, self).__init__(
+            name=this_name,
+            modify=False,
+            create=False,
+            overwrite=False
+        )
 
+        self._contents = contents
+        self._index_name = index_name
+        return
 
+    def _check_existence(self):
+        return True
+
+    def _read(self):
+        if isinstance(self._contents, pd.DataFrame):
+            return self._contents
+        elif isinstance(self._contents, Container):
+            return self._contents.get_df()
+        else:
+            assert False
+
+    def _write_back(self, df):
+        raise NotImplementedError()
+
+    def _get_index_name(self):
+        if self._index_name is None:
+            raise RuntimeError(f'{self.get_name()} is empty and a default index name has not been provided')
+        return self._index_name
 
 

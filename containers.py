@@ -147,6 +147,11 @@ class Container(object):
         return other_df
 
     def _reconcile_columns(self, other_df):
+        if len(self._df) == 0 and len(self._df.columns) == 0:
+            # this is a special case; eventually maybe we should have an "expected schema"
+            # for empty containers, but for now we'll just go with the schema of the incoming rows
+            return other_df
+
         for column in self._df.columns:
             if column not in other_df.columns:
                 other_df[column] = np.nan
@@ -226,7 +231,9 @@ class Container(object):
         num_dups = len(other_df) - len(other_unique)
 
         if len(self._df) == 0:
-            self._df = other_unique
+            new_df = other_unique
+            num_added = len(other_unique)
+            num_already_present = 0
         else:
             # remove entries that are already there
             genuinely_new_entries_idx = other_unique.index.difference(self._df.index, sort=False)

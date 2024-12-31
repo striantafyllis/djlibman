@@ -284,6 +284,34 @@ class SpotifyInterface:
 
         return self._cache.look_up_or_get(body, _TTL, 'liked_tracks')
 
+    def get_artist_albums(self, artist_id):
+        # this bypasses the cache; these results are not usually accessed multiple times
+        # during a run
+
+        results = _batch_result(
+            lambda limit, offset: self._connection.artist_albums(artist_id=artist_id, limit=limit, offset=offset)
+        )
+
+        # TODO continue here; post-processing etc.
+        return results
+
+    def get_album_tracks(self, album_id):
+        # this bypasses the cache; these results are not usually accessed multiple times
+        # during a run
+
+        results = _batch_result(
+            lambda limit, offset: self._connection.album_tracks(album_id=album_id, limit=limit, offset=offset)
+        )
+
+        results = _postprocess_tracks(results)
+
+        df = pd.DataFrame.from_records(results)
+        if not df.empty:
+            df = df.set_index(df.id)
+
+        return df
+
+
     def get_recently_played_tracks(self):
         """Access the last played tracks, up to 50; Spotify doesn't give us access to more."""
         result = self._connection.current_user_recently_played()

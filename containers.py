@@ -375,6 +375,15 @@ class Container(object):
 
         return
 
+    def sort(self, column, ascending=True):
+        self._ensure_df()
+
+        self._df.sort_values(by=column, ascending=ascending, axis=0)
+
+        return
+
+
+
 class Doc(Container):
     def __init__(self, name: str, overwrite=False, index_name=None):
         super(Doc, self).__init__(f"doc {name}", overwrite=overwrite, create=False, modify=True)

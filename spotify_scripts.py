@@ -408,7 +408,48 @@ def get_artist_discography(artist_name):
         else:
             tracks = pd.concat([tracks, artist_album_tracks])
 
+    tracks = Wrapper(contents=tracks, name=f'Discography for artist {artist_name}')
+    tracks.deduplicate()
+
     print(f'{artist_name}: found {len(tracks)} total tracks')
 
     return tracks
+
+
+def sample_artist_to_queue(artist_name, latest=10, popular=10):
+    print(f'Sampling artist {artist_name} to queue...')
+    discogs = get_artist_discography(artist_name)
+
+    print(f'Found {len(discogs)} tracks')
+
+    listening_history = Doc('listening_history')
+    queue = Doc('queue')
+
+    discogs.remove(listening_history)
+    discogs.remove(queue)
+
+    print(f'Left after removing listening history and queue: {len(discogs)} tracks')
+
+    discogs.sort('added_at', ascending=False)
+
+    latest_tracks = discogs.get_df()[:latest]
+
+    discogs.remove(latest_tracks)
+
+    print('Latest tracks:')
+    pretty_print_tracks(latest_tracks, indent=' '*4, enum=True)
+
+    discogs.sort('popularity', ascending=False)
+
+    most_popular_tracks = discogs.get_df()[:popular]
+
+    print('Most popular tracks:')
+    pretty_print_tracks(most_popular_tracks, indent=' '*4, enum=True)
+
+    queue.append(latest_tracks)
+    queue.append(most_popular_tracks)
+
+    queue.write()
+
+    return
 

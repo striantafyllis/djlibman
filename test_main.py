@@ -45,7 +45,10 @@ def main():
 
     # remove_artist_old_entries_from_listening_history('Simos Tagias', '2024-07-01')
 
-    discogs = get_artist_discography('Armen Miran')
+    # discogs = get_artist_discography('Armen Miran')
+
+    # sample_artist_to_queue('EMPHI')
+    sample_artist_to_queue('Ivan Baffa')
 
     return
 

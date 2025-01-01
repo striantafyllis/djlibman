@@ -293,6 +293,9 @@ def shuffle_spotify_playlist(playlist_name):
 def add_to_queue(tracks):
     """Adds tracks to the disk queue. The tracks have to be either a Container or a DataFrame."""
 
+    if isinstance(tracks, str):
+        tracks = SpotifyPlaylist(tracks)
+
     tracks_wrapper = Wrapper(tracks)
 
     print(f'Attempting to add {len(tracks_wrapper)} tracks to the disk queue...')
@@ -316,7 +319,7 @@ def add_to_queue(tracks):
         l1_queue_name = djlib_config.get_default_spotify_queue_at_level(1)
 
         l1_queue = SpotifyPlaylist(l1_queue_name)
-        l1_queue.append(tracks_wrapper)
+        l1_queue.append(tracks_wrapper, prompt=False)
         l1_queue.write()
 
     return

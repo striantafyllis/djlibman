@@ -15,18 +15,29 @@ import djlib_config
 
 class Container(object):
     """Root of the hierarchy; abstract class"""
-    def __init__(self, name: str, modify=True, create=False, overwrite=False):
+    def __init__(self, name: str, modify=True, create=False, overwrite=False, prompt=None):
         self._name = name
         self._df = None
         self._changed = False
         self._exists = self._check_existence()
         self._modify = modify
         self._overwrite = overwrite
+        self._prompt = prompt
 
         if not self._exists and not create:
             raise RuntimeError(f'{name} does not exist')
 
         return
+
+    def _should_prompt(self, local_prompt):
+        if local_prompt is not None:
+            return local_prompt
+        if self._prompt is not None:
+            return self._prompt
+
+        # if write-back is not allowed, don't prompt, as modifications aren't permanent
+        return self._modify
+
 
     def _get_index_name(self):
         raise NotImplementedError()
@@ -82,7 +93,7 @@ class Container(object):
         self._ensure_df()
 
         if len(other_df) == 0:
-            return
+            return other_df
 
         this_index_name = self._df.index.name
         if this_index_name is None and len(self._df) == 0:
@@ -161,18 +172,20 @@ class Container(object):
 
         return other_df
 
-    def deduplicate(self) -> None:
+    def deduplicate(self, prompt=None) -> None:
         self._ensure_df()
 
         print(f'Deduplicating {self.get_name()}...')
 
         dup_pos = dataframe_duplicate_index_labels(self._df)
         if len(dup_pos) > 0:
-            print(f'{self.get_name()} has {len(dup_pos)} duplicate entries!')
-            choice = get_user_choice('Remove?')
-            if choice == 'yes':
-                self._df = dataframe_drop_rows_at_positions(self._df, dup_pos)
-                self._changed = True
+            print(f'{self.get_name()}: removing {len(dup_pos)} duplicate entries')
+            if self._should_prompt(prompt):
+                choice = get_user_choice('Remove?')
+                if choice != 'yes':
+                    return
+            self._df = dataframe_drop_rows_at_positions(self._df, dup_pos)
+            self._changed = True
 
         return
 
@@ -208,7 +221,7 @@ class Container(object):
     def get_difference(self, other):
         return self._get_set_operation_result(other, 'difference')
 
-    def append(self, other) -> None:
+    def append(self, other, prompt=None) -> None:
         self._ensure_df()
 
         if isinstance(other, Container):
@@ -270,15 +283,18 @@ class Container(object):
         if num_added == 0:
             return
 
-        choice = get_user_choice('Proceed?')
-        if choice == 'yes':
-            self._df = new_df
-            print(f'{self.get_name()} now has {len(self._df)} entries')
-            self._changed = True
+        if self._should_prompt(prompt):
+            choice = get_user_choice('Proceed?')
+            if choice != 'yes':
+                return
+
+        self._df = new_df
+        print(f'{self.get_name()} now has {len(self._df)} entries')
+        self._changed = True
 
         return
 
-    def remove(self, other) -> None:
+    def remove(self, other, prompt=None) -> None:
         self._ensure_df()
 
         if isinstance(other, pd.Index):
@@ -334,22 +350,28 @@ class Container(object):
         if num_removed == 0:
             return
 
-        choice = get_user_choice('Proceed?')
-        if choice == 'yes':
-            self._df = self._df.loc[new_idx]
-            self._changed = True
+        if self._should_prompt(prompt):
+            choice = get_user_choice('Proceed?')
+            if choice != 'yes':
+                return
+        self._df = self._df.loc[new_idx]
+        self._changed = True
 
         return
 
-    def truncate(self):
+    def truncate(self, prompt=None):
         if len(self) == 0:
             return
 
         print(f'{self.get_name()}: truncating, removing {len(self)} entries')
-        choice = get_user_choice('Proceed?')
-        if choice == 'yes':
-            self._df = self._df[0:0]
-            self._changed = True
+
+        if self._should_prompt(prompt):
+            choice = get_user_choice('Proceed?')
+            if choice != 'yes':
+                return
+
+        self._df = self._df[0:0]
+        self._changed = True
 
         return
 
@@ -357,7 +379,7 @@ class Doc(Container):
     def __init__(self, name: str, overwrite=False, index_name=None):
         super(Doc, self).__init__(f"doc {name}", overwrite=overwrite, create=False, modify=True)
         self._doc = djlib_config.docs[name]
-        self._index_name = None
+        self._index_name = index_name
         return
 
     def _check_existence(self):

@@ -323,3 +323,92 @@ def add_to_queue(tracks):
         l1_queue.write()
 
     return
+
+def get_artists(tracks: Union[Container, pd.DataFrame]):
+    """Returns a dictionary - id to artist name - from the argument - which
+       should be a DF of Spotify tracks or similar."""
+
+    if isinstance(tracks, Container):
+        tracks = tracks.get_df()
+
+    artist_id_to_name = {}
+
+    for artist_list in tracks.artists:
+        if not isinstance(artist_list, list) and pd.isna(artist_list):
+            continue
+        for artist in artist_list:
+            id = artist['id']
+            name = artist['name']
+
+            existing_name = artist_id_to_name.get(id)
+            if existing_name is None:
+                artist_id_to_name[id] = name
+            elif existing_name != name:
+                # Sometimes this happens if an artist changes their Spotify name.
+                # In that case, keep the latest name.
+                print(f'Warning: Artist ID {id} associated with two different names: '
+                      f'{existing_name} and {name}')
+                artist_id_to_name[id] = name
+
+    return artist_id_to_name
+
+
+def find_spotify_artist(artist_name):
+    """Returns the Spotify entry for the artist with the given name as a dictionary.
+    The ID is in there also.
+    The search is first done in the library, then expands to all of Spotify if necessary."""
+
+    listening_history = Doc('listening_history')
+
+    artists = get_artists(listening_history)
+
+    candidate_ids = []
+
+    for id, name in artists.items():
+        if name == artist_name:
+            candidate_ids.append(id)
+
+    if len(candidate_ids) > 1:
+        raise ValueError(f'Multiple IDs found for artist {artist_name}: {candidate_ids}')
+    elif len(candidate_ids) == 0:
+        raise ValueError(f'Artist {artist_name} not found')
+
+    return candidate_ids[0]
+
+def has_artist(track, artist_id):
+    for artist in track.artists:
+        if artist['id'] == artist_id:
+            return True
+    return False
+
+
+def get_artist_discography(artist_name):
+    artist_id = find_spotify_artist(artist_name)
+
+    artist_albums = djlib_config.spotify.get_artist_albums(artist_id)
+
+    num_tracks = sum([
+        album['total_tracks'] for album in artist_albums
+    ])
+
+    print(f'{artist_name}: found {len(artist_albums)} albums with {num_tracks} tracks')
+    # pretty_print_albums(artist_albums, indent=' '*4, enum=True)
+
+    tracks = None
+
+    for album in artist_albums:
+        album_tracks = djlib_config.spotify.get_album_tracks(album['id'])
+
+        artist_album_tracks = album_tracks.loc[album_tracks.apply(lambda t: has_artist(t, artist_id), axis=1)]
+
+        print(f'Album {album["name"]}: {len(album_tracks)} tracks, {len(artist_album_tracks)} artist tracks')
+
+        if tracks is None:
+            tracks = artist_album_tracks
+        else:
+            tracks = pd.concat([tracks, artist_album_tracks])
+
+    print(f'{artist_name}: found {len(tracks)} total tracks')
+
+    return tracks
+

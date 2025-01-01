@@ -450,6 +450,7 @@ class SpotifyLiked(Container):
 
         return
 
+
 class RekordboxPlaylist(Container):
     def __init__(self, name: str, modify=True, create=False, overwrite=False):
         self._playlist_name = name

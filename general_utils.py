@@ -284,10 +284,21 @@ def pretty_print_tracks(tracks, indent='', enum=False):
 
     for i in range(num_tracks):
         sys.stdout.write(indent)
-        if enumerate:
+        if enum:
             sys.stdout.write('%d: ' % (i+1))
 
         sys.stdout.write('%s\n' % format_track(tracks[i]))
+
+    return
+
+def pretty_print_albums(albums, indent='', enum=False):
+    for i, album in enumerate(albums):
+        sys.stdout.write(indent)
+        if enum:
+            sys.stdout.write(f'{i+1}: ')
+        sys.stdout.write(f'{album['id']}: {album['name']} ({album['total_tracks']} tracks)\n')
+
+    sys.stdout.flush()
 
     return
 

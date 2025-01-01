@@ -39,7 +39,7 @@ _TRACK_COLUMNS = {
     'name': None,
     'artists': _ARTIST_COLUMNS,
     'duration_ms': None,
-    'popularity': None,
+    'popularity': lambda item: int(item['popularity']),
     'added_at': lambda item: pd.to_datetime(
         item['played_at'] if 'played_at' in item else
             (item['added_at'] if 'added_at' in item else None),
@@ -64,9 +64,21 @@ _TRACK_COLUMNS = {
     # 'uri'
 }
 
+_ALBUM_COLUMNS = {
+    'id': None,
+    'name': None,
+    'release_date': lambda item: pd.to_datetime(item['release_date'], utc=True),
+    'total_tracks': lambda item: int(item['total_tracks'])
+}
+
 _BASE_62 = re.compile(r'^[0-9A-Za-z]+$')
 
 _TTL = 600
+
+def is_spotify_id(s: str):
+    # Spotify playlist IDs are base-62 numbers and they are usually about 22 digits long
+    return len(s) > 20 and _BASE_62.match(s)
+
 
 def _batch_result(request_func, start=0, stop=None, stop_condition=None, use_offset=True):
     """Stop condition is inclusive"""
@@ -164,6 +176,10 @@ def _postprocess_tracks(results):
     projection = project(results, _TRACK_COLUMNS)
     return projection
 
+def _postprocess_albums(results):
+    projection = project(results, _ALBUM_COLUMNS)
+    return projection
+
 
 class SpotifyInterface:
     def __init__(self, config):
@@ -240,8 +256,7 @@ class SpotifyInterface:
         return
 
     def _get_playlist_id_if_necessary(self, playlist_name_or_id):
-        # Spotify playlist IDs are base-62 numbers and they are usually about 22 digits long
-        if len(playlist_name_or_id) > 20 and _BASE_62.match(playlist_name_or_id):
+        if is_spotify_id(playlist_name_or_id):
             return playlist_name_or_id
 
         # the string is a playlist name
@@ -292,20 +307,43 @@ class SpotifyInterface:
             lambda limit, offset: self._connection.artist_albums(artist_id=artist_id, limit=limit, offset=offset)
         )
 
-        # TODO continue here; post-processing etc.
+        results = _postprocess_albums(results)
+
         return results
 
     def get_album_tracks(self, album_id):
         # this bypasses the cache; these results are not usually accessed multiple times
         # during a run
 
+        album_info = self._connection.album(album_id)
+
+        popularity = int(album_info['popularity'])
+        release_date = pd.to_datetime(album_info['release_date'], utc=True)
+
+        album_columns = project(album_info, _ALBUM_COLUMNS)
+
         results = _batch_result(
             lambda limit, offset: self._connection.album_tracks(album_id=album_id, limit=limit, offset=offset)
         )
 
-        results = _postprocess_tracks(results)
+        # make these look like the track lists that come back from playlists etc.
+        projection = project(
+            results,
+            {
+                'id': None,
+                'name': None,
+                'artists': _ARTIST_COLUMNS,
+                'duration_ms': None,
+                'popularity': lambda _: popularity,
+                'added_at': lambda _: release_date,
+                'added_by': lambda _: None,
+                'album': lambda _: album_columns,
+                'disc_number': None,
+                'track_number': None
+            }
+        )
 
-        df = pd.DataFrame.from_records(results)
+        df = pd.DataFrame.from_records(projection)
         if not df.empty:
             df = df.set_index(df.id)
 

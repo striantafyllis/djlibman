@@ -423,10 +423,19 @@ def get_artist_discography(artist_name):
         else:
             tracks = pd.concat([tracks, artist_album_tracks])
 
-    tracks = Wrapper(contents=tracks, name=f'Discography for artist {artist_name}')
-    tracks.deduplicate()
+    print(f'{artist_name}: found {len(tracks)} tracks')
 
-    print(f'{artist_name}: found {len(tracks)} total tracks')
+    mixed_tracks = tracks.apply(lambda t: t['name'].endswith(' - Mixed'), axis=1)
+
+    tracks = tracks.loc[~mixed_tracks]
+
+    print(f'{artist_name}: after removing mixed tracks: {len(tracks)} tracks')
+
+    tracks = Wrapper(contents=tracks, name=f'Discography for artist {artist_name}')
+    tracks.sort('popularity', ascending=False)
+    tracks.deduplicate(deep=True)
+
+    print(f'{artist_name}: after deduplication: {len(tracks)} tracks')
 
     return tracks
 

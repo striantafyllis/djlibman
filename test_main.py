@@ -59,6 +59,30 @@ def artist_discog_workspace_1():
 
     return
 
+def artist_discog_workspace_2():
+    artist_name = 'Ivan Baffa'
+    tracks = Doc('discog1').get_df()
+
+    print(f'{artist_name}: found {len(tracks)} tracks')
+
+    mixed_tracks = tracks.apply(lambda t: t['name'].endswith(' - Mixed'), axis=1)
+
+    tracks = tracks.loc[~mixed_tracks]
+
+    print(f'{artist_name}: after removing mixed tracks: {len(tracks)} tracks')
+
+    tracks = Wrapper(contents=tracks, name=f'Discography for artist {artist_name}')
+    tracks.sort('popularity', ascending=False)
+    tracks.deduplicate(deep=True)
+
+    print(f'{artist_name}: after deduplication: {len(tracks)} tracks')
+
+    doc = Doc('discog2', create=True)
+    doc.append(tracks, prompt=False)
+    doc.write()
+
+    return
+
 
 def main():
     # queue_maintenance(last_track=10, promote_queue_name='simos tagias tmp')
@@ -74,7 +98,7 @@ def main():
 
     # filter_spotify_playlist('Progressive House 2025 local copy')
 
-    artist_discog_workspace_1()
+    artist_discog_workspace_2()
 
     return
 

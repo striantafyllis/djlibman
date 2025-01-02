@@ -172,12 +172,18 @@ class Container(object):
 
         return other_df
 
-    def deduplicate(self, prompt=None) -> None:
+    def deduplicate(self, prompt=None, deep=False) -> None:
         self._ensure_df()
 
         print(f'Deduplicating {self.get_name()}...')
 
-        dup_pos = dataframe_duplicate_index_labels(self._df)
+        if deep:
+            signatures = self._df.apply(get_track_signature, axis=1)
+
+            dup_pos = duplicate_positions(signatures)
+        else:
+            dup_pos = dataframe_duplicate_index_labels(self._df)
+
         if len(dup_pos) > 0:
             print(f'{self.get_name()}: removing {len(dup_pos)} duplicate entries')
             if self._should_prompt(prompt):

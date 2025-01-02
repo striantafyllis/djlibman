@@ -118,6 +118,22 @@ def infer_types(df):
     return df
 
 
+def duplicate_positions(iterable):
+    already_seen_values = set()
+
+    positions = []
+
+    for i, value in enumerate(iterable):
+        if value in already_seen_values:
+            positions.append(i)
+        else:
+            already_seen_values.add(value)
+
+    assert len(positions) == len(iterable) - len(already_seen_values)
+
+    return positions
+
+
 def dataframe_duplicate_index_labels(df):
     """Returns the positions of duplicate index labels in a dataframe.
     I'm surprised that Pandas doesn't already offer this."""
@@ -127,19 +143,8 @@ def dataframe_duplicate_index_labels(df):
     if len(df.index) == len(unique_idx):
         return []
 
-    already_seen_labels = set()
+    return duplicate_positions(df.index)
 
-    positions = []
-
-    for i, label in enumerate(df.index):
-        if label in already_seen_labels:
-            positions.append(i)
-        else:
-            already_seen_labels.add(label)
-
-    assert len(positions) == len(df.index) - len(unique_idx)
-
-    return positions
 
 def dataframe_drop_rows_at_positions(df, positions):
     """Returns a new dataframe without the rows indicated by the positions.
@@ -270,6 +275,27 @@ def format_track_for_search(track):
     string = string.lower()
 
     return string
+
+
+def get_track_signature(track):
+    """Returns a string that should uniquely identify the track in most contexts;
+       the string contains the artist names and the track title separated by \u2013"""
+    if 'artists' in track:
+        # Spotify-style track; artists is a list of dict
+        artists = ', '.join(artist['name'] for artist in track['artists'])
+    elif 'Artists' in track:
+        artists = track['Artists']
+    else:
+        raise ValueError(f"Can't compute signature for track {track}: no artists")
+
+    if 'Title' in track:
+        name = track['title']
+    elif 'name' in track:
+        name = track['name']
+    else:
+        raise ValueError(f"Can't compute signature for track {track}: no title")
+
+    return artists + '\u2013' + name
 
 
 def pretty_print_tracks(tracks, indent='', enum=False):

@@ -324,6 +324,21 @@ def add_to_queue(tracks):
 
     return
 
+def filter_spotify_playlist(playlist_name):
+    """Removes tracks in queue and listening history from a Spotify playlist"""
+
+    playlist = SpotifyPlaylist(playlist_name)
+
+    listening_history = Doc('listening_history')
+    queue = Doc('queue', index_name='id')
+
+    playlist.remove(listening_history)
+    playlist.remove(queue)
+    playlist.write()
+
+    return
+
+
 def get_artists(tracks: Union[Container, pd.DataFrame]):
     """Returns a dictionary - id to artist name - from the argument - which
        should be a DF of Spotify tracks or similar."""

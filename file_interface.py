@@ -40,8 +40,8 @@ class FileDoc:
     def __init__(self,
                  path,
                  backups = 0,
-                 header = None,
-                 index_column = None,
+                 header = 0,
+                 index_column = '_FIRST_COLUMN',
                  list_columns = [],
                  boolean_columns = [],
                  datetime_columns = [],
@@ -82,7 +82,10 @@ class FileDoc:
                 self._contents[column_name] = self._contents[column_name].apply(converter)
 
         if self._index_column is not None:
-            self._contents = self._contents.set_index(self._contents[self._index_column])
+            if self._index_column == '_FIRST_COLUMN' and len(self._contents.columns) > 0:
+                self._contents = self._contents.set_index(self._contents.columns[0])
+            else:
+                self._contents = self._contents.set_index(self._contents[self._index_column])
 
         return
 
@@ -91,6 +94,9 @@ class FileDoc:
 
     def _raw_write(self, df):
         raise Exception('Not implemented')
+
+    def exists(self):
+        return os.path.exists(self._path)
 
     def read(self, force=False):
         if force or self._last_read_time is None or os.path.getmtime(self._path) > self._last_read_time:
@@ -184,4 +190,5 @@ class CsvFile(FileDoc):
                   header=(self._header is not None),
                   index=False)
         return
+
 

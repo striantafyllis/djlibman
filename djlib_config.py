@@ -13,6 +13,8 @@ import spotify_interface
 import google_interface
 import file_interface
 
+_default_dir = None
+
 rekordbox = None
 google = None
 spotify = None
@@ -24,6 +26,7 @@ _log_file = './djlibman.log'
 _log_level = logging.INFO
 
 def init(config_file=None):
+    global _default_dir
     global rekordbox
     global google
     global spotify
@@ -56,7 +59,9 @@ def init(config_file=None):
 
         if section_name == 'general':
             for field in section.keys():
-                if field == 'backups':
+                if field == 'default_dir':
+                    _default_dir = section[field]
+                elif field == 'backups':
                     _backups = section.getint(field)
                 elif field == 'logfile':
                     _log_file = section.get(field)
@@ -147,16 +152,39 @@ def _add_doc(name, type, **kwargs):
     if name in docs:
         raise Exception("Duplicate doc name: '%s'" % name)
 
+    doc = create_doc(name, type, **kwargs)
+
+    docs[name] = doc
+    if name not in globals():
+        globals()[name] = doc
+
+    return
+
+def create_doc(name, type='csv', **kwargs):
     if type == 'google_sheet':
         if google is None:
             raise Exception("Cannot add Google sheet '%s'; no Google connection specified" % name)
 
         doc = google_interface.GoogleSheet(google, **kwargs)
     else:
+        if _default_dir is None:
+            raise Exception(f'Doc {name}: no default dir and no path specified')
+
         if 'path' not in kwargs:
-            raise Exception("Cannot add file document '%s'; no path specified" % name)
-        path = kwargs['path']
-        del kwargs['path']
+            if type == 'csv':
+                extension = '.csv'
+            elif type == 'excel':
+                extension = '.xlsx'
+            else:
+                raise Exception("Unsupported doc type: '%s'" % type)
+
+            path = os.path.join(_default_dir, name)
+            if not name.endswith(extension):
+                path += extension
+
+        else:
+            path = kwargs['path']
+            del kwargs['path']
 
         if 'backups' not in kwargs:
             kwargs['backups'] = _backups
@@ -168,11 +196,8 @@ def _add_doc(name, type, **kwargs):
         else:
             raise Exception("Unsupported doc type: '%s'" % type)
 
-    docs[name] = doc
-    if name not in globals():
-        globals()[name] = doc
+    return doc
 
-    return
 
 
 def delete_backups():

@@ -15,7 +15,7 @@ import djlib_config
 
 class Container(object):
     """Root of the hierarchy; abstract class"""
-    def __init__(self, name: str, modify=True, create=False, overwrite=False, prompt=None):
+    def __init__(self, name: str, *, create=False, modify=True, overwrite=False, prompt=None):
         self._name = name
         self._df = None
         self._changed = False
@@ -236,8 +236,9 @@ class Container(object):
         if len(other_df) == 0:
             return
 
-        other_df = self._reconcile_ids(other_df)
-        other_df = self._reconcile_columns(other_df)
+        if len(self._df) > 0:
+            other_df = self._reconcile_ids(other_df)
+            other_df = self._reconcile_columns(other_df)
 
         other_unique = dataframe_ensure_unique_index(other_df)
 
@@ -296,6 +297,9 @@ class Container(object):
 
     def remove(self, other, prompt=None) -> None:
         self._ensure_df()
+
+        if len(self._df) == 0:
+            return
 
         if isinstance(other, pd.Index):
             other_idx = other
@@ -383,16 +387,31 @@ class Container(object):
         return
 
 
-
 class Doc(Container):
-    def __init__(self, name: str, overwrite=False, index_name=None):
-        super(Doc, self).__init__(f"doc {name}", overwrite=overwrite, create=False, modify=True)
-        self._doc = djlib_config.docs[name]
+    def __init__(self,
+                 name: str, *,
+                 modify=True,
+                 create=False,
+                 overwrite=False,
+                 index_name=None,
+                 **kwargs):
+        if name in djlib_config.docs:
+            self._doc = djlib_config.docs[name]
+            if len(kwargs) > 0:
+                raise ValueError(f'Doc {name} is in config but doc args {kwargs.keys()} were also specified')
+        else:
+            self._doc = djlib_config.create_doc(name, **kwargs)
+
+        super(Doc, self).__init__(f"doc {name}",
+                                  modify=modify,
+                                  create=create,
+                                  overwrite=overwrite)
+
         self._index_name = index_name
         return
 
     def _check_existence(self):
-        return True
+        return self._doc.exists()
 
     def _read(self):
         return self._doc.read()
@@ -403,7 +422,8 @@ class Doc(Container):
 
     def _get_index_name(self):
         if self._index_name is None:
-            raise RuntimeError(f'{self.get_name()} is empty and a default index name has not been provided')
+            self._ensure_df()
+            return self._df.index.name
         return self._index_name
 
 class SpotifyPlaylist(Container):

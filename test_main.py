@@ -48,57 +48,72 @@ def write_file_workspace():
     return
 
 
-def artist_discog_workspace_1():
-    artist_name = 'Ivan Baffa'
-    discogs = get_artist_discography(artist_name)
+def lambda_tmp(t):
+    return t['name'].endswith(' - Mixed')
+
+
+def artist_discog_prep(artist_name):
+    tracks = get_artist_discography(artist_name)
 
     doc = Doc('discog1', create=True)
-
-    doc.append(discogs)
-    doc.write()
-
-    return
-
-def artist_discog_workspace_2():
-    artist_name = 'Ivan Baffa'
-    tracks = Doc('discog1').get_df()
-
-    print(f'{artist_name}: found {len(tracks)} tracks')
-
-    mixed_tracks = tracks.apply(lambda t: t['name'].endswith(' - Mixed'), axis=1)
-
-    tracks = tracks.loc[~mixed_tracks]
-
-    print(f'{artist_name}: after removing mixed tracks: {len(tracks)} tracks')
-
-    tracks = Wrapper(contents=tracks, name=f'Discography for artist {artist_name}')
-    tracks.sort('popularity', ascending=False)
-    tracks.deduplicate(deep=True)
-
-    print(f'{artist_name}: after deduplication: {len(tracks)} tracks')
-
-    doc = Doc('discog2', create=True)
     doc.append(tracks, prompt=False)
     doc.write()
+    return
+
+def artist_discog_workspace_3(artist_name):
+    latest = 10
+    popular = 10
+
+    discogs = Doc('discog1')
+
+    print(f'Found {len(discogs)} tracks')
+
+    listening_history = Doc('listening_history')
+    queue = Doc('queue')
+
+    discogs.remove(listening_history, deep=True, prompt=False)
+    discogs.remove(queue, deep=True)
+
+    print(f'Left after removing listening history and queue: {len(discogs)} tracks')
+
+    if latest > 0:
+        discogs.sort('added_at', ascending=False)
+
+        latest_tracks = discogs.get_df()[:latest]
+
+        discogs.remove(latest_tracks, prompt=False)
+
+        print('Latest tracks:')
+        pretty_print_tracks(latest_tracks, indent=' '*4, enum=True, extra_attribs='added_at')
+
+        queue.append(latest_tracks)
+
+    if popular > 0:
+        discogs.sort('popularity', ascending=False)
+
+        most_popular_tracks = discogs.get_df()[:popular]
+
+        print('Most popular tracks:')
+        pretty_print_tracks(most_popular_tracks, indent=' '*4, enum=True, extra_attribs='popularity')
+
+        queue.append(most_popular_tracks)
+
+    # queue.write()
 
     return
 
 
 def main():
-    # queue_maintenance(last_track=10, promote_queue_name='simos tagias tmp')
+    # p = SpotifyPlaylist('L2 queue')
+    # df = p.get_df()
 
-    # add_to_queue('simos tagias tmp')
+    artist_name = 'Ivan Baffa'
 
-    # remove_artist_old_entries_from_listening_history('Simos Tagias', '2024-07-01')
+    # artist_discog_prep(artist_name)
 
-    # discogs = get_artist_discography('Armen Miran')
+    # artist_discog_workspace_3(artist_name)
 
-    # sample_artist_to_queue('EMPHI')
-    # sample_artist_to_queue('Ivan Baffa')
-
-    # filter_spotify_playlist('Progressive House 2025 local copy')
-
-    artist_discog_workspace_2()
+    sample_artist_to_queue(artist_name)
 
     return
 

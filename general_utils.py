@@ -226,12 +226,15 @@ def back_up_file(path, max_backups):
     shutil.copyfile(path, backup)
     return
 
-def format_track(track):
+def format_track(track, extra_attribs=[]):
+    if isinstance(extra_attribs, str):
+        extra_attribs = [extra_attribs]
+
     s = ''
 
     for id_field in ['TrackID', 'id']:
         if id_field in track:
-            s += '%s: ' % track[id_field]
+            s += f'{track[id_field]}: '
             break
 
     if 'artists' in track:
@@ -242,7 +245,13 @@ def format_track(track):
 
     title = get_attrib_or_fail(track, ['Title', 'name'])
 
-    return s + '%s \u2013 %s' % (artists, title)
+    s += f'{artists} \u2013 {title}'
+
+    for extra_attrib in extra_attribs:
+        s += f' {extra_attrib}={track[extra_attrib]}'
+
+    return s
+
 
 def format_track_for_search(track):
     """Creates a search string that's more likely to generate matches out of a
@@ -298,7 +307,7 @@ def get_track_signature(track):
     return artists + '\u2013' + name
 
 
-def pretty_print_tracks(tracks, indent='', enum=False):
+def pretty_print_tracks(tracks, indent='', enum=False, extra_attribs=[]):
     num_tracks = len(tracks)
     if num_tracks == 0:
         return
@@ -313,7 +322,7 @@ def pretty_print_tracks(tracks, indent='', enum=False):
         if enum:
             sys.stdout.write('%d: ' % (i+1))
 
-        sys.stdout.write('%s\n' % format_track(tracks[i]))
+        sys.stdout.write('%s\n' % format_track(tracks[i], extra_attribs))
 
     return
 

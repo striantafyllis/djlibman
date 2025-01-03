@@ -178,11 +178,14 @@ class Container(object):
         print(f'Deduplicating {self.get_name()}...')
 
         if deep:
-            signatures = self._df.apply(get_track_signature, axis=1)
+            prev_index_name = self._df.index.name
 
-            dup_pos = duplicate_positions(signatures)
+            signatures = self._df.apply(get_track_signature, axis=1)
+            this_df = self._df.set_index(signatures)
         else:
-            dup_pos = dataframe_duplicate_index_labels(self._df)
+            this_df = self._df
+
+        dup_pos = dataframe_duplicate_index_labels(this_df)
 
         if len(dup_pos) > 0:
             print(f'{self.get_name()}: removing {len(dup_pos)} duplicate entries')
@@ -190,7 +193,14 @@ class Container(object):
                 choice = get_user_choice('Remove?')
                 if choice != 'yes':
                     return
-            self._df = dataframe_drop_rows_at_positions(self._df, dup_pos)
+
+            this_df = dataframe_drop_rows_at_positions(self._df, dup_pos)
+
+            if deep:
+                self._df = this_df.set_index(prev_index_name, drop=False)
+            else:
+                self._df = this_df
+
             self._changed = True
 
         return
@@ -227,7 +237,7 @@ class Container(object):
     def get_difference(self, other):
         return self._get_set_operation_result(other, 'difference')
 
-    def append(self, other, prompt=None) -> None:
+    def append(self, other, prompt=None, deep=False) -> None:
         self._ensure_df()
 
         if isinstance(other, Container):
@@ -246,24 +256,46 @@ class Container(object):
             other_df = self._reconcile_ids(other_df)
             other_df = self._reconcile_columns(other_df)
 
+        if deep:
+            other_prev_index_name = other_df.index.name
+            other_signatures = other_df.apply(get_track_signature, axis=1)
+            other_df = other_df.set_index(other_signatures)
+
         other_unique = dataframe_ensure_unique_index(other_df)
 
         num_dups = len(other_df) - len(other_unique)
 
+        assert num_dups >= 0
+
         if len(self._df) == 0:
+            if deep:
+                other_unique = other_unique.set_index(other_prev_index_name, drop=False)
+
             new_df = other_unique
             num_added = len(other_unique)
             num_already_present = 0
         else:
             # remove entries that are already there
-            genuinely_new_entries_idx = other_unique.index.difference(self._df.index, sort=False)
+
+            if deep:
+                this_idx = self._df.apply(get_track_signature, axis=1)
+            else:
+                this_idx = self._df.index
+
+            genuinely_new_entries_idx = other_unique.index.difference(this_idx, sort=False)
 
             genuinely_new_entries = other_unique.loc[genuinely_new_entries_idx]
 
             num_already_present = len(other_unique) - len(genuinely_new_entries)
             num_added = len(genuinely_new_entries)
 
+            if deep:
+                genuinely_new_entries = genuinely_new_entries.set_index(other_prev_index_name, drop=False)
+
             new_df = pd.concat([self._df, genuinely_new_entries])
+
+        assert num_already_present >= 0
+        assert num_added >= 0
 
         status_str = f'{self.get_name()}:'
         if other_name is not None:
@@ -301,13 +333,15 @@ class Container(object):
 
         return
 
-    def remove(self, other, prompt=None) -> None:
+    def remove(self, other, prompt=None, deep=False) -> None:
         self._ensure_df()
 
         if len(self._df) == 0:
             return
 
         if isinstance(other, pd.Index):
+            if deep:
+                raise ValueError('Index argument cannot be used if deep=True')
             other_idx = other
         else:
             if isinstance(other, Container):
@@ -326,14 +360,28 @@ class Container(object):
 
             other_idx = other_df.index
 
+        if deep:
+            prev_index_name = self._df.index.name
+
+            signatures = self._df.apply(get_track_signature, axis=1)
+            this_df = self._df.set_index(signatures)
+
+            other_idx = pd.Index(other_df.apply(get_track_signature, axis=1))
+        else:
+            this_df = self._df
+
         other_unique = other_idx.unique()
 
         num_dups = len(other_idx) - len(other_unique)
 
-        new_idx = self._df.index.difference(other_unique, sort=False)
+        new_idx = this_df.index.difference(other_unique, sort=False)
 
-        num_removed = len(self._df) - len(new_idx)
+        num_removed = len(this_df) - len(new_idx)
         num_absent = len(other_unique) - num_removed
+
+        assert num_dups >= 0
+        assert num_removed >= 0
+        assert num_absent >= 0
 
         status_str = f'{self.get_name()}:'
         if other_name is not None:
@@ -364,7 +412,13 @@ class Container(object):
             choice = get_user_choice('Proceed?')
             if choice != 'yes':
                 return
-        self._df = self._df.loc[new_idx]
+        this_df = this_df.loc[new_idx]
+
+        if deep:
+            self._df = this_df.set_index(prev_index_name, drop=False)
+        else:
+            self._df = this_df
+
         self._changed = True
 
         return
@@ -388,7 +442,7 @@ class Container(object):
     def sort(self, column, ascending=True):
         self._ensure_df()
 
-        self._df.sort_values(by=column, ascending=ascending, axis=0)
+        self._df = self._df.sort_values(by=column, ascending=ascending, axis=0)
 
         return
 

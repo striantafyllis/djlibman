@@ -83,9 +83,9 @@ class FileDoc:
 
         if self._index_column is not None:
             if self._index_column == '_FIRST_COLUMN' and len(self._contents.columns) > 0:
-                self._contents = self._contents.set_index(self._contents.columns[0])
+                self._contents = self._contents.set_index(self._contents.columns[0], drop=False)
             else:
-                self._contents = self._contents.set_index(self._contents[self._index_column])
+                self._contents = self._contents.set_index(self._index_column, drop=False)
 
         return
 

@@ -189,17 +189,7 @@ def sanity_check_spotify_queue(spotify_queue_name, is_level_1=False):
     spotify_queue.deduplicate()
 
     if is_level_1:
-        # Make sure all items in the L1 queue are also in the disk queue
-        disk_queue = Doc('queue')
-
-        tracks_not_in_disk_queue = spotify_queue.get_difference(disk_queue)
-
-        if len(tracks_not_in_disk_queue) > 0:
-            print(f'WARNING: {len(tracks_not_in_disk_queue)} tracks are in {spotify_queue_name} '
-                  f'but not in disk queue')
-            choice = get_user_choice('Remove?')
-            if choice == 'yes':
-                spotify_queue.remove(tracks_not_in_disk_queue)
+        pass
     else:
         # Make sure all items in the L2+ queues are already in the listening history
         listening_history = Doc('listening_history')
@@ -449,29 +439,32 @@ def sample_artist_to_queue(artist_name, latest=10, popular=10):
     listening_history = Doc('listening_history')
     queue = Doc('queue')
 
-    discogs.remove(listening_history)
-    discogs.remove(queue)
+    discogs.remove(listening_history, deep=True, prompt=False)
+    discogs.remove(queue, deep=True)
 
     print(f'Left after removing listening history and queue: {len(discogs)} tracks')
 
-    discogs.sort('added_at', ascending=False)
+    if latest > 0:
+        discogs.sort('added_at', ascending=False)
 
-    latest_tracks = discogs.get_df()[:latest]
+        latest_tracks = discogs.get_df()[:latest]
 
-    discogs.remove(latest_tracks)
+        discogs.remove(latest_tracks, prompt=False)
 
-    print('Latest tracks:')
-    pretty_print_tracks(latest_tracks, indent=' '*4, enum=True)
+        print('Latest tracks:')
+        pretty_print_tracks(latest_tracks, indent=' '*4, enum=True, extra_attribs='added_at')
 
-    discogs.sort('popularity', ascending=False)
+        queue.append(latest_tracks)
 
-    most_popular_tracks = discogs.get_df()[:popular]
+    if popular > 0:
+        discogs.sort('popularity', ascending=False)
 
-    print('Most popular tracks:')
-    pretty_print_tracks(most_popular_tracks, indent=' '*4, enum=True)
+        most_popular_tracks = discogs.get_df()[:popular]
 
-    queue.append(latest_tracks)
-    queue.append(most_popular_tracks)
+        print('Most popular tracks:')
+        pretty_print_tracks(most_popular_tracks, indent=' '*4, enum=True, extra_attribs='popularity')
+
+        queue.append(most_popular_tracks)
 
     queue.write()
 

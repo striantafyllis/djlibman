@@ -144,8 +144,8 @@ def promote_tracks_in_spotify_queues(
     return
 
 def replenish_spotify_queue(
-        queue_name,
-        target_size=150):
+        queue_name='L1 queue',
+        target_size=100):
     spotify_queue = SpotifyPlaylist(queue_name)
     disk_queue = Doc('queue')
 
@@ -171,7 +171,7 @@ def replenish_spotify_queue(
             tracks_to_add = disk_queue.get_df().loc[candidate_tracks_idx]
 
         print(f'Adding {num_tracks_to_add} tracks to {queue_name}')
-        pretty_print_tracks(tracks_wanted, indent=' '*4, enum=True)
+        pretty_print_tracks(tracks_to_add, indent=' '*4, enum=True)
 
         spotify_queue.append(tracks_to_add)
         spotify_queue.write()
@@ -351,8 +351,8 @@ def get_artists(tracks: Union[Container, pd.DataFrame]):
             elif existing_name != name:
                 # Sometimes this happens if an artist changes their Spotify name.
                 # In that case, keep the latest name.
-                print(f'Warning: Artist ID {id} associated with two different names: '
-                      f'{existing_name} and {name}')
+                # print(f'Warning: Artist ID {id} associated with two different names: '
+                #       f'{existing_name} and {name}')
                 artist_id_to_name[id] = name
 
     return artist_id_to_name

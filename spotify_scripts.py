@@ -5,7 +5,7 @@ import djlib_config
 from containers import *
 
 def sanity_check_disk_queues():
-    queue = Doc('queue')
+    queue = Queue()
     print(f'Queue: {len(queue)} tracks')
 
     listening_history = Doc('listening_history')
@@ -132,7 +132,7 @@ def promote_tracks_in_spotify_queues(
 
     if promote_queue_level == 1:
         print(f'Removing listened tracks from disk queue...')
-        queue = Doc('queue')
+        queue = Queue()
         queue.remove(listened_tracks)
         queue.write()
 
@@ -147,7 +147,7 @@ def replenish_spotify_queue(
         queue_name='L1 queue',
         target_size=100):
     spotify_queue = SpotifyPlaylist(queue_name)
-    disk_queue = Doc('queue')
+    disk_queue = Queue()
 
     tracks_wanted = target_size - len(spotify_queue)
     if tracks_wanted <= 0:
@@ -300,7 +300,7 @@ def add_to_queue(tracks):
     if len(tracks_wrapper) == 0:
         return
 
-    queue = Doc('queue', index_name='spotify_id')
+    queue = Queue()
     queue.append(tracks_wrapper)
     queue.write()
 
@@ -320,7 +320,7 @@ def filter_spotify_playlist(playlist_name):
     playlist = SpotifyPlaylist(playlist_name)
 
     listening_history = Doc('listening_history')
-    queue = Doc('queue', index_name='spotify_id')
+    queue = Queue()
 
     playlist.remove(listening_history)
     playlist.remove(queue)
@@ -434,7 +434,7 @@ def sample_artist_to_queue(artist_name, latest=10, popular=10):
     print(f'Found {len(discogs)} tracks')
 
     listening_history = Doc('listening_history')
-    queue = Doc('queue')
+    queue = Queue()
 
     discogs.remove(listening_history, deep=True, prompt=False)
     discogs.remove(queue, deep=True)

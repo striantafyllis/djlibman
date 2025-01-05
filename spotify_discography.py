@@ -1,0 +1,207 @@
+"""
+Functions to maintain artist discographies.
+These need special treatment because they generate too many Spotify REST requests,
+which are slow, and may also lead Spotify to rate-limit me.
+
+In the Spotify API, getting an artist's discography has to be done in two steps:
+- First, get all the albums that contain the artist's tracks
+- Then, get all the tracks for each album, and filter out the artist's tracks
+
+Both these stages can be cached to disk, so that they don't have to be repeated every time.
+- Album tracks should never change; once recovered, they can be used forever.
+- An artist's albums can change, but there is no need to refresh them very frequently;
+  once a week or so should be enough.
+"""
+
+import os
+import os.path
+import time
+
+import djlib_config
+from containers import *
+from djlib_config import discography_cache_dir
+
+
+_SECONDS_PER_DAY = 24 * 3600
+
+
+def get_artists(tracks: Union[Container, pd.DataFrame]):
+    """Returns a dictionary - id to artist name - from the argument - which
+       should be a DF of Spotify tracks or similar."""
+
+    if isinstance(tracks, Container):
+        tracks = tracks.get_df()
+
+    artist_id_to_name = {}
+
+    for i in range(len(tracks)):
+        artist_ids = tracks.artist_ids.iat[i].split('|')
+        artist_names = tracks.artist_names.iat[i].split('|')
+
+        if not isinstance(artist_ids, list) and pd.isna(artist_ids):
+            continue
+
+        for j in range(len(artist_ids)):
+            id = artist_ids[j]
+            name = artist_names[j]
+
+            existing_name = artist_id_to_name.get(id)
+            if existing_name is None:
+                artist_id_to_name[id] = name
+            elif existing_name != name:
+                # Sometimes this happens if an artist changes their Spotify name.
+                # In that case, keep the latest name.
+                # print(f'Warning: Artist ID {id} associated with two different names: '
+                #       f'{existing_name} and {name}')
+                artist_id_to_name[id] = name
+
+    return artist_id_to_name
+
+
+def find_spotify_artist(artist_name):
+    """Returns the Spotify entry for the artist with the given name as a dictionary.
+    The ID is in there also.
+    The search is first done in the library, then expands to all of Spotify if necessary."""
+
+    listening_history = Doc('listening_history')
+
+    artists = get_artists(listening_history)
+
+    candidate_ids = []
+
+    for id, name in artists.items():
+        if name == artist_name:
+            candidate_ids.append(id)
+
+    if len(candidate_ids) > 1:
+        raise ValueError(f'Multiple IDs found for artist {artist_name}: {candidate_ids}')
+    elif len(candidate_ids) == 0:
+        raise ValueError(f'Artist {artist_name} not found')
+
+    return candidate_ids[0]
+
+def has_artist(track, artist_id):
+    return artist_id in track.artist_ids.split('|')
+
+
+def _get_from_cache(name, cache_file_name, ttl_days=None):
+    cache_file_path = os.path.join(djlib_config.discography_cache_dir, cache_file_name)
+
+    cache_file_doc = Doc(name,
+                         create=True,
+                         path=cache_file_path,
+                         type='csv',
+                         datetime_columns=['release_date', 'added_at'])
+
+    # try to find the artist albums in the cache
+    if cache_file_doc.exists():
+        if djlib_config.discography_verbose > 1:
+            print(f'{name} found in cache: {cache_file_path}')
+
+        if ttl_days is not None:
+            file_creation_time = cache_file_doc.getmtime()
+
+            file_age = time.time() - file_creation_time
+
+            if file_age > ttl_days * _SECONDS_PER_DAY:
+                if djlib_config.discography_verbose > 1:
+                    print(f'{cache_file_path} is too old; file age {file_age:.0f}, '
+                          f'TTL {djlib_config.artist_albums_ttl_days}')
+
+                cache_file_doc.delete()
+    else:
+        if djlib_config.discography_verbose > 1:
+            print(f'{name} not found in cache')
+
+    return cache_file_doc
+
+
+def get_artist_albums(artist_name):
+    artist_id = find_spotify_artist(artist_name)
+
+    cache_file_doc = _get_from_cache(f'artist albums for {artist_name}',
+                                     f'artist-albums-{artist_id}-{artist_name}.csv',
+                                     ttl_days=djlib_config.artist_albums_ttl_days)
+
+    if cache_file_doc.exists():
+        artist_albums = cache_file_doc.get_df()
+    else:
+        artist_albums = djlib_config.spotify.get_artist_albums(artist_id)
+
+    if djlib_config.discography_verbose > 0:
+        total_tracks = artist_albums.total_tracks.sum()
+        print(f'Artist {artist_name}: found {len(artist_albums)} albums with {total_tracks} total tracks')
+
+    if not cache_file_doc.exists() and djlib_config.artist_albums_ttl_days > 0:
+        if djlib_config.discography_verbose > 1:
+            print(f'Artist albums for {artist_name}: writing cache file {cache_file_doc._doc._path}')
+
+        cache_file_doc.append(artist_albums, prompt=False)
+        cache_file_doc.write()
+
+    return artist_albums
+
+def get_album_tracks(album_id, album_name):
+    cache_file_doc = _get_from_cache(
+        f'album tracks for {album_name}',
+        f'album-tracks-{album_id}-{album_name}.csv')
+
+    if cache_file_doc.exists():
+        album_tracks = cache_file_doc.get_df()
+    else:
+        album_tracks = djlib_config.spotify.get_album_tracks(album_id)
+
+    if djlib_config.discography_verbose > 1:
+        print(f'Album {album_name}: found {len(album_tracks)} tracks')
+
+    if not cache_file_doc.exists():
+        if djlib_config.discography_verbose > 1:
+            print(f'Album {album_name}: writing cache file {cache_file_doc._doc._path}')
+
+        cache_file_doc.append(album_tracks, prompt=False)
+        cache_file_doc.write()
+
+    return album_tracks
+
+
+def get_artist_discography(artist_name):
+    artist_id = find_spotify_artist(artist_name)
+
+    artist_albums = djlib_config.spotify.get_artist_albums(artist_id)
+
+    num_tracks = sum([
+        album['total_tracks'] for album in artist_albums
+    ])
+
+    print(f'{artist_name}: found {len(artist_albums)} albums with {num_tracks} tracks')
+    # pretty_print_albums(artist_albums, indent=' '*4, enum=True)
+
+    tracks = None
+
+    for album in artist_albums:
+        album_tracks = djlib_config.spotify.get_album_tracks(album['album_id'])
+
+        artist_album_tracks = album_tracks.loc[album_tracks.apply(lambda t: has_artist(t, artist_id), axis=1)]
+
+        print(f'Album {album["name"]}: {len(album_tracks)} tracks, {len(artist_album_tracks)} artist tracks')
+
+        if tracks is None:
+            tracks = artist_album_tracks
+        else:
+            tracks = pd.concat([tracks, artist_album_tracks])
+
+    print(f'{artist_name}: found {len(tracks)} tracks')
+
+    mixed_tracks = tracks.apply(lambda t: t['name'].endswith(' - Mixed'), axis=1)
+
+    tracks = tracks.loc[~mixed_tracks]
+
+    print(f'{artist_name}: after removing mixed tracks: {len(tracks)} tracks')
+
+    tracks = Wrapper(contents=tracks, name=f'Discography for artist {artist_name}')
+    tracks.sort('popularity', ascending=False)
+    tracks.deduplicate(deep=True)
+
+    print(f'{artist_name}: after deduplication: {len(tracks)} tracks')
+
+    return tracks

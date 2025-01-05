@@ -30,6 +30,7 @@ _ALBUM_COLUMNS = {
     'artist_ids': lambda t: '|'.join([artist['id'] for artist in t['artists']]),
     # in the unlikely case that the artist name contains a pipe...
     'artist_names': lambda t: '|'.join([artist['name'].replace('|', '--') for artist in t['artists']]),
+    'popularity': lambda t: t['popularity'] if 'popularity' in t else None,
     'album_type': None,
     'release_date': lambda item: pd.to_datetime(item['release_date'], utc=True),
     'total_tracks': lambda item: int(item['total_tracks'])
@@ -306,15 +307,20 @@ class SpotifyInterface:
 
         results = _postprocess_albums(results)
 
-        return results
+        df = pd.DataFrame.from_records(results)
+        if not df.empty:
+            df = df.set_index('album_id', drop=False)
+
+        return df
 
     def get_album_tracks(self, album_id):
         # this bypasses the cache; these results are not usually accessed multiple times
         # during a run
 
+        # note: we need to repeat the album query even if we have the album entry from
+        # get_artist_albums() because the get_artist_albums() result misses the popularity field
         album_info = self._connection.album(album_id)
-
-        album_columns = project(album_info, _ALBUM_COLUMNS)
+        album_entry = project(album_info, _ALBUM_COLUMNS)
 
         results = _batch_result(
             lambda limit, offset: self._connection.album_tracks(album_id=album_id, limit=limit, offset=offset)
@@ -330,9 +336,11 @@ class SpotifyInterface:
                 # in the unlikely case that the artist name contains a pipe...
                 'artist_names': lambda t: '|'.join([artist['name'].replace('|', '--') for artist in t['artists']]),
                 'duration_ms': int,
-                'release_date': lambda _: album_columns['release_date'],
-                'popularity': lambda _: album_columns['popularity'],
-                'added_at': lambda _: album_columns['release_date']
+                'release_date': lambda _: album_entry['release_date'],
+                'popularity': lambda _: album_entry['popularity'],
+                'added_at': lambda _: album_entry['release_date'],
+                'album_id': lambda _: album_id,
+                'album_name': lambda _: album_entry['name']
             }
         )
 

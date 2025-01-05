@@ -21,6 +21,9 @@ spotify = None
 docs = {}
 _backups = 0
 spotify_queues = []
+discography_cache_dir = None
+discography_verbose = 1
+artist_albums_ttl_days = 7
 
 _log_file = './djlibman.log'
 _log_level = logging.INFO
@@ -31,6 +34,9 @@ def init(config_file=None):
     global google
     global spotify
     global spotify_queues
+    global discography_cache_dir
+    global artist_albums_ttl_days
+    global discography_verbose
     global docs
     global _backups
     global _log_file
@@ -119,6 +125,20 @@ def init(config_file=None):
                                          f"{type(v)}")
 
                 spotify_queues.append(value)
+
+        elif section_name == 'spotify_discography':
+            for field in section.keys():
+                if field == 'discography_cache_dir':
+                    discography_cache_dir = section[field]
+                elif field == 'artist_albums_ttl_days':
+                    artist_albums_ttl_days = section.getint(field)
+                elif field == 'discography_verbose':
+                    discography_verbose = section.getint(field)
+                else:
+                    raise Exception(f'Unknown field in config section {section_name}: {field}')
+
+            if discography_cache_dir is None:
+                discography_cache_dir = _default_dir + '/discography_cache'
 
         elif section_name.startswith('docs.'):
             name = section_name[5:]

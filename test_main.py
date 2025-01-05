@@ -153,8 +153,11 @@ def go_through_artist_list():
     return
 
 def main():
+    artist_albums = spotify_discography.get_artist_albums('Dany Dz')
 
-    queue_maintenance()
+    artist_album = artist_albums.iloc[0]
+
+    album_tracks = spotify_discography.get_album_tracks(artist_album['album_id'], artist_album['name'])
 
     return
 

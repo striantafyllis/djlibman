@@ -62,6 +62,9 @@ class Container(object):
     def get_name(self) -> str:
         return self._name
 
+    def exists(self):
+        return self._exists
+
     def get_df(self) -> pd.DataFrame:
         self._ensure_df()
         return self._df
@@ -475,6 +478,14 @@ class Doc(Container):
 
     def _check_existence(self):
         return self._doc.exists()
+
+    def getmtime(self):
+        return self._doc.getmtime()
+
+    def delete(self):
+        if self.exists():
+            self._doc.delete()
+        self._exists = False
 
     def _read(self):
         return self._doc.read()

@@ -98,6 +98,15 @@ class FileDoc:
     def exists(self):
         return os.path.exists(self._path)
 
+    def delete(self):
+        os.remove(self._path)
+        return
+
+    def getmtime(self):
+        if not self.exists():
+            return None
+        return os.path.getmtime(self._path)
+
     def read(self, force=False):
         if force or self._last_read_time is None or os.path.getmtime(self._path) > self._last_read_time:
             self._parse()

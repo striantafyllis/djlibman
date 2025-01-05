@@ -153,18 +153,8 @@ def go_through_artist_list():
     return
 
 def main():
-    # playlist = SpotifyPlaylist('L1 queue')
-    #
-    # doc = Doc('example_playlist', create=True)
-    # doc.append(playlist, prompt=False)
-    #
-    # doc.write()
 
-    # Doc('example_playlist', datetime_columns=['release_date']).get_df()
-
-    # convert_listening_history()
-
-    convert_rekordbox_to_spotify()
+    queue_maintenance()
 
     return
 

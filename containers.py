@@ -494,8 +494,8 @@ class Queue(Doc):
             self,
             name: str = 'queue', *,
             modify=True,
-            create=False,
-            overwrite=False,
+            create=True,
+            overwrite=True,
             index_name='spotify_id',
             **kwargs):
         super(Queue, self).__init__(

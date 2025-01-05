@@ -293,27 +293,6 @@ def format_track_for_search(track):
     return string
 
 
-def get_track_signature(track):
-    """Returns a string that should uniquely identify the track in most contexts;
-       the string contains the artist names and the track title separated by \u2013"""
-    if 'artists' in track:
-        # Spotify-style track; artists is a list of dict
-        artists = ', '.join(artist['name'] for artist in track['artists'])
-    elif 'Artists' in track:
-        artists = track['Artists']
-    else:
-        raise ValueError(f"Can't compute signature for track {track}: no artists")
-
-    if 'Title' in track:
-        name = track['title']
-    elif 'name' in track:
-        name = track['name']
-    else:
-        raise ValueError(f"Can't compute signature for track {track}: no title")
-
-    return artists + '\u2013' + name
-
-
 def pretty_print_tracks(tracks, indent='', enum=False, extra_attribs=[]):
     num_tracks = len(tracks)
     if num_tracks == 0:

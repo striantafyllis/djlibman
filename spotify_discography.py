@@ -16,11 +16,14 @@ Both these stages can be cached to disk, so that they don't have to be repeated 
 import os
 import os.path
 import time
+import re
 
 import djlib_config
 from containers import *
 from djlib_config import discography_cache_dir
 
+def _verbose():
+    return djlib_config.discography_verbose
 
 _SECONDS_PER_DAY = 24 * 3600
 
@@ -80,10 +83,6 @@ def find_spotify_artist(artist_name):
 
     return candidate_ids[0]
 
-def has_artist(track, artist_id):
-    return artist_id in track.artist_ids.split('|')
-
-
 def _get_from_cache(name, cache_file_name, ttl_days=None):
     cache_file_path = os.path.join(djlib_config.discography_cache_dir, cache_file_name)
 
@@ -95,7 +94,7 @@ def _get_from_cache(name, cache_file_name, ttl_days=None):
 
     # try to find the artist albums in the cache
     if cache_file_doc.exists():
-        if djlib_config.discography_verbose > 1:
+        if _verbose() >= 4:
             print(f'{name} found in cache: {cache_file_path}')
 
         if ttl_days is not None:
@@ -104,21 +103,19 @@ def _get_from_cache(name, cache_file_name, ttl_days=None):
             file_age = time.time() - file_creation_time
 
             if file_age > ttl_days * _SECONDS_PER_DAY:
-                if djlib_config.discography_verbose > 1:
+                if _verbose() >= 4:
                     print(f'{cache_file_path} is too old; file age {file_age:.0f}, '
                           f'TTL {djlib_config.artist_albums_ttl_days}')
 
                 cache_file_doc.delete()
     else:
-        if djlib_config.discography_verbose > 1:
+        if _verbose() >= 4:
             print(f'{name} not found in cache')
 
     return cache_file_doc
 
 
-def get_artist_albums(artist_name):
-    artist_id = find_spotify_artist(artist_name)
-
+def _get_artist_albums(artist_id, artist_name):
     cache_file_doc = _get_from_cache(f'artist albums for {artist_name}',
                                      f'artist-albums-{artist_id}-{artist_name.replace('/', '-')}.csv',
                                      ttl_days=djlib_config.artist_albums_ttl_days)
@@ -128,12 +125,12 @@ def get_artist_albums(artist_name):
     else:
         artist_albums = djlib_config.spotify.get_artist_albums(artist_id)
 
-    if djlib_config.discography_verbose > 0:
+    if _verbose() >= 2:
         total_tracks = artist_albums.total_tracks.sum()
         print(f'Artist {artist_name}: found {len(artist_albums)} albums with {total_tracks} total tracks')
 
     if not cache_file_doc.exists() and djlib_config.artist_albums_ttl_days > 0:
-        if djlib_config.discography_verbose > 1:
+        if _verbose() >= 4:
             print(f'Artist albums for {artist_name}: writing cache file {cache_file_doc._doc._path}')
 
         cache_file_doc.append(artist_albums, prompt=False)
@@ -141,7 +138,7 @@ def get_artist_albums(artist_name):
 
     return artist_albums
 
-def get_album_tracks(album_id, album_name):
+def _get_album_tracks(album_id, album_name):
     cache_file_doc = _get_from_cache(
         f'album tracks for {album_name}',
         f'album-tracks-{album_id}-{album_name.replace('/', '-')}.csv')
@@ -151,11 +148,11 @@ def get_album_tracks(album_id, album_name):
     else:
         album_tracks = djlib_config.spotify.get_album_tracks(album_id)
 
-    if djlib_config.discography_verbose > 1:
+    if _verbose() >= 3:
         print(f'Album {album_name}: found {len(album_tracks)} tracks')
 
     if not cache_file_doc.exists():
-        if djlib_config.discography_verbose > 1:
+        if _verbose() >= 4:
             print(f'Album {album_name}: writing cache file {cache_file_doc._doc._path}')
 
         cache_file_doc.append(album_tracks, prompt=False)
@@ -163,45 +160,108 @@ def get_album_tracks(album_id, album_name):
 
     return album_tracks
 
+def _filter_tracks_by_artist(artist_id, tracks):
+    return tracks.loc[
+        tracks.apply(
+            lambda track: artist_id in track['artist_ids'].split('|'),
+            axis=1
+        )
+    ]
+
+def _get_track_signature(track):
+    """Returns a string that should uniquely identify the track in most contexts;
+       the string contains the artist names and the track title separated by \u2013"""
+    name = track['name']
+    artist_ids = track['artist_ids'].split('|')
+
+    name = name.upper()
+    name = re.sub(r'\((.*)\)', r' - \1', name)
+    name = re.sub(r'\[(.*)\]', r' - \1', name)
+
+    name = name.replace(' - EXTENDED MIX', '')
+    name = name.replace('EXDENDED REMIX', 'REMIX')
+
+    artist_ids.sort()
+
+    return tuple(artist_ids + [name])
+
+def _form_track_from_signature_group(same_sig_tracks, listening_history):
+    if len(same_sig_tracks) == 1:
+        track = same_sig_tracks
+    else:
+        # if possible, select the track ID that is in listening history; this way it will get filtered.
+        ids_in_lh = same_sig_tracks.index.intersection(listening_history.get_df().index, sort=False)
+
+        if len(ids_in_lh) >= 1:
+            # note: the track here is not a Series - it's a single-row dataframe
+            # this way GroupBy.apply() combines the return values properly.
+            track = same_sig_tracks.loc[[ids_in_lh[0]]]
+        else:
+            # select the oldest ID
+            same_sig_tracks.sort_values(by='release_date', inplace=True)
+            track = same_sig_tracks.iloc[:1]
+
+        # Combine the popularities of the tracks. For now I just add them up,
+        # and then also add the number of duplicates - because a track that gets
+        # reposted in more albums is arguably more popular.
+        popularity = same_sig_tracks.popularity.sum() + len(same_sig_tracks) - 1
+        track['popularity'] = popularity
+
+    track = track.drop(labels='signature', axis=1)
+
+    assert isinstance(track, pd.DataFrame)
+    assert len(track) == 1
+
+    return track
+
 
 def get_artist_discography(artist_name):
     artist_id = find_spotify_artist(artist_name)
 
-    artist_albums = djlib_config.spotify.get_artist_albums(artist_id)
+    artist_albums = _get_artist_albums(artist_id, artist_name)
 
-    num_tracks = sum([
-        album['total_tracks'] for album in artist_albums
-    ])
+    artist_tracks = pd.concat(
+        artist_albums.apply(
+            lambda album: _filter_tracks_by_artist(
+                artist_id,
+                _get_album_tracks(album['album_id'], album['name'])),
+            axis=1
+        )
+        .values
+    )
 
-    print(f'{artist_name}: found {len(artist_albums)} albums with {num_tracks} tracks')
-    # pretty_print_albums(artist_albums, indent=' '*4, enum=True)
+    assert len(artist_tracks) >= len(artist_albums)
 
-    tracks = None
+    if _verbose() >= 2:
+        print(f'{artist_name}: found {len(artist_tracks)} tracks')
 
-    for album in artist_albums:
-        album_tracks = djlib_config.spotify.get_album_tracks(album['album_id'])
+    def is_mixed(track):
+        name = track['name'].upper()
+        return name.endswith(' - MIXED') or name.endswith('(MIXED)') or name.endswith('[MIXED]')
 
-        artist_album_tracks = album_tracks.loc[album_tracks.apply(lambda t: has_artist(t, artist_id), axis=1)]
+    artist_tracks = artist_tracks.loc[
+        artist_tracks.apply(lambda t: not is_mixed(t), axis=1)
+    ]
 
-        print(f'Album {album["name"]}: {len(album_tracks)} tracks, {len(artist_album_tracks)} artist tracks')
+    if _verbose() >= 2:
+        print(f'{artist_name}: {len(artist_tracks)} tracks left after removing mixed tracks')
 
-        if tracks is None:
-            tracks = artist_album_tracks
-        else:
-            tracks = pd.concat([tracks, artist_album_tracks])
+    artist_tracks['signature'] = artist_tracks.apply(
+        _get_track_signature,
+        axis=1
+    )
 
-    print(f'{artist_name}: found {len(tracks)} tracks')
+    gby = artist_tracks.groupby(by='signature', as_index=False, sort=False, group_keys=False)
 
-    mixed_tracks = tracks.apply(lambda t: t['name'].endswith(' - Mixed'), axis=1)
+    listening_history = Doc('listening_history')
 
-    tracks = tracks.loc[~mixed_tracks]
+    dedup_tracks = gby.apply(
+        func=lambda group: _form_track_from_signature_group(group, listening_history)
+    )
 
-    print(f'{artist_name}: after removing mixed tracks: {len(tracks)} tracks')
+    assert len(dedup_tracks) == len(gby)
 
-    tracks = Wrapper(contents=tracks, name=f'Discography for artist {artist_name}')
-    tracks.sort('popularity', ascending=False)
-    tracks.deduplicate(deep=True)
+    if _verbose() >= 1:
+        print(f'{artist_name}: {len(dedup_tracks)} tracks left after deduplication')
 
-    print(f'{artist_name}: after deduplication: {len(tracks)} tracks')
-
-    return tracks
+    return dedup_tracks

@@ -4,6 +4,7 @@ import sys
 import pandas as pd
 
 from djlibman import *
+from spotify_discography import get_artist_discography
 
 
 def convert_listening_history():
@@ -145,14 +146,11 @@ def read_file(filename):
 
 
 def go_through_artist_list():
-    artists = read_file('./sample_artists.txt')
+    # artists = read_file('./sample_artists.txt')
+    artists = read_file('./ready_artists.txt')
 
     for artist in artists:
-        artist_albums = spotify_discography.get_artist_albums(artist)
-
-        artist_albums.apply(
-            lambda artist_album: spotify_discography.get_album_tracks(artist_album['album_id'], artist_album['name']),
-            axis=1)
+        get_artist_discography(artist)
         # sample_artist_to_queue(artist)
 
     return

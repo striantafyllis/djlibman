@@ -148,16 +148,17 @@ def go_through_artist_list():
     artists = read_file('./sample_artists.txt')
 
     for artist in artists:
-        sample_artist_to_queue(artist)
+        artist_albums = spotify_discography.get_artist_albums(artist)
+
+        artist_albums.apply(
+            lambda artist_album: spotify_discography.get_album_tracks(artist_album['album_id'], artist_album['name']),
+            axis=1)
+        # sample_artist_to_queue(artist)
 
     return
 
 def main():
-    artist_albums = spotify_discography.get_artist_albums('Dany Dz')
-
-    artist_album = artist_albums.iloc[0]
-
-    album_tracks = spotify_discography.get_album_tracks(artist_album['album_id'], artist_album['name'])
+    go_through_artist_list()
 
     return
 

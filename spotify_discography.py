@@ -120,7 +120,7 @@ def get_artist_albums(artist_name):
     artist_id = find_spotify_artist(artist_name)
 
     cache_file_doc = _get_from_cache(f'artist albums for {artist_name}',
-                                     f'artist-albums-{artist_id}-{artist_name}.csv',
+                                     f'artist-albums-{artist_id}-{artist_name.replace('/', '-')}.csv',
                                      ttl_days=djlib_config.artist_albums_ttl_days)
 
     if cache_file_doc.exists():
@@ -144,7 +144,7 @@ def get_artist_albums(artist_name):
 def get_album_tracks(album_id, album_name):
     cache_file_doc = _get_from_cache(
         f'album tracks for {album_name}',
-        f'album-tracks-{album_id}-{album_name}.csv')
+        f'album-tracks-{album_id}-{album_name.replace('/', '-')}.csv')
 
     if cache_file_doc.exists():
         album_tracks = cache_file_doc.get_df()

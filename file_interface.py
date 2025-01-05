@@ -187,10 +187,12 @@ class CsvFile(FileDoc):
             for col in range(cols):
                 el = raw.iat[row,col]
                 if isinstance(el, str) and len(el) >= 2 and el[0] in ['[', '{']:
-                    # try:
+                    try:
                         raw.iat[row, col] = eval(el)
-                    # except SyntaxError:
-                    #     pass
+                    except SyntaxError:
+                        pass
+                    except NameError:
+                        pass
 
         return raw
 

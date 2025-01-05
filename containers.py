@@ -171,18 +171,12 @@ class Container(object):
 
         return other_df
 
-    def deduplicate(self, prompt=None, deep=False) -> None:
+    def deduplicate(self, prompt=None) -> None:
         self._ensure_df()
 
         print(f'Deduplicating {self.get_name()}...')
 
-        if deep:
-            prev_index_name = self._df.index.name
-
-            signatures = self._df.apply(get_track_signature, axis=1)
-            this_df = self._df.set_index(signatures)
-        else:
-            this_df = self._df
+        this_df = self._df
 
         dup_pos = dataframe_duplicate_index_labels(this_df)
 
@@ -195,10 +189,7 @@ class Container(object):
 
             this_df = dataframe_drop_rows_at_positions(self._df, dup_pos)
 
-            if deep:
-                self._df = this_df.set_index(prev_index_name, drop=False)
-            else:
-                self._df = this_df
+            self._df = this_df
 
             self._changed = True
 
@@ -239,7 +230,7 @@ class Container(object):
     def _preprocess_before_append(self, df: pd.DataFrame):
         return df
 
-    def append(self, other, prompt=None, deep=False) -> None:
+    def append(self, other, prompt=None) -> None:
         self._ensure_df()
 
         if isinstance(other, Container):
@@ -258,11 +249,6 @@ class Container(object):
             other_df = self._reconcile_ids(other_df)
             other_df = self._reconcile_columns(other_df)
 
-        if deep:
-            other_prev_index_name = other_df.index.name
-            other_signatures = other_df.apply(get_track_signature, axis=1)
-            other_df = other_df.set_index(other_signatures)
-
         other_unique = dataframe_ensure_unique_index(other_df)
 
         num_dups = len(other_df) - len(other_unique)
@@ -270,9 +256,6 @@ class Container(object):
         assert num_dups >= 0
 
         if len(self._df) == 0:
-            if deep:
-                other_unique = other_unique.set_index(other_prev_index_name, drop=False)
-
             other_unique = self._preprocess_before_append(other_unique)
 
             new_df = other_unique
@@ -281,10 +264,7 @@ class Container(object):
         else:
             # remove entries that are already there
 
-            if deep:
-                this_idx = self._df.apply(get_track_signature, axis=1)
-            else:
-                this_idx = self._df.index
+            this_idx = self._df.index
 
             genuinely_new_entries_idx = other_unique.index.difference(this_idx, sort=False)
 
@@ -292,9 +272,6 @@ class Container(object):
 
             num_already_present = len(other_unique) - len(genuinely_new_entries)
             num_added = len(genuinely_new_entries)
-
-            if deep:
-                genuinely_new_entries = genuinely_new_entries.set_index(other_prev_index_name, drop=False)
 
             genuinely_new_entries = self._preprocess_before_append(genuinely_new_entries)
 
@@ -339,15 +316,13 @@ class Container(object):
 
         return
 
-    def remove(self, other, prompt=None, deep=False) -> None:
+    def remove(self, other, prompt=None) -> None:
         self._ensure_df()
 
         if len(self._df) == 0:
             return
 
         if isinstance(other, pd.Index):
-            if deep:
-                raise ValueError('Index argument cannot be used if deep=True')
             other_idx = other
         else:
             if isinstance(other, Container):
@@ -366,15 +341,7 @@ class Container(object):
 
             other_idx = other_df.index
 
-        if deep:
-            prev_index_name = self._df.index.name
-
-            signatures = self._df.apply(get_track_signature, axis=1)
-            this_df = self._df.set_index(signatures)
-
-            other_idx = pd.Index(other_df.apply(get_track_signature, axis=1))
-        else:
-            this_df = self._df
+        this_df = self._df
 
         other_unique = other_idx.unique()
 
@@ -420,10 +387,7 @@ class Container(object):
                 return
         this_df = this_df.loc[new_idx]
 
-        if deep:
-            self._df = this_df.set_index(prev_index_name, drop=False)
-        else:
-            self._df = this_df
+        self._df = this_df
 
         self._changed = True
 

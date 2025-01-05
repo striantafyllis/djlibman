@@ -24,31 +24,34 @@ _SCOPES = [
     'user-read-recently-played'
 ]
 
-_ARTIST_COLUMNS = ['id', 'name']
-
 _ALBUM_COLUMNS = {
-        'id': None,
-        'name': None,
-        'album_type': None,
-        'release_date': lambda item: pd.to_datetime(item['release_date'], utc=True),
-        'artists': _ARTIST_COLUMNS
-    }
+    'album_id': 'id',
+    'name': None,
+    'artist_ids': lambda t: '|'.join([artist['id'] for artist in t['artists']]),
+    # in the unlikely case that the artist name contains a pipe...
+    'artist_names': lambda t: '|'.join([artist['name'].replace('|', '--') for artist in t['artists']]),
+    'album_type': None,
+    'release_date': lambda item: pd.to_datetime(item['release_date'], utc=True),
+    'total_tracks': lambda item: int(item['total_tracks'])
+}
 
 _TRACK_COLUMNS = {
-    'id': None,
+    'spotify_id': 'id',
     'name': None,
-    'artists': _ARTIST_COLUMNS,
-    'duration_ms': None,
-    'popularity': lambda item: int(item['popularity']),
+    'artist_ids': lambda t: '|'.join([artist['id'] for artist in t['artists']]),
+    # in the unlikely case that the artist name contains a pipe...
+    'artist_names': lambda t: '|'.join([artist['name'].replace('|', '--') for artist in t['artists']]),
+    'duration_ms': int,
+    'release_date': lambda t: pd.to_datetime(t['album']['release_date'], utc=True),
+    'popularity': int,
     'added_at': lambda item: pd.to_datetime(
         item['played_at'] if 'played_at' in item else
             (item['added_at'] if 'added_at' in item else None),
         utc=True),
-    'added_by': lambda item: item['added_by']['id'] if 'added_by' in item else None,
-    'album': _ALBUM_COLUMNS,
-    'disc_number': None,
-    'track_number': None,
+    'album_id': lambda t: t['album']['id'],
+    'album_name': lambda t: t['album']['name'],
     # ignored columns from Spotify:
+    # 'added_by',
     # 'is_local',
     # 'primary_color',
     # 'video_thumbnail',
@@ -64,12 +67,6 @@ _TRACK_COLUMNS = {
     # 'uri'
 }
 
-_ALBUM_COLUMNS = {
-    'id': None,
-    'name': None,
-    'release_date': lambda item: pd.to_datetime(item['release_date'], utc=True),
-    'total_tracks': lambda item: int(item['total_tracks'])
-}
 
 _BASE_62 = re.compile(r'^[0-9A-Za-z]+$')
 
@@ -276,7 +273,7 @@ class SpotifyInterface:
 
             df = pd.DataFrame.from_records(results)
             if not df.empty:
-                df = df.set_index(df.id)
+                df = df.set_index('spotify_id', drop=False)
 
             return df
 
@@ -293,7 +290,7 @@ class SpotifyInterface:
 
             df = pd.DataFrame.from_records(results)
             if not df.empty:
-                df = df.set_index(df.id)
+                df = df.set_index('spotify_id', drop=False)
 
             return df
 
@@ -317,9 +314,6 @@ class SpotifyInterface:
 
         album_info = self._connection.album(album_id)
 
-        popularity = int(album_info['popularity'])
-        release_date = pd.to_datetime(album_info['release_date'], utc=True)
-
         album_columns = project(album_info, _ALBUM_COLUMNS)
 
         results = _batch_result(
@@ -330,22 +324,21 @@ class SpotifyInterface:
         projection = project(
             results,
             {
-                'id': None,
+                'spotify_id': 'id',
                 'name': None,
-                'artists': _ARTIST_COLUMNS,
-                'duration_ms': None,
-                'popularity': lambda _: popularity,
-                'added_at': lambda _: release_date,
-                'added_by': lambda _: None,
-                'album': lambda _: album_columns,
-                'disc_number': None,
-                'track_number': None
+                'artist_ids': lambda t: '|'.join([artist['id'] for artist in t['artists']]),
+                # in the unlikely case that the artist name contains a pipe...
+                'artist_names': lambda t: '|'.join([artist['name'].replace('|', '--') for artist in t['artists']]),
+                'duration_ms': int,
+                'release_date': lambda _: album_columns['release_date'],
+                'popularity': lambda _: album_columns['popularity'],
+                'added_at': lambda _: album_columns['release_date']
             }
         )
 
         df = pd.DataFrame.from_records(projection)
         if not df.empty:
-            df = df.set_index(df.id)
+            df = df.set_index('spotify_id', drop=False)
 
         return df
 
@@ -360,7 +353,7 @@ class SpotifyInterface:
 
         df = pd.DataFrame.from_records(results)
         if not df.empty:
-            df = df.set_index(df.id)
+            df = df.set_index('spotify_id', drop=False)
 
         return df
 
@@ -379,7 +372,7 @@ class SpotifyInterface:
 
         df = pd.DataFrame.from_records(results)
         if not df.empty:
-            df = df.set_index(df.id)
+            df = df.set_index('spotify_id', drop=False)
 
         return df
 
@@ -396,7 +389,7 @@ class SpotifyInterface:
 
         df = pd.DataFrame.from_records(results)
         if not df.empty:
-            df = df.set_index(df.id)
+            df = df.set_index('spotify_id', drop=False)
 
         return df
 
@@ -404,7 +397,7 @@ class SpotifyInterface:
         playlist_id = self._get_playlist_id_if_necessary(playlist_name_or_id)
 
         if isinstance(tracks, pd.DataFrame):
-            tracks = tracks.id
+            tracks = tracks.spotify_id
 
         if check_for_duplicates:
             existing_tracks = self.get_playlist_tracks(playlist_id)
@@ -434,7 +427,7 @@ class SpotifyInterface:
         playlist_id = self._get_playlist_id_if_necessary(playlist_name_or_id)
 
         if isinstance(tracks, pd.DataFrame):
-            tracks = tracks.id
+            tracks = tracks.spotify_id
 
         _batch_request(
             (lambda x: self._connection.playlist_replace_items(playlist_id, x),
@@ -455,7 +448,7 @@ class SpotifyInterface:
         playlist_id = self._get_playlist_id_if_necessary(playlist_name_or_id)
 
         if isinstance(tracks, pd.DataFrame):
-            tracks = tracks.id
+            tracks = tracks.spotify_id
 
         _batch_request(
             lambda x: self._connection.playlist_remove_all_occurrences_of_items(playlist_id=playlist_id, items=x),
@@ -468,7 +461,7 @@ class SpotifyInterface:
 
     def add_liked_tracks(self, tracks):
         if isinstance(tracks, pd.DataFrame):
-            tracks = tracks.id
+            tracks = tracks.spotify_id
 
         if not isinstance(tracks, pd.Index):
             tracks = pd.Index(tracks)
@@ -494,7 +487,7 @@ class SpotifyInterface:
 
     def remove_liked_tracks(self, tracks):
         if isinstance(tracks, pd.DataFrame):
-            tracks = tracks.id
+            tracks = tracks.spotify_id
 
         _batch_request(
             lambda x: self._connection.current_user_saved_tracks_delete(x),

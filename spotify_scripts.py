@@ -300,7 +300,7 @@ def add_to_queue(tracks):
     if len(tracks_wrapper) == 0:
         return
 
-    queue = Doc('queue', index_name='id')
+    queue = Doc('queue', index_name='spotify_id')
     queue.append(tracks_wrapper)
     queue.write()
 
@@ -320,7 +320,7 @@ def filter_spotify_playlist(playlist_name):
     playlist = SpotifyPlaylist(playlist_name)
 
     listening_history = Doc('listening_history')
-    queue = Doc('queue', index_name='id')
+    queue = Doc('queue', index_name='spotify_id')
 
     playlist.remove(listening_history)
     playlist.remove(queue)
@@ -338,12 +338,13 @@ def get_artists(tracks: Union[Container, pd.DataFrame]):
 
     artist_id_to_name = {}
 
-    for artist_list in tracks.artists:
-        if not isinstance(artist_list, list) and pd.isna(artist_list):
-            continue
-        for artist in artist_list:
-            id = artist['id']
-            name = artist['name']
+    for i in range(len(tracks)):
+        artist_ids = tracks.artist_ids.iat(i).split('|')
+        artist_names = tracks.artist_names.iat(i).split('|')
+
+        for j in len(artist_ids):
+            id = artist_ids[j]
+            name = artist_names[j]
 
             existing_name = artist_id_to_name.get(id)
             if existing_name is None:
@@ -381,11 +382,7 @@ def find_spotify_artist(artist_name):
     return candidate_ids[0]
 
 def has_artist(track, artist_id):
-    for artist in track.artists:
-        if artist['id'] == artist_id:
-            return True
-    return False
-
+    return artist_id in track.artist_ids.split('|')
 
 def get_artist_discography(artist_name):
     artist_id = find_spotify_artist(artist_name)
@@ -402,7 +399,7 @@ def get_artist_discography(artist_name):
     tracks = None
 
     for album in artist_albums:
-        album_tracks = djlib_config.spotify.get_album_tracks(album['id'])
+        album_tracks = djlib_config.spotify.get_album_tracks(album['album_id'])
 
         artist_album_tracks = album_tracks.loc[album_tracks.apply(lambda t: has_artist(t, artist_id), axis=1)]
 

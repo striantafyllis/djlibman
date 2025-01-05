@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 
 from djlib_config import *
-
+from general_utils import *
 from playlist_scripts import *
 
 def rekordbox_sanity_checks():
@@ -284,7 +284,7 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
     rekordbox_to_spotify_mapping = rekordbox_to_spotify.read()
     print('Rekordbox to Spotify mapping: %d entries' % len(rekordbox_to_spotify_mapping))
 
-    assert main_playlist_tracks.index.name == 'TrackID'
+    assert main_playlist_tracks.index.name == 'rekordbox_id'
     assert rekordbox_to_spotify_mapping.index.name == 'rekordbox_id'
 
     unmapped_rekordbox_ids = main_playlist_tracks.index.difference(rekordbox_to_spotify_mapping.index, sort=False)
@@ -343,7 +343,7 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
 
                     if choice == 'yes':
                         mapping_row = pd.Series({
-                            'rekordbox_id': rekordbox_track.TrackID,
+                            'rekordbox_id': rekordbox_track.rekordbox_id,
                             'spotify_id': spotify_track.id
                         },
                         index = rekordbox_to_spotify_mapping.columns)
@@ -351,8 +351,8 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
                         mapping_row[rekordbox_to_spotify_mapping.columns[2:]] =\
                             spotify_track[rekordbox_to_spotify_mapping.columns[2:]]
 
-                        rekordbox_to_spotify_mapping.loc[rekordbox_track.TrackID] = mapping_row
-                        rekordbox_mapped_ids.append(rekordbox_track.TrackID)
+                        rekordbox_to_spotify_mapping.loc[rekordbox_track.rekordbox_id] = mapping_row
+                        rekordbox_mapped_ids.append(rekordbox_track.rekordbox_id)
 
             choice = get_user_choice('Proceed with rekordbox to spotify mapping?')
             if choice == 'yes':
@@ -387,7 +387,7 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
                         choice = get_user_choice('Accept?', options=['yes', 'next','give up'])
                         if choice == 'yes':
                             mapping_row = pd.Series({
-                                'rekordbox_id': rekordbox_track.TrackID,
+                                'rekordbox_id': rekordbox_track.rekordbox_id,
                                 'spotify_id': spotify_track.id
                             },
                                 index=rekordbox_to_spotify_mapping.columns)
@@ -395,9 +395,9 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
                             mapping_row[rekordbox_to_spotify_mapping.columns[2:]] = \
                                 spotify_track[rekordbox_to_spotify_mapping.columns[2:]]
 
-                            rekordbox_to_spotify_mapping.loc[rekordbox_track.TrackID] = mapping_row
+                            rekordbox_to_spotify_mapping.loc[rekordbox_track.rekordbox_id] = mapping_row
 
-                            rekordbox_unmapped_tracks = rekordbox_unmapped_tracks.drop(rekordbox_track.TrackID)
+                            rekordbox_unmapped_tracks = rekordbox_unmapped_tracks.drop(rekordbox_track.rekordbox_id)
 
                             done = True
                             break
@@ -411,14 +411,14 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
                     choice = get_user_choice('Mark as not found?')
                     if choice == 'yes':
                         mapping_row = pd.Series({
-                            'rekordbox_id': rekordbox_track.TrackID,
+                            'rekordbox_id': rekordbox_track.rekordbox_id,
                             'spotify_id': spotify_track.id
                         },
                             index=rekordbox_to_spotify_mapping.columns)
 
-                        rekordbox_to_spotify_mapping.loc[rekordbox_track.TrackID] = mapping_row
+                        rekordbox_to_spotify_mapping.loc[rekordbox_track.rekordbox_id] = mapping_row
 
-                        rekordbox_unmapped_tracks = rekordbox_unmapped_tracks.drop(rekordbox_track.TrackID)
+                        rekordbox_unmapped_tracks = rekordbox_unmapped_tracks.drop(rekordbox_track.rekordbox_id)
 
             rekordbox_to_spotify.write(rekordbox_to_spotify_mapping)
 

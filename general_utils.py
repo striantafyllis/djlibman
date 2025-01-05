@@ -2,7 +2,7 @@
 """
 Utility functions dependent only on Python libraries
 """
-
+import inspect
 import re
 import os
 import os.path
@@ -37,6 +37,13 @@ def project(table, projection):
             for key, value_func in projection.items():
                 if value_func is None:
                     value = row[key]
+                elif isinstance(value_func, str):
+                    value = row[value_func]
+                elif inspect.isclass(value_func):
+                    value = value_func(row[key])
+                elif isinstance(value_func, tuple) and len(value_func) == 2:
+                    type_conv, row_key = value_func
+                    value = type_conv(row[row_key])
                 elif callable(value_func):
                     value = value_func(row)
                 elif isinstance(value_func, dict) or isinstance(value_func, list):
@@ -232,14 +239,14 @@ def format_track(track, extra_attribs=[]):
 
     s = ''
 
-    for id_field in ['TrackID', 'id']:
+    for id_field in ['rekordbox_id', 'spotify_id']:
         if id_field in track:
             s += f'{track[id_field]}: '
             break
 
-    if 'artists' in track:
-        # Spotify-style track; artists is a list of dict
-        artists = ', '.join(artist['name'] for artist in track['artists'])
+    if 'artist_names' in track:
+        # Spotify-style track
+        artists = ', '.join(track['artists'].split('|'))
     elif 'Artists' in track:
         artists = track['Artists']
 

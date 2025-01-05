@@ -102,10 +102,8 @@ class Container(object):
         if this_index_name == other_df.index.name:
             return other_df
 
-        if this_index_name in ['id', 'spotify_id']:
-            if other_df.index.name in ['id', 'spotify_id']:
-                pass
-            elif other_df.index.name in ['TrackID', 'rekordbox_id']:
+        if this_index_name == 'spotify_id':
+            if other_df.index.name == 'rekordbox_id':
                 rekordbox_to_spotify_mapping = djlib_config.docs['rekordbox_to_spotify'].read()
 
                 # remove empty mappings
@@ -127,10 +125,8 @@ class Container(object):
                 other_df = other_df.set_index(keys=this_index_name, drop=False)
             else:
                 raise ValueError(f"Unknown other index {other_df.index.name}")
-        elif this_index_name in ['TrackID', 'rekordbox_id']:
-            if other_df.index.name in ['TrackID', 'rekordbox_id']:
-                pass
-            elif other_df.index.name in ['id', 'spotify_id']:
+        elif this_index_name == 'rekordbox_id':
+            if other_df.index.name == 'spotify_id':
                 rekordbox_to_spotify_mapping = docs['rekordbox_to_spotify'].read()
 
                 # remove empty mappings
@@ -237,6 +233,9 @@ class Container(object):
     def get_difference(self, other):
         return self._get_set_operation_result(other, 'difference')
 
+    def _preprocess_before_append(self, df: pd.DataFrame):
+        return df
+
     def append(self, other, prompt=None, deep=False) -> None:
         self._ensure_df()
 
@@ -271,6 +270,8 @@ class Container(object):
             if deep:
                 other_unique = other_unique.set_index(other_prev_index_name, drop=False)
 
+            other_unique = self._preprocess_before_append(other_unique)
+
             new_df = other_unique
             num_added = len(other_unique)
             num_already_present = 0
@@ -291,6 +292,8 @@ class Container(object):
 
             if deep:
                 genuinely_new_entries = genuinely_new_entries.set_index(other_prev_index_name, drop=False)
+
+            genuinely_new_entries = self._preprocess_before_append(genuinely_new_entries)
 
             new_df = pd.concat([self._df, genuinely_new_entries])
 
@@ -486,6 +489,28 @@ class Doc(Container):
             return self._df.index.name
         return self._index_name
 
+class Queue(Doc):
+    def __init__(
+            self,
+            name: str = 'queue', *,
+            modify=True,
+            create=False,
+            overwrite=False,
+            index_name='spotify_id',
+            **kwargs):
+        super(Queue, self).__init__(
+            name=name,
+            modify=modify,
+            create=create,
+            overwrite=overwrite,
+            index_name=index_name,
+            **kwargs
+        )
+
+    def _preprocess_before_append(self, df: pd.DataFrame):
+        df = df.assign(added_at=pd.Timestamp.utcnow())
+        return df
+
 class SpotifyPlaylist(Container):
     def __init__(self, name: str, modify=True, create=False, overwrite=False):
         self._playlist_name = name
@@ -495,7 +520,7 @@ class SpotifyPlaylist(Container):
         return
 
     def _get_index_name(self):
-        return 'id'
+        return 'spotify_id'
 
     def _check_existence(self):
         return djlib_config.spotify.playlist_exists(self._playlist_name)
@@ -515,7 +540,7 @@ class SpotifyLiked(Container):
         return
 
     def _get_index_name(self):
-        return 'id'
+        return 'spotify_id'
 
     def _check_existence(self):
         return True
@@ -549,7 +574,7 @@ class RekordboxPlaylist(Container):
         return
 
     def _get_index_name(self):
-        return 'TrackID'
+        return 'rekordbox_id'
 
     def _check_existence(self):
         return djlib_config.rekordbox.playlist_exists(self._playlist_name)

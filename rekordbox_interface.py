@@ -10,6 +10,7 @@ from general_utils import *
 
 # Rename some Rekordbox attributes
 _attrib_rename = {
+    'TrackID': 'rekordbox_id',
     'Artist': 'Artists',
     'Name': 'Title',
     'AverageBpm': 'BPM',
@@ -164,11 +165,11 @@ class RekordboxInterface:
             raise Exception('The playlist is an empty folder playlist but track_ids specified')
 
         if isinstance(track_ids, pd.DataFrame):
-            track_ids = track_ids.TrackID
+            track_ids = track_ids.rekordbox_id
 
         # make sure the track IDs exist
         if not isinstance(track_ids, pd.Index):
-            track_ids = pd.Index(track_ids, name='TrackID')
+            track_ids = pd.Index(track_ids, name='rekordbox_id')
 
         unknown_track_ids = track_ids.difference(self._collection.index, sort=False)
         if len(unknown_track_ids) > 0:
@@ -327,8 +328,8 @@ def _parse_collection(node: ET.Element):
     df = pd.DataFrame.from_records(collection)
     df = infer_types(df)
 
-    # has to be done after infer_types so that the TrackIDs in the index are ints and not strings
-    df = df.set_index(df.TrackID)
+    # has to be done after infer_types so that the track IDs in the index are ints and not strings
+    df = df.set_index(df.rekordbox_id)
 
     return df
 
@@ -368,7 +369,7 @@ def _parse_playlist_node(node: ET.Element):
             track_id = np.int64(child.attrib['Key'])
             track_ids.append(track_id)
 
-        return pd.Index(track_ids, name='TrackID')
+        return pd.Index(track_ids, name='rekordbox_id')
     else:
         assert False
 

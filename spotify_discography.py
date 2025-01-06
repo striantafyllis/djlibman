@@ -175,7 +175,7 @@ def _get_track_signature(track):
     artist_ids = track['artist_ids'].split('|')
 
     # get rid of parenthesized combinations of uppercase letters and numbers - these are usually label codes
-    name = re.sub(r'(\[|\()[A-Z]+ ?[0-9]+(\]|\))', '', name)
+    name = re.sub(r'(\[|\()[A-Z]{3,100} ?[0-9]+(\]|\))', '', name)
 
     name = name.upper()
 

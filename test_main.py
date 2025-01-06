@@ -185,11 +185,16 @@ def read_file_with_numbers(filename):
 
 
 def go_through_artist_list():
-    # artists = read_file('./sample_artists.txt')
-    artists = read_file_with_numbers('./ready_artists.txt')
+    djlib_config.discography_verbose = 5
+    artists = read_file('./sample_artists.txt')
 
-    for artist, number in artists:
-        sample_artist_to_queue(artist, latest=number, popular=number)
+    for artist in artists:
+        spotify_discography.get_artist_discography(artist)
+
+    # artists = read_file_with_numbers('./ready_artists.txt')
+    #
+    # for artist, number in artists:
+    #     sample_artist_to_queue(artist, latest=number, popular=number)
 
     return
 

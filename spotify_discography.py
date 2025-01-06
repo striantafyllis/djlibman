@@ -174,18 +174,33 @@ def _get_track_signature(track):
     name = track['name']
     artist_ids = track['artist_ids'].split('|')
 
-    name = name.upper()
-    name = re.sub(r'\((.*)\)', r' - \1', name)
-    name = re.sub(r'\[(.*)\]', r' - \1', name)
+    # get rid of parenthesized combinations of uppercase letters and numbers - these are usually label codes
+    name = re.sub(r'(\[|\()[A-Z]+ ?[0-9]+(\]|\))', '', name)
 
-    name = name.replace(' - EXTENDED MIX', '')
-    name = name.replace('EXDENDED REMIX', 'REMIX')
+    name = name.upper()
+
+    # get read of "featuring ...", "feat. " etc.
+    name = re.sub(r'FEAT(\.|URING) .*', '', name)
+
+    for s in ['(', ')', '[', ']', '-', ' AND ', ' X ', 'EXTENDED', 'ORIGINAL', 'REMIX', 'MIXED', 'MIX', 'RADIO', 'EDIT']:
+        name = name.replace(s, '')
+
+    # get rid of whitespace differences
+    name = ' '.join(name.split())
 
     artist_ids.sort()
 
     return tuple(artist_ids + [name])
 
 def _form_track_from_signature_group(same_sig_tracks, listening_history):
+    """Returns a dataframe with a single row that's the best representative of the
+       entire track group.
+    """
+    # a good place to insert complicated breakpoints...
+    # signature = same_sig_tracks.signature[0]
+    # if 'A LONELY PINK CLOUD' in signature:
+    #     pass
+
     if len(same_sig_tracks) == 1:
         track = same_sig_tracks
     else:
@@ -193,12 +208,42 @@ def _form_track_from_signature_group(same_sig_tracks, listening_history):
         ids_in_lh = same_sig_tracks.index.intersection(listening_history.get_df().index, sort=False)
 
         if len(ids_in_lh) >= 1:
-            # note: the track here is not a Series - it's a single-row dataframe
-            # this way GroupBy.apply() combines the return values properly.
             track = same_sig_tracks.loc[[ids_in_lh[0]]]
         else:
+            # remove undesirable edits
+            def is_desirable_edit(track):
+                name = track['name'].upper()
+                is_undesirable = (
+                        name.endswith(' - MIXED') or
+                        name.endswith('(MIXED)') or
+                        name.endswith('[MIXED]') or
+                        'RADIO EDIT' in name
+                )
+                return not is_undesirable
+
+            def is_extended_edit(track):
+                name = track['name'].upper()
+                is_extended = 'EXTENDED' in name or ' X ' in name
+                return is_extended
+
+            desirable_tracks = same_sig_tracks.loc[
+                same_sig_tracks.apply(is_desirable_edit, axis=1)
+            ]
+
+            if len(desirable_tracks) == 0:
+                # This happens very rarely - e.g. all versions of a track on Spotify are radio edits -
+                # but it does happen. Often Beatport has a normal version, so we don't want to exclude these.
+                desirable_tracks = same_sig_tracks
+
+            # try to find an extended mix if possible
+            extended_tracks = desirable_tracks.loc[
+                desirable_tracks.apply(is_extended_edit, axis=1)
+            ]
+            if len(extended_tracks) > 0:
+                desirable_tracks = extended_tracks
+
             # select the oldest ID
-            same_sig_tracks.sort_values(by='release_date', inplace=True)
+            desirable_tracks.sort_values(by='release_date', inplace=True)
             track = same_sig_tracks.iloc[:1]
 
         # Combine the popularities of the tracks. For now I just add them up,
@@ -206,8 +251,6 @@ def _form_track_from_signature_group(same_sig_tracks, listening_history):
         # reposted in more albums is arguably more popular.
         popularity = same_sig_tracks.popularity.sum() + len(same_sig_tracks) - 1
         track['popularity'] = popularity
-
-    track = track.drop(labels='signature', axis=1)
 
     assert isinstance(track, pd.DataFrame)
     assert len(track) == 1
@@ -232,16 +275,13 @@ def get_artist_discography(artist_name):
 
     assert len(artist_tracks) >= len(artist_albums)
 
+    # for debugging - remove
+    # artist_tracks = artist_tracks.loc[
+    #     artist_tracks.apply(lambda t: 'Getting Closer' in t['name'], axis=1)
+    # ]
+
     if _verbose() >= 2:
         print(f'{artist_name}: found {len(artist_tracks)} tracks')
-
-    def is_mixed(track):
-        name = track['name'].upper()
-        return name.endswith(' - MIXED') or name.endswith('(MIXED)') or name.endswith('[MIXED]')
-
-    artist_tracks = artist_tracks.loc[
-        artist_tracks.apply(lambda t: not is_mixed(t), axis=1)
-    ]
 
     if _verbose() >= 2:
         print(f'{artist_name}: {len(artist_tracks)} tracks left after removing mixed tracks')
@@ -261,7 +301,12 @@ def get_artist_discography(artist_name):
 
     assert len(dedup_tracks) == len(gby)
 
+    # not necessary but makes debugging easier
+    # dedup_tracks.sort_values(by='name', inplace=True)
+
     if _verbose() >= 1:
         print(f'{artist_name}: {len(dedup_tracks)} tracks left after deduplication')
+
+    dedup_tracks.drop(labels='signature', axis=1, inplace=True)
 
     return dedup_tracks

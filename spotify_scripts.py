@@ -331,29 +331,30 @@ def filter_spotify_playlist(playlist_name):
 
 
 
-def sample_artist_to_queue(artist_name, latest=10, popular=10):
+def sample_artist_to_queue(artist_name, *, latest=10, popular=10):
     print(f'Sampling artist {artist_name} to queue...')
-    discogs = spotify_discography.get_artist_discography(artist_name)
+    discogs = Wrapper(spotify_discography.get_artist_discography(artist_name),
+                      name=f'discography for artist {artist_name}')
 
     print(f'Found {len(discogs)} tracks')
 
     listening_history = Doc('listening_history')
     queue = Queue()
 
-    discogs.remove(listening_history, deep=True, prompt=False)
-    discogs.remove(queue, deep=True)
+    discogs.remove(listening_history, prompt=False)
+    discogs.remove(queue, prompt=False)
 
     print(f'Left after removing listening history and queue: {len(discogs)} tracks')
 
     if latest > 0:
-        discogs.sort('added_at', ascending=False)
+        discogs.sort('release_date', ascending=False)
 
         latest_tracks = discogs.get_df()[:latest]
 
         discogs.remove(latest_tracks, prompt=False)
 
         print('Latest tracks:')
-        pretty_print_tracks(latest_tracks, indent=' '*4, enum=True, extra_attribs='added_at')
+        pretty_print_tracks(latest_tracks, indent=' '*4, enum=True, extra_attribs='release_date')
 
         queue.append(latest_tracks)
 

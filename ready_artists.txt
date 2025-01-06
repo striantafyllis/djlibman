@@ -1,8 +1,9 @@
-Ivan Baffa
-EMPHI
-Kay-D
-Kamilo Sanclemente
-FNX OMAR
-Dany Dz
-Ruben Karapetyan
-Oliver & Tom
+# Ivan Baffa 10
+# EMPHI 10
+# Kay-D 10
+# Kamilo Sanclemente 20
+# FNX OMAR 20
+# Dany Dz 10
+# Ruben Karapetyan 20
+# Oliver & Tom 20
+

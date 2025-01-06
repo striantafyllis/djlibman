@@ -134,8 +134,12 @@ def read_file(filename):
     lines = []
 
     for line in fh:
+        comment_start = line.find('#')
+        if comment_start != -1:
+            line = line[:comment_start]
+
         line = line.strip()
-        if line.startswith('#'):
+        if line == '':
             continue
 
         lines.append(line)
@@ -144,14 +148,48 @@ def read_file(filename):
 
     return lines
 
+def read_file_with_numbers(filename):
+    fh = open(filename)
+
+    lines = []
+
+    for line in fh:
+        comment_start = line.find('#')
+        if comment_start != -1:
+            line = line[:comment_start]
+
+        line = line.strip()
+        if line == '':
+            continue
+
+        pieces = line.split()
+
+        num = None
+        string = None
+        if len(pieces) >= 2:
+            try:
+                num = int(pieces[-1])
+                string = ' '.join(pieces[:-1])
+            except ValueError:
+                pass
+
+        if string is None:
+            string = ' '.join(pieces)
+
+        lines.append((string, num))
+
+    fh.close()
+
+    return lines
+
+
 
 def go_through_artist_list():
     # artists = read_file('./sample_artists.txt')
-    artists = read_file('./ready_artists.txt')
+    artists = read_file_with_numbers('./ready_artists.txt')
 
-    for artist in artists:
-        get_artist_discography(artist)
-        # sample_artist_to_queue(artist)
+    for artist, number in artists:
+        sample_artist_to_queue(artist, latest=number, popular=number)
 
     return
 

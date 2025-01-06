@@ -246,7 +246,7 @@ def format_track(track, extra_attribs=[]):
 
     if 'artist_names' in track:
         # Spotify-style track
-        artists = ', '.join(track['artists'].split('|'))
+        artists = ', '.join(track['artist_names'].split('|'))
     elif 'Artists' in track:
         artists = track['Artists']
 

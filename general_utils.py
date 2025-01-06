@@ -170,6 +170,10 @@ def dataframe_ensure_unique_index(df):
     pos = dataframe_duplicate_index_labels(df)
     return dataframe_drop_rows_at_positions(df, pos)
 
+def dataframe_filter(df, filter):
+    bool_array = df.apply(filter, axis=1)
+    return df.loc[bool_array]
+
 def get_attrib_or_fail(series, attrib_possible_names):
     for attrib in attrib_possible_names:
         if attrib in series:

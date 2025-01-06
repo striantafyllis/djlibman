@@ -4,63 +4,59 @@ import numpy as np
 
 from djlib_config import *
 from general_utils import *
-from playlist_scripts import *
+# from playlist_scripts import *
+from containers import *
 
 def rekordbox_sanity_checks():
     top_level_playlist_names = ['Main Library', 'back catalog', 'non-DJ']
 
-    collection = rekordbox.get_collection()
+    collection = RekordboxCollection()
     print('Rekordbox collection: %d tracks' % len(collection))
 
     errors = 0
 
     # check that all top-level playlists exist
+    print('Top-level playlists:')
     top_level_playlists = []
     for name in top_level_playlist_names:
-        try:
-            playlist = rekordbox.get_playlist_track_ids(name)
-            top_level_playlists.append(playlist)
-        except KeyError:
+        playlist = RekordboxPlaylist(name)
+        top_level_playlists.append(playlist)
+        if not playlist.exists():
             sys.stderr.write("Top-level rekordbox playlist '%s' does not exist\n" % playlist)
-            top_level_playlists.append(None)
             errors += 1
+        else:
+            print(f'    {playlist.get_name()}: {len(playlist)} tracks')
 
-    print('Top-level playlists:')
-    for i in range(len(top_level_playlist_names)):
-        if top_level_playlists[i] is None:
-            continue
-
-        print('    %s: %d tracks' % (top_level_playlist_names[i], len(top_level_playlists[i])))
 
     # check that top-level playlists do not overlap
     for i in range(len(top_level_playlist_names)):
-        if top_level_playlists[i] is None:
+        if not top_level_playlists[i].exists():
             continue
 
         for j in range(i+1, len(top_level_playlist_names)):
-            if top_level_playlists[j] is None:
+            if not top_level_playlists[j].exists():
                 continue
 
-            intersection = top_level_playlists[i].intersection(top_level_playlists[j], sort=False)
+            intersection = top_level_playlists[i].get_intersection(top_level_playlists[j])
 
-            for track_id in intersection:
-                sys.stderr.write("Track appears in two top-level playlists, %s and %s: %s\n" % (
-                    top_level_playlist_names[i],
-                    top_level_playlist_names[j],
-                    format_track(collection.loc[track_id])
-                ))
+            for track in intersection.values:
+                sys.stderr.write(
+                    f"Track appears in two top-level playlists, {top_level_playlist_names[i]} and "
+                    f"{top_level_playlist_names[j]}: "
+                    f"{format_track(track)}\n"
+                )
                 errors += 1
 
     # check that every track is in a top-level playlist
-    track_ids_without_top_level = collection.index
+    track_ids_without_top_level = collection.get_df().index
 
     for top_level_playlist in top_level_playlists:
-        if top_level_playlist is None:
+        if not top_level_playlist.exists():
             continue
-        track_ids_without_top_level = track_ids_without_top_level.difference(top_level_playlist, sort=False)
+        track_ids_without_top_level = track_ids_without_top_level.difference(top_level_playlist.get_df().index, sort=False)
 
     for track_id in track_ids_without_top_level:
-        sys.stderr.write("Track is not in any top-level playlist: %s\n" % format_track(collection.loc[track_id]))
+        sys.stderr.write("Track is not in any top-level playlist: %s\n" % format_track(collection.get_df().loc[track_id]))
         errors += 1
 
     if errors > 0:
@@ -70,38 +66,32 @@ def rekordbox_sanity_checks():
     return True
 
 def djlib_sanity_checks():
-    djlib = docs['djlib']
-    djlib_tracks = djlib.read()
+    djlib = Doc('djlib')
 
-    print('djlib excel sheet: %d tracks' % len(djlib_tracks))
+    print('djlib excel sheet: %d tracks' % len(djlib))
 
-    rekordbox_tracks = rekordbox.get_collection()
+    collection = RekordboxCollection()
 
     errors = 0
 
-    if djlib_tracks.index.dtype != pd.Int64Dtype():
+    djlib_index = djlib.get_df().index
+    if djlib_index.name != 'rekordbox_id' or djlib_index.dtype != pd.Int64Dtype():
         # this will mess everything up
         errors += 1
-        sys.stderr.write('Bad type for djlib index: %s - should be %s. This will mess everything up.\n' % (
-            djlib_tracks.index.dtype,
-            pd.Int64Dtype()
-        ))
+        sys.stderr.write(f'Bad djlib index: {djlib_index.name} type {djlib_index.dtype}\n')
     else:
-        no_track_ids_idx = djlib_tracks.index.isna()
+        no_track_ids_idx = djlib_index.isna()
 
-        no_track_ids = djlib_tracks[no_track_ids_idx]
+        no_track_ids = djlib.get_df().loc[no_track_ids_idx]
 
         for i in range(len(no_track_ids)):
             sys.stderr.write('Track has no Rekordbox ID: %s\n' % format_track(no_track_ids.iloc[i]))
             errors += 1
 
-        with_track_ids = djlib_tracks.loc[~no_track_ids_idx]
-
-        not_found_in_rekordbox_idx = with_track_ids.index.difference(rekordbox_tracks.index)
-        not_found_in_rekordbox = djlib_tracks.loc[not_found_in_rekordbox_idx]
+        not_found_in_rekordbox = djlib.get_difference(collection)
 
         for i in range(len(not_found_in_rekordbox)):
-            sys.stderr.write('Track not found in Rekordbox: %s\n' % format_track(not_found_in_rekordbox.iloc[i]))
+            sys.stderr.write(f'Track not found in Rekordbox: {format_track(not_found_in_rekordbox)}\n')
             errors += 1
 
     if errors > 0:
@@ -112,157 +102,44 @@ def djlib_sanity_checks():
 
 
 def djlib_values_sanity_check():
-    djlib_tracks = docs['djlib'].read()
+    djlib = Doc('djlib')
 
     errors = 0
 
-    bad_class_filter = djlib_tracks.apply(
-        lambda track: not re.match(r'[ABCX][1-5]?', track.Class),
-        axis=1
-    )
-    bad_class_tracks = djlib_tracks.loc[bad_class_filter]
+    bad_class_tracks = djlib.get_filtered(lambda track: pd.isna(track.Class) or not re.match(r'O?[ABCX][1-5]?', track.Class))
 
     if len(bad_class_tracks) > 0:
         errors += 1
 
-        print('%d djilb tracks have a malformed Class field' % len(bad_class_tracks))
+        print(f'{len(bad_class_tracks)} djilb tracks have a malformed Class field')
         pretty_print_tracks(bad_class_tracks, indent=' '*4, enum=True)
 
     return (errors == 0)
 
 _automatic_accept_threshold = 0.9
 
-def djlib_maintenance(cutoff_ratio=0.3):
-    djlib_tracks_changed = False
+def djlib_maintenance():
+    djlib = Doc('djlib')
+    main_library = RekordboxPlaylist('Main Library')
 
-    djlib = docs['djlib']
-    new_tracks_sheet = docs['new_tracks_scratch']
-
-    djlib_tracks = djlib.read()
-    rekordbox_main_library_tracks = rekordbox.get_playlist_tracks('Main Library')
-
-    if djlib_tracks.index.name != rekordbox_main_library_tracks.index.name:
-        raise Exception('djlib and Rekordbox have different indices: %s vs. %s' % (
-            djlib_tracks.index.name, rekordbox_main_library_tracks.index.name))
-
+    missing_from_djlib = main_library.get_difference(djlib)
     # filter out local edits
-    should_transfer = rekordbox_main_library_tracks.Title.apply(
-        lambda title: not title.endswith('[Local Edit]')
-    )
+    missing_from_djlib = dataframe_filter(missing_from_djlib,
+                                          lambda track: not track['Title'].endswith('[Local Edit]'))
 
-    missing_from_djlib_idx = (rekordbox_main_library_tracks
-        .index[should_transfer]
-        .difference(djlib_tracks.index, sort=False))
+    djlib_auto_columns = djlib.get_df().columns.intersection(
+        main_library.get_df().columns, sort=False)
 
-    djlib_auto_columns = djlib_tracks.columns.intersection(
-        rekordbox_main_library_tracks.columns, sort=False)
-    djlib_user_columns = djlib_tracks.columns.difference(djlib_auto_columns, sort=False)
-
-    if len(missing_from_djlib_idx) == 0:
+    if len(missing_from_djlib) == 0:
         print('All Rekordbox Main Library tracks are in djlib')
     else:
-        assert djlib_tracks.index.name in djlib_auto_columns
+        assert djlib.get_df().index.name in djlib_auto_columns
 
-        new_rekordbox_tracks = rekordbox_main_library_tracks[djlib_auto_columns].loc[missing_from_djlib_idx]
+        print(f'{len(missing_from_djlib)} Rekordbox Main Library tracks are missing from djlib')
+        pretty_print_tracks(missing_from_djlib, indent=' '*4, enum=True)
 
-        print('%d Rekordbox Main Library tracks are missing from djlib' % len(new_rekordbox_tracks))
-        pretty_print_tracks(new_rekordbox_tracks, indent=' '*4, enum=True)
-        choice = get_user_choice('Add to djlib?')
-
-        if choice == 'yes':
-            new_djlib_tracks = pd.DataFrame(
-                index=new_rekordbox_tracks.index,
-                columns=djlib_tracks.columns)
-
-            new_djlib_tracks[djlib_auto_columns] = new_rekordbox_tracks
-
-            djlib_tracks = pd.concat([djlib_tracks, new_djlib_tracks])
-            djlib_tracks_changed = True
-
-            print('djlib now has %d tracks' % len(djlib_tracks))
-
-            djlib.write(djlib_tracks)
-
-    # see if there are any empty rows in djlib
-    djlib_tracks_is_empty_row = None
-    for column in djlib_user_columns:
-        column_is_empty = pd.isna(djlib_tracks[column])
-        if djlib_tracks_is_empty_row is None:
-            djlib_tracks_is_empty_row = column_is_empty
-        else:
-            djlib_tracks_is_empty_row &= column_is_empty
-
-    # fill in empty rows in djlib from the New Tracks sheet
-    djlib_tracks_empty_rows = djlib_tracks.loc[djlib_tracks_is_empty_row]
-    if len(djlib_tracks_empty_rows) == 0:
-        return
-
-    choice = get_user_choice('djlib has %d empty rows; look in New Tracks sheet?' % len(djlib_tracks_empty_rows))
-    if choice != 'yes':
-        return
-
-    new_tracks = new_tracks_sheet.read()
-
-    if len(new_tracks) == 0:
-        print('Nothing in New Tracks sheet')
-    else:
-        new_tracks_unknown_cols = new_tracks.columns.difference(djlib_tracks.columns, sort=False)
-
-        if len(new_tracks_unknown_cols) > 0:
-            sys.stderr.write('New Tracks sheet has unknown columns %s; these will be ignored.\n' %
-                             new_tracks_unknown_cols.to_list())
-
-        new_tracks_usable_cols = new_tracks.columns.intersection(djlib_tracks.columns, sort=False)
-
-        if len(new_tracks_usable_cols) == 0:
-            sys.stderr.write('New Tracks sheet has no usable columns; ignoring.\n')
-        elif 'Title' not in new_tracks_usable_cols:
-            sys.stderr.write('New Tracks does not have a Title column; ignoring.\n')
-        else:
-            new_tracks_usable_cols = new_tracks_usable_cols[new_tracks_usable_cols != 'Title']
-
-            print('Attempting to create a mapping between %d empty djlib rows and %d New Tracks entries' % (
-                len(djlib_tracks_empty_rows),
-                len(new_tracks)
-            ))
-
-            result = fuzzy_one_to_one_mapping(
-                djlib_tracks_empty_rows.Title.apply(format_track_for_search).to_list(),
-                new_tracks.Title.apply(format_track_for_search).to_list(),
-                cutoff_ratio=cutoff_ratio
-            )
-
-            djlib_tracks_changed = False
-            if len(result['pairs']) > 0:
-                print('Found the following potential mappings:')
-
-                for mapping in result['pairs']:
-                    djlib_idx = mapping['index1']
-                    new_track_idx = mapping['index2']
-                    print()
-                    print('djlib: %s' % format_track(djlib_tracks_empty_rows.iloc[djlib_idx]))
-                    print('New Tracks: %s' % new_tracks.iloc[new_track_idx].Title)
-                    print('Match ratio: %.2f' % mapping['ratio'])
-                    if mapping['ratio'] >= _automatic_accept_threshold:
-                        print('Accepted automatically')
-                        choice = 'yes'
-                    else:
-                        choice = get_user_choice('Accept?')
-                    if choice == 'yes':
-                        # an extra maneuver here to do the assignment in one step;
-                        # chained assignment may stop working in future versions of Pandas
-                        djlib_tracks.loc[
-                            djlib_tracks_empty_rows.index[djlib_idx],
-                            new_tracks_usable_cols
-                        ] =\
-                          new_tracks.iloc[new_track_idx][new_tracks_usable_cols]
-
-                        djlib_tracks_changed = True
-
-    if djlib_tracks_changed:
-        choice = get_user_choice('Proceed with djlib edits?')
-        if choice == 'yes':
-            djlib.write(djlib_tracks)
+        djlib.append(missing_from_djlib[djlib_auto_columns])
+        djlib.write()
 
     return
 
@@ -431,113 +308,113 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
     return
 
 
-def djlib_spotify_likes_maintenance():
-    """
-    Rules:
-    - All tracks of classes A and B should be liked
-    - All tracks of class C should NOT be liked
-    - Classes X, P etc. can go either way
-    """
+# def djlib_spotify_likes_maintenance():
+#     """
+#     Rules:
+#     - All tracks of classes A and B should be liked
+#     - All tracks of class C should NOT be liked
+#     - Classes X, P etc. can go either way
+#     """
+#
+#     print('Checking djlib classes against Spotify liked tracks...')
+#
+#     djlib = docs['djlib']
+#     djlib_tracks = djlib.read()
+#
+#     djlib_tracks_with_spotify_id = add_spotify_ids(djlib_tracks, include_missing_ids=False)
+#
+#     djlib_tracks_without_spotify_id = len(djlib_tracks) - len(djlib_tracks_with_spotify_id)
+#     if djlib_tracks_without_spotify_id > 0:
+#         print(f'{djlib_tracks_without_spotify_id} out of {len(djlib_tracks)} tracks are missing Spotify IDs; omitting.')
+#
+#     djlib_tracks_ab_filter = djlib_tracks_with_spotify_id.apply(
+#         lambda track: is_class(track, 'A', 'B'),
+#         axis=1
+#     )
+#     djlib_tracks_ab = djlib_tracks_with_spotify_id.loc[djlib_tracks_ab_filter]
+#     print(f'{len(djlib_tracks_ab)} AB tracks...')
+#
+#     djlib_tracks_c_filter = djlib_tracks_with_spotify_id.apply(
+#         lambda track: is_class(track, 'C'),
+#         axis=1
+#     )
+#     djlib_tracks_c = djlib_tracks_with_spotify_id.loc[djlib_tracks_c_filter]
+#     print(f'{len(djlib_tracks_c)} C tracks...')
+#
+#     print('Getting Spotify liked tracks...')
+#     spotify_liked_tracks = spotify.get_liked_tracks()
+#
+#     djlib_liked_tracks = djlib_tracks_with_spotify_id.merge(
+#         right=spotify_liked_tracks,
+#         how='inner',
+#         left_on='spotify_id',
+#         right_index=True
+#     )
+#     djlib_liked_tracks_idx = djlib_liked_tracks.index
+#
+#     liked_djlib_tracks_c = djlib_tracks_c.loc[djlib_tracks_c.index.intersection(djlib_liked_tracks_idx)]
+#
+#     if len(liked_djlib_tracks_c) > 0:
+#         print(f'{len(liked_djlib_tracks_c)} C tracks are liked on Spotify:')
+#         pretty_print_tracks(liked_djlib_tracks_c, indent=' '*4, enum=True)
+#
+#         choice = get_user_choice('What to do?', options=['unlike', 'abort'])
+#         if choice == 'abort':
+#             return False
+#         elif choice == 'unlike':
+#             spotify.remove_liked_tracks(liked_djlib_tracks_c.spotify_id)
+#             print(f'Removed {len(liked_djlib_tracks_c)} C tracks from Spotify liked tracks.')
+#         else:
+#             assert False
+#
+#     unliked_djlib_tracks_ab = djlib_tracks_ab.loc[djlib_tracks_ab.index.difference(djlib_liked_tracks_idx)]
+#
+#     if len(unliked_djlib_tracks_ab) > 0:
+#         print(f'{len(unliked_djlib_tracks_ab)} A and B tracks are not liked on Spotify:')
+#         pretty_print_tracks(unliked_djlib_tracks_ab, indent=' '*4, enum=True)
+#
+#         choice = get_user_choice('What to do?', options=['like', 'abort'])
+#         if choice == 'abort':
+#             return False
+#         elif choice == 'like':
+#             spotify.add_liked_tracks(unliked_djlib_tracks_ab.spotify_id)
+#             print(f'Added {len(unliked_djlib_tracks_ab)} A and B tracks to Spotify liked tracks.')
+#         else:
+#             assert False
+#
+#     return True
 
-    print('Checking djlib classes against Spotify liked tracks...')
-
-    djlib = docs['djlib']
-    djlib_tracks = djlib.read()
-
-    djlib_tracks_with_spotify_id = add_spotify_ids(djlib_tracks, include_missing_ids=False)
-
-    djlib_tracks_without_spotify_id = len(djlib_tracks) - len(djlib_tracks_with_spotify_id)
-    if djlib_tracks_without_spotify_id > 0:
-        print(f'{djlib_tracks_without_spotify_id} out of {len(djlib_tracks)} tracks are missing Spotify IDs; omitting.')
-
-    djlib_tracks_ab_filter = djlib_tracks_with_spotify_id.apply(
-        lambda track: is_class(track, 'A', 'B'),
-        axis=1
-    )
-    djlib_tracks_ab = djlib_tracks_with_spotify_id.loc[djlib_tracks_ab_filter]
-    print(f'{len(djlib_tracks_ab)} AB tracks...')
-
-    djlib_tracks_c_filter = djlib_tracks_with_spotify_id.apply(
-        lambda track: is_class(track, 'C'),
-        axis=1
-    )
-    djlib_tracks_c = djlib_tracks_with_spotify_id.loc[djlib_tracks_c_filter]
-    print(f'{len(djlib_tracks_c)} C tracks...')
-
-    print('Getting Spotify liked tracks...')
-    spotify_liked_tracks = spotify.get_liked_tracks()
-
-    djlib_liked_tracks = djlib_tracks_with_spotify_id.merge(
-        right=spotify_liked_tracks,
-        how='inner',
-        left_on='spotify_id',
-        right_index=True
-    )
-    djlib_liked_tracks_idx = djlib_liked_tracks.index
-
-    liked_djlib_tracks_c = djlib_tracks_c.loc[djlib_tracks_c.index.intersection(djlib_liked_tracks_idx)]
-
-    if len(liked_djlib_tracks_c) > 0:
-        print(f'{len(liked_djlib_tracks_c)} C tracks are liked on Spotify:')
-        pretty_print_tracks(liked_djlib_tracks_c, indent=' '*4, enum=True)
-
-        choice = get_user_choice('What to do?', options=['unlike', 'abort'])
-        if choice == 'abort':
-            return False
-        elif choice == 'unlike':
-            spotify.remove_liked_tracks(liked_djlib_tracks_c.spotify_id)
-            print(f'Removed {len(liked_djlib_tracks_c)} C tracks from Spotify liked tracks.')
-        else:
-            assert False
-
-    unliked_djlib_tracks_ab = djlib_tracks_ab.loc[djlib_tracks_ab.index.difference(djlib_liked_tracks_idx)]
-
-    if len(unliked_djlib_tracks_ab) > 0:
-        print(f'{len(unliked_djlib_tracks_ab)} A and B tracks are not liked on Spotify:')
-        pretty_print_tracks(unliked_djlib_tracks_ab, indent=' '*4, enum=True)
-
-        choice = get_user_choice('What to do?', options=['like', 'abort'])
-        if choice == 'abort':
-            return False
-        elif choice == 'like':
-            spotify.add_liked_tracks(unliked_djlib_tracks_ab.spotify_id)
-            print(f'Added {len(unliked_djlib_tracks_ab)} A and B tracks to Spotify liked tracks.')
-        else:
-            assert False
-
-    return True
 
 
-
-def library_maintenance():
-    if not rekordbox_sanity_checks():
-        return False
-
-    if not djlib_sanity_checks():
-        return False
-
-    if not djlib_values_sanity_check():
-        return False
-
-    djlib_maintenance()
-
-    rekordbox_to_spotify_maintenance()
-
-    if not djlib_spotify_likes_maintenance():
-        return
-
-    choice = get_user_choice('Rebuild Rekordbox playlists?')
-    rebuild_rekordbox = (choice == 'yes')
-
-    choice = get_user_choice('Rebuild Spotify playlists?')
-    rebuild_spotify = (choice == 'yes')
-
-    if rebuild_rekordbox or rebuild_spotify:
-        playlist_maintenance(
-            do_rekordbox=rebuild_rekordbox,
-            do_spotify=rebuild_spotify
-        )
-
-    return
+# def library_maintenance():
+#     if not rekordbox_sanity_checks():
+#         return False
+#
+#     if not djlib_sanity_checks():
+#         return False
+#
+#     if not djlib_values_sanity_check():
+#         return False
+#
+#     djlib_maintenance()
+#
+#     rekordbox_to_spotify_maintenance()
+#
+#     if not djlib_spotify_likes_maintenance():
+#         return
+#
+#     choice = get_user_choice('Rebuild Rekordbox playlists?')
+#     rebuild_rekordbox = (choice == 'yes')
+#
+#     choice = get_user_choice('Rebuild Spotify playlists?')
+#     rebuild_spotify = (choice == 'yes')
+#
+#     if rebuild_rekordbox or rebuild_spotify:
+#         playlist_maintenance(
+#             do_rekordbox=rebuild_rekordbox,
+#             do_spotify=rebuild_spotify
+#         )
+#
+#     return
 
 

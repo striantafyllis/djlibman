@@ -156,21 +156,6 @@ class Container(object):
 
         return other_df
 
-    def _reconcile_columns(self, other_df):
-        if len(self._df) == 0 and len(self._df.columns) == 0:
-            # this is a special case; eventually maybe we should have an "expected schema"
-            # for empty containers, but for now we'll just go with the schema of the incoming rows
-            return other_df
-
-        for column in self._df.columns:
-            if column not in other_df.columns:
-                other_df[column] = np.nan
-
-        # this takes care of extra columns, columns in different order etc.
-        other_df = other_df[self._df.columns]
-
-        return other_df
-
     def deduplicate(self, prompt=None) -> None:
         self._ensure_df()
 
@@ -227,6 +212,12 @@ class Container(object):
     def get_difference(self, other):
         return self._get_set_operation_result(other, 'difference')
 
+    def get_filtered(self, filter):
+        self._ensure_df()
+
+        bool_array = self._df.apply(filter, axis=1)
+        return self._df.loc[bool_array]
+
     def _preprocess_before_append(self, df: pd.DataFrame):
         return df
 
@@ -247,7 +238,6 @@ class Container(object):
 
         if len(self._df) > 0:
             other_df = self._reconcile_ids(other_df)
-            other_df = self._reconcile_columns(other_df)
 
         other_unique = dataframe_ensure_unique_index(other_df)
 
@@ -538,6 +528,27 @@ class SpotifyLiked(Container):
             djlib_config.spotify.remove_liked_tracks(tracks_to_remove)
 
         return
+
+
+class RekordboxCollection(Container):
+    def __init__(self):
+        super(RekordboxCollection, self).__init__(
+            name='Rekordbox Collection',
+            create=False,
+            modify=False,
+            overwrite=False,
+            prompt=False
+        )
+        return
+
+    def _get_index_name(self):
+        return 'rekordbox_id'
+
+    def _check_existence(self):
+        return True
+
+    def _read(self):
+        return djlib_config.rekordbox.get_collection()
 
 
 class RekordboxPlaylist(Container):

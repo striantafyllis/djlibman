@@ -201,6 +201,11 @@ def go_through_artist_list():
 def main():
     go_through_artist_list()
 
+    # rekordbox_sanity_checks()
+    # djlib_sanity_checks()
+    # djlib_values_sanity_check()
+    # djlib_maintenance()
+
     return
 
 if __name__ == '__main__':

@@ -305,10 +305,8 @@ def djlib_spotify_likes_maintenance():
 
     djlib = Doc('djlib')
 
-    df = djlib.get_df()
-
-    ab_tracks = djlib.get_filtered(lambda track: is_class(track, 'A', 'B'))
-    c_tracks = djlib.get_filtered(lambda track: is_class(track, 'C'))
+    ab_tracks = djlib.get_filtered(lambda track: track_is(track, classes=['A', 'B']))
+    c_tracks = djlib.get_filtered(lambda track: track_is(track, classes=['C']))
 
     ab_tracks_with_spotify = add_spotify_fields_to_rekordbox(ab_tracks, drop_missing_ids=True)
     c_tracks_with_spotify = add_spotify_fields_to_rekordbox(c_tracks, drop_missing_ids=True)

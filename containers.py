@@ -105,6 +105,10 @@ class Container(object):
         if this_index_name == other_df.index.name:
             return other_df
 
+        if this_index_name in other_df.columns:
+            other_df = other_df.set_index(this_index_name, drop=False)
+            return other_df
+
         if this_index_name == 'spotify_id':
             if other_df.index.name == 'rekordbox_id':
                 rekordbox_to_spotify_mapping = djlib_config.docs['rekordbox_to_spotify'].read()
@@ -576,7 +580,7 @@ class Wrapper(Container):
     def __init__(self, contents: Union[Container, pd.DataFrame], name=None, index_name=None):
         if isinstance(contents, Container):
             if name is None:
-                name = contents.get_name()
+                name = 'Wrapper(' + contents.get_name() + ')'
             if index_name is None:
                 index_name = contents._get_index_name()
         elif isinstance(contents, pd.DataFrame):
@@ -584,12 +588,11 @@ class Wrapper(Container):
         else:
             raise ValueError(f'Invalid wrapper contents type: {type(contents)}')
 
-        this_name = 'Wrapper'
-        if name is not None:
-            this_name += '(' + name + ')'
+        if name is None:
+            name = 'Wrapper'
 
         super(Wrapper, self).__init__(
-            name=this_name,
+            name=name,
             modify=False,
             create=False,
             overwrite=False

@@ -79,13 +79,14 @@ class FileDoc:
 
         if self._apply_converters:
             for column_name, converter in self._converters.items():
-                self._contents[column_name] = self._contents[column_name].apply(converter)
+                if column_name in self._contents.columns:
+                    self._contents[column_name] = self._contents[column_name].apply(converter)
 
         if self._index_column is not None:
             if self._index_column == '_FIRST_COLUMN' and len(self._contents.columns) > 0:
-                self._contents = self._contents.set_index(self._contents.columns[0], drop=False)
+                self._contents.set_index(self._contents.columns[0], drop=False, inplace=True)
             else:
-                self._contents = self._contents.set_index(self._index_column, drop=False)
+                self._contents.set_index(self._index_column, drop=False, inplace=True)
 
         return
 

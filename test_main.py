@@ -201,14 +201,9 @@ def go_through_artist_list():
 def main():
     # go_through_artist_list()
 
-    # rekordbox_sanity_checks()
-    # djlib_sanity_checks()
-    # djlib_values_sanity_check()
-    # djlib_maintenance()
-
-    rekordbox_to_spotify_maintenance()
-
     # spotify_discography.get_artist_discography('Dany Dz')
+
+    library_maintenance()
 
     return
 

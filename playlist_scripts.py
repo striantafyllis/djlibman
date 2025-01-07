@@ -1,8 +1,17 @@
 
+
+import pandas as pd
+import numpy as np
+
+from general_utils import *
 from djlib_config import *
-from djlibman_utils import *
+from containers import *
+
 
 def is_class(track, *classes):
+    if pd.isna(track.Class):
+        return False
+
     for clss in classes:
         if track.Class.startswith(clss):
             return True

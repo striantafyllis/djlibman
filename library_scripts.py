@@ -4,8 +4,33 @@ import numpy as np
 
 from djlib_config import *
 from general_utils import *
-# from playlist_scripts import *
+from playlist_scripts import *
 from containers import *
+
+
+def add_spotify_fields_to_rekordbox(rekordbox_tracks: pd.DataFrame, *, drop_missing_ids=False):
+    rekordbox_to_spotify = Doc('rekordbox_to_spotify')
+
+    rekordbox_to_spotify_df = rekordbox_to_spotify.get_df()
+
+    if drop_missing_ids:
+        rekordbox_to_spotify_df = dataframe_filter(
+            rekordbox_to_spotify_df,
+            lambda track: not pd.isna(track['spotify_id'])
+        )
+
+    if rekordbox_tracks.index.name != 'rekordbox_id':
+        raise ValueError('Argument is not indexed by rekordbox_id')
+
+    rekordbox_tracks_with_spotify_fields = rekordbox_tracks.merge(
+        right=rekordbox_to_spotify_df,
+        left_index=True,
+        right_index=True,
+        how=('inner' if drop_missing_ids else 'left')
+    )
+
+    return rekordbox_tracks_with_spotify_fields
+
 
 def rekordbox_sanity_checks():
     top_level_playlist_names = ['Main Library', 'back catalog', 'non-DJ']
@@ -268,113 +293,64 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
     return
 
 
-# def djlib_spotify_likes_maintenance():
-#     """
-#     Rules:
-#     - All tracks of classes A and B should be liked
-#     - All tracks of class C should NOT be liked
-#     - Classes X, P etc. can go either way
-#     """
-#
-#     print('Checking djlib classes against Spotify liked tracks...')
-#
-#     djlib = docs['djlib']
-#     djlib_tracks = djlib.read()
-#
-#     djlib_tracks_with_spotify_id = add_spotify_ids(djlib_tracks, include_missing_ids=False)
-#
-#     djlib_tracks_without_spotify_id = len(djlib_tracks) - len(djlib_tracks_with_spotify_id)
-#     if djlib_tracks_without_spotify_id > 0:
-#         print(f'{djlib_tracks_without_spotify_id} out of {len(djlib_tracks)} tracks are missing Spotify IDs; omitting.')
-#
-#     djlib_tracks_ab_filter = djlib_tracks_with_spotify_id.apply(
-#         lambda track: is_class(track, 'A', 'B'),
-#         axis=1
-#     )
-#     djlib_tracks_ab = djlib_tracks_with_spotify_id.loc[djlib_tracks_ab_filter]
-#     print(f'{len(djlib_tracks_ab)} AB tracks...')
-#
-#     djlib_tracks_c_filter = djlib_tracks_with_spotify_id.apply(
-#         lambda track: is_class(track, 'C'),
-#         axis=1
-#     )
-#     djlib_tracks_c = djlib_tracks_with_spotify_id.loc[djlib_tracks_c_filter]
-#     print(f'{len(djlib_tracks_c)} C tracks...')
-#
-#     print('Getting Spotify liked tracks...')
-#     spotify_liked_tracks = spotify.get_liked_tracks()
-#
-#     djlib_liked_tracks = djlib_tracks_with_spotify_id.merge(
-#         right=spotify_liked_tracks,
-#         how='inner',
-#         left_on='spotify_id',
-#         right_index=True
-#     )
-#     djlib_liked_tracks_idx = djlib_liked_tracks.index
-#
-#     liked_djlib_tracks_c = djlib_tracks_c.loc[djlib_tracks_c.index.intersection(djlib_liked_tracks_idx)]
-#
-#     if len(liked_djlib_tracks_c) > 0:
-#         print(f'{len(liked_djlib_tracks_c)} C tracks are liked on Spotify:')
-#         pretty_print_tracks(liked_djlib_tracks_c, indent=' '*4, enum=True)
-#
-#         choice = get_user_choice('What to do?', options=['unlike', 'abort'])
-#         if choice == 'abort':
-#             return False
-#         elif choice == 'unlike':
-#             spotify.remove_liked_tracks(liked_djlib_tracks_c.spotify_id)
-#             print(f'Removed {len(liked_djlib_tracks_c)} C tracks from Spotify liked tracks.')
-#         else:
-#             assert False
-#
-#     unliked_djlib_tracks_ab = djlib_tracks_ab.loc[djlib_tracks_ab.index.difference(djlib_liked_tracks_idx)]
-#
-#     if len(unliked_djlib_tracks_ab) > 0:
-#         print(f'{len(unliked_djlib_tracks_ab)} A and B tracks are not liked on Spotify:')
-#         pretty_print_tracks(unliked_djlib_tracks_ab, indent=' '*4, enum=True)
-#
-#         choice = get_user_choice('What to do?', options=['like', 'abort'])
-#         if choice == 'abort':
-#             return False
-#         elif choice == 'like':
-#             spotify.add_liked_tracks(unliked_djlib_tracks_ab.spotify_id)
-#             print(f'Added {len(unliked_djlib_tracks_ab)} A and B tracks to Spotify liked tracks.')
-#         else:
-#             assert False
-#
-#     return True
+def djlib_spotify_likes_maintenance():
+    """
+    Rules:
+    - All tracks of classes A and B should be liked
+    - All tracks of class C should NOT be liked
+    - Classes X, P etc. can go either way
+    """
+
+    print('Checking djlib classes against Spotify liked tracks...')
+
+    djlib = Doc('djlib')
+
+    df = djlib.get_df()
+
+    ab_tracks = djlib.get_filtered(lambda track: is_class(track, 'A', 'B'))
+    c_tracks = djlib.get_filtered(lambda track: is_class(track, 'C'))
+
+    ab_tracks_with_spotify = add_spotify_fields_to_rekordbox(ab_tracks, drop_missing_ids=True)
+    c_tracks_with_spotify = add_spotify_fields_to_rekordbox(c_tracks, drop_missing_ids=True)
+
+    spotify_liked = SpotifyLiked()
+
+    spotify_liked.append(Wrapper(ab_tracks_with_spotify, name='A and B library tracks'))
+    spotify_liked.remove(Wrapper(c_tracks_with_spotify, name='C library tracks'))
+
+    spotify_liked.write()
+    return
 
 
 
-# def library_maintenance():
-#     if not rekordbox_sanity_checks():
-#         return False
-#
-#     if not djlib_sanity_checks():
-#         return False
-#
-#     if not djlib_values_sanity_check():
-#         return False
-#
-#     djlib_maintenance()
-#
-#     rekordbox_to_spotify_maintenance()
-#
-#     if not djlib_spotify_likes_maintenance():
-#         return
-#
-#     choice = get_user_choice('Rebuild Rekordbox playlists?')
-#     rebuild_rekordbox = (choice == 'yes')
-#
-#     choice = get_user_choice('Rebuild Spotify playlists?')
-#     rebuild_spotify = (choice == 'yes')
-#
-#     if rebuild_rekordbox or rebuild_spotify:
-#         playlist_maintenance(
-#             do_rekordbox=rebuild_rekordbox,
-#             do_spotify=rebuild_spotify
-#         )
-#
-#     return
+def library_maintenance():
+    if not rekordbox_sanity_checks():
+        return False
+
+    if not djlib_sanity_checks():
+        return False
+
+    if not djlib_values_sanity_check():
+        return False
+
+    djlib_maintenance()
+
+    rekordbox_to_spotify_maintenance()
+
+    djlib_spotify_likes_maintenance()
+
+    # choice = get_user_choice('Rebuild Rekordbox playlists?')
+    # rebuild_rekordbox = (choice == 'yes')
+    #
+    # choice = get_user_choice('Rebuild Spotify playlists?')
+    # rebuild_spotify = (choice == 'yes')
+    #
+    # if rebuild_rekordbox or rebuild_spotify:
+    #     playlist_maintenance(
+    #         do_rekordbox=rebuild_rekordbox,
+    #         do_spotify=rebuild_spotify
+    #     )
+
+    return
 
 

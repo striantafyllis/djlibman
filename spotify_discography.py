@@ -283,13 +283,12 @@ def get_artist_discography(artist_name):
     if _verbose() >= 2:
         print(f'{artist_name}: found {len(artist_tracks)} tracks')
 
-    if _verbose() >= 2:
-        print(f'{artist_name}: {len(artist_tracks)} tracks left after removing mixed tracks')
-
     artist_tracks['signature'] = artist_tracks.apply(
         _get_track_signature,
         axis=1
     )
+
+    artist_tracks.sort_values(by='name', inplace=True)
 
     gby = artist_tracks.groupby(by='signature', as_index=False, sort=False, group_keys=False)
 

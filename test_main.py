@@ -98,7 +98,7 @@ def remove_artist_old_entries_from_listening_history(
         artist_name,
         cutoff_date
 ):
-    artist_id = find_spotify_artist(artist_name)
+    artist_id = spotify_discography.find_spotify_artist(artist_name)
 
     cutoff_date = pd.to_datetime(cutoff_date, utc=True)
 
@@ -199,12 +199,16 @@ def go_through_artist_list():
     return
 
 def main():
-    go_through_artist_list()
+    # go_through_artist_list()
 
     # rekordbox_sanity_checks()
     # djlib_sanity_checks()
     # djlib_values_sanity_check()
     # djlib_maintenance()
+
+    rekordbox_to_spotify_maintenance()
+
+    # spotify_discography.get_artist_discography('Dany Dz')
 
     return
 

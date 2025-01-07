@@ -269,27 +269,45 @@ def format_track_for_search(track):
     track's artists and title."""
 
     if isinstance(track, str):
-        string = track
+        string = track.lower()
     else:
-        if 'artists' in track:
-            artists = ' '.join(artist['name'] for artist in track['artists'])
+        string = get_attrib_or_fail(track, ['Title', 'name'])
+        string = string.lower()
+
+    # Remove some things that are usually in Rekordbox but not in Spotify
+    string = re.sub(r'(feat\.|featuring)', '', string, flags=re.IGNORECASE)
+    string = re.sub(r'original mix', '', string, flags=re.IGNORECASE)
+
+    if not isinstance(track, str):
+        if 'artist_names' in track:
+            artists_list = [artist.lower() for artist in track['artist_names'].split('|')]
+
+            # Work around a big difference between Spotify and everyone else:
+            # In Spotify, remix artists are in the artists' list; in other services they aren't
+            filtered_artists_list = [artist for artist in artists_list if artist not in string]
+
+            artists = ' '.join(filtered_artists_list)
         elif 'Artists' in track:
-            artists = track['Artists']
+            artists = track['Artists'].replace(',', ' ').lower()
         else:
             raise Exception("None of the attributes %s are present in series %s" % (
                 ['artists', 'Artists'],
                 track
             ))
 
-        title = get_attrib_or_fail(track, ['Title', 'name'])
-        string = artists + ' ' + title
+        # sort the words in the artist string; this is necessary because Spotify and Rekordbox
+        # often list artists in different order.
+        # This will also mix up first and last names of the same artist; I don't see a way to avoid this
+        artist_words = artists.split()
+        artist_words.sort()
 
-    # Remove some things that are usually in Rekordbox but not in Spotify
-    string = re.sub(r'(feat\.|featuring)', '', string, flags=re.IGNORECASE)
-    string = re.sub(r'original mix', '', string, flags=re.IGNORECASE)
+        string = ' '.join(artist_words) + ' ' + string
 
     # replace sequences of non-word characters with a single space
     string = re.sub(r'\W+', ' ', string)
+
+    # replace multiple spaces with single space
+    string = ' '.join(string.split())
 
     # get rid of capitalization problems
     string = string.lower()

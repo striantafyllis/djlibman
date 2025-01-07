@@ -146,109 +146,79 @@ def djlib_maintenance():
 
 def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
                                      cutoff_ratio=0.6):
-    main_playlist_tracks = rekordbox.get_playlist_tracks(rekordbox_main_playlist)
-    print("Rekordbox '%s' playlist: %d tracks" % (
-        rekordbox_main_playlist, len(main_playlist_tracks)))
+    main_library = RekordboxPlaylist('Main Library')
+    print(f'Rekordbox main library: {len(main_library)} tracks')
+
+    rekordbox_to_spotify = Doc('rekordbox_to_spotify')
+    print(f'Rekordbox to Spotify mapping: {len(rekordbox_to_spotify)} entries')
+
+    unmapped_rekordbox_tracks = main_library.get_difference(rekordbox_to_spotify)
 
     # filter out local edits
-    should_map = main_playlist_tracks.Title.apply(
-        lambda title: not title.endswith('[Local Edit]')
-    )
-    main_playlist_tracks = main_playlist_tracks[should_map]
+    unmapped_rekordbox_tracks = dataframe_filter(unmapped_rekordbox_tracks,
+                                  lambda track: not track['Title'].endswith('[Local Edit]'))
 
-    rekordbox_to_spotify = docs['rekordbox_to_spotify']
-
-    rekordbox_to_spotify_mapping = rekordbox_to_spotify.read()
-    print('Rekordbox to Spotify mapping: %d entries' % len(rekordbox_to_spotify_mapping))
-
-    assert main_playlist_tracks.index.name == 'rekordbox_id'
-    assert rekordbox_to_spotify_mapping.index.name == 'rekordbox_id'
-
-    unmapped_rekordbox_ids = main_playlist_tracks.index.difference(rekordbox_to_spotify_mapping.index, sort=False)
-
-    if len(unmapped_rekordbox_ids) == 0:
+    if len(unmapped_rekordbox_tracks) == 0:
         print('All Rekordbox main playlist tracks have Spotify mappings')
         return
 
-    print('%d Rekordbox main playlist tracks do not have a Spotify mapping' % len(unmapped_rekordbox_ids))
+    print(f'{len(unmapped_rekordbox_tracks)} Rekordbox main playlist tracks do not have a Spotify mapping')
 
-    rekordbox_unmapped_tracks = main_playlist_tracks.loc[unmapped_rekordbox_ids]
+    # look for mappings in listening history first
+    listening_history = Doc('listening_history')
 
-    choice = get_user_choice('Look for mappings in Spotify Liked Tracks?')
-    if choice == 'yes':
-        spotify_liked_tracks = spotify.get_liked_tracks()
+    unmapped_listened_tracks = listening_history.get_difference(
+        pd.Index(rekordbox_to_spotify.get_df().spotify_id))
 
-        spotify_unmapped_liked_tracks_idx = spotify_liked_tracks.index.difference(
-            rekordbox_to_spotify_mapping.spotify_id, sort=False
-        )
+    # handy hack to create a new dataframe with the same schema as the existing one
+    new_mappings = pd.DataFrame(rekordbox_to_spotify.get_df().iloc[:0])
 
-        if len(spotify_unmapped_liked_tracks_idx) == 0:
-            print('All Spotify liked tracks have already been mapped')
-        else:
-            spotify_unmapped_liked_tracks = spotify_liked_tracks.loc[
-                spotify_unmapped_liked_tracks_idx
-            ]
+    if len(unmapped_listened_tracks) == 0:
+        print('All listening history tracks have already been mapped')
+    else:
+        print(f'Attempting to create a mapping between {len(unmapped_rekordbox_tracks)} unmapped Rekordbox '
+              f'tracks and {len(unmapped_listened_tracks)} unmapped listening history tracks')
 
-            print('Attempting to create a mapping between %d unmapped Rekordbox tracks and '
-                  '%d unmapped Spotify liked tracks' % (
-                len(rekordbox_unmapped_tracks),
-                len(spotify_unmapped_liked_tracks)
-            ))
+        rekordbox_sequences = unmapped_rekordbox_tracks.apply(format_track_for_search, axis=1)
+        listened_sequences = unmapped_listened_tracks.apply(format_track_for_search, axis=1)
 
-            rekordbox_sequences = rekordbox_unmapped_tracks.apply(format_track_for_search, axis=1)
-            spotify_sequences = spotify_unmapped_liked_tracks.apply(format_track_for_search, axis=1)
+        result = fuzzy_one_to_one_mapping(rekordbox_sequences.to_list(), listened_sequences.to_list(),
+                                          cutoff_ratio=cutoff_ratio)
 
-            result = fuzzy_one_to_one_mapping(rekordbox_sequences.to_list(), spotify_sequences.to_list(), cutoff_ratio=cutoff_ratio)
+        for mapping in result['pairs']:
+            rekordbox_idx = mapping['index1']
+            listened_idx = mapping['index2']
+            rekordbox_track = unmapped_rekordbox_tracks.iloc[rekordbox_idx]
+            spotify_track = unmapped_listened_tracks.iloc[listened_idx]
+            print()
+            print(f'Rekordbox: {format_track(rekordbox_track)}')
+            print(f'Spotify: {format_track(spotify_track)}')
+            print(f'Match ratio: {mapping['ratio']:.2f}')
+            if mapping['ratio'] >= _automatic_accept_threshold:
+                print('Accepted automatically')
+                choice = 'yes'
+            else:
+                choice = get_user_choice('Accept?')
 
-            if len(result['pairs']) > 0:
-                print('Found the following potential mappings:')
-
-                rekordbox_mapped_ids = []
-
-                for mapping in result['pairs']:
-                    rekordbox_track = rekordbox_unmapped_tracks.iloc[mapping['index1']]
-                    spotify_track = spotify_unmapped_liked_tracks.iloc[mapping['index2']]
-                    print()
-                    print('Rekordbox: %s' % format_track(rekordbox_track))
-                    print('Spotify: %s' % format_track(spotify_track))
-                    print('Match ratio: %.2f' % mapping['ratio'])
-                    if mapping['ratio'] >= _automatic_accept_threshold:
-                        print('Accepted automatically')
-                        choice = 'yes'
-                    else:
-                        choice = get_user_choice('Accept?')
-
-                    if choice == 'yes':
-                        mapping_row = pd.Series({
-                            'rekordbox_id': rekordbox_track.rekordbox_id,
-                            'spotify_id': spotify_track.id
-                        },
-                        index = rekordbox_to_spotify_mapping.columns)
-
-                        mapping_row[rekordbox_to_spotify_mapping.columns[2:]] =\
-                            spotify_track[rekordbox_to_spotify_mapping.columns[2:]]
-
-                        rekordbox_to_spotify_mapping.loc[rekordbox_track.rekordbox_id] = mapping_row
-                        rekordbox_mapped_ids.append(rekordbox_track.rekordbox_id)
-
-            choice = get_user_choice('Proceed with rekordbox to spotify mapping?')
             if choice == 'yes':
-                rekordbox_to_spotify.write(rekordbox_to_spotify_mapping)
-                rekordbox_unmapped_tracks = rekordbox_unmapped_tracks.loc[
-                    rekordbox_unmapped_tracks.index.difference(
-                        rekordbox_mapped_ids, sort=False)
-                ]
+                rekordbox_id = rekordbox_track['rekordbox_id']
 
-    if len(rekordbox_unmapped_tracks) > 0:
-        print('%d Rekordbox main playlist tracks are still unmapped' % len(rekordbox_unmapped_tracks))
-        pretty_print_tracks(rekordbox_unmapped_tracks, indent=' '*4, enum=True)
+                new_mappings.loc[rekordbox_id] = { 'rekordbox_id': rekordbox_id} |\
+                    spotify_track[new_mappings.columns[1:]].to_dict()
+
+    unmapped_rekordbox_tracks = unmapped_rekordbox_tracks.loc[
+        unmapped_rekordbox_tracks.index.difference(new_mappings.index, sort=False)
+    ]
+
+    if len(unmapped_rekordbox_tracks) > 0:
+        print(f'{len(unmapped_rekordbox_tracks)} Rekordbox main playlist tracks are still unmapped:')
+        pretty_print_tracks(unmapped_rekordbox_tracks, indent=' '*4, enum=True)
         choice = get_user_choice('Do Spotify search?')
         if choice == 'yes':
-            rekordbox_ids = list(rekordbox_unmapped_tracks.index)
+            for rekordbox_track in unmapped_rekordbox_tracks.values:
+                rekordbox_id = rekordbox_track['rekordbox_id']
 
-            for rekordbox_id in rekordbox_ids:
-                rekordbox_track = rekordbox_unmapped_tracks.loc[rekordbox_id]
-                print('Searching for Rekordbox track: %s' % format_track(rekordbox_track))
+                print(f'Searching for Rekordbox track: {format_track(rekordbox_track)}')
 
                 search_string = format_track_for_search(rekordbox_track)
 
@@ -260,21 +230,12 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
                 else:
                     for i in range(len(spotify_tracks)):
                         spotify_track = spotify_tracks.iloc[i]
-                        print('Option %d: %s' % (i+1, format_track(spotify_track)))
+                        print(f'Option {i+1}: {format_track(spotify_track)}')
                         choice = get_user_choice('Accept?', options=['yes', 'next','give up'])
                         if choice == 'yes':
-                            mapping_row = pd.Series({
-                                'rekordbox_id': rekordbox_track.rekordbox_id,
-                                'spotify_id': spotify_track.id
-                            },
-                                index=rekordbox_to_spotify_mapping.columns)
-
-                            mapping_row[rekordbox_to_spotify_mapping.columns[2:]] = \
-                                spotify_track[rekordbox_to_spotify_mapping.columns[2:]]
-
-                            rekordbox_to_spotify_mapping.loc[rekordbox_track.rekordbox_id] = mapping_row
-
-                            rekordbox_unmapped_tracks = rekordbox_unmapped_tracks.drop(rekordbox_track.rekordbox_id)
+                            new_mappings.loc[rekordbox_id] = {'rekordbox_id': rekordbox_id}
+                            new_mappings.loc[rekordbox_id][new_mappings.columns[1:]] = \
+                                spotify_track[new_mappings.columns[1:]]
 
                             done = True
                             break
@@ -287,23 +248,22 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
                     print('No Spotify mapping found for Rekordbox track: %s' % format_track(rekordbox_track))
                     choice = get_user_choice('Mark as not found?')
                     if choice == 'yes':
-                        mapping_row = pd.Series({
-                            'rekordbox_id': rekordbox_track.rekordbox_id,
-                            'spotify_id': spotify_track.id
-                        },
-                            index=rekordbox_to_spotify_mapping.columns)
+                        new_mappings.loc[rekordbox_id] = {'rekordbox_id': rekordbox_id}
 
-                        rekordbox_to_spotify_mapping.loc[rekordbox_track.rekordbox_id] = mapping_row
 
-                        rekordbox_unmapped_tracks = rekordbox_unmapped_tracks.drop(rekordbox_track.rekordbox_id)
+    unmapped_rekordbox_tracks = unmapped_rekordbox_tracks.loc[
+        unmapped_rekordbox_tracks.index.difference(new_mappings.index, sort=False)
+    ]
 
-            rekordbox_to_spotify.write(rekordbox_to_spotify_mapping)
-
-    if len(rekordbox_unmapped_tracks) == 0:
+    if len(unmapped_rekordbox_tracks) == 0:
         print('All Rekordbox main playlist tracks have been mapped to Spotify!')
     else:
-        print('%d Rekordbox main playlist tracks remain unmapped' % len(rekordbox_unmapped_tracks))
-        pretty_print_tracks(rekordbox_unmapped_tracks, indent=' '*4, enum=True)
+        print(f'{len(unmapped_rekordbox_tracks)} Rekordbox main playlist tracks remain unmapped')
+        pretty_print_tracks(unmapped_rekordbox_tracks, indent=' '*4, enum=True)
+
+    if len(new_mappings) > 0:
+        rekordbox_to_spotify.append(new_mappings)
+        rekordbox_to_spotify.write()
 
     return
 

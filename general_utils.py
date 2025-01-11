@@ -320,6 +320,9 @@ def pretty_print_tracks(tracks, indent='', enum=False, extra_attribs=[]):
     if num_tracks == 0:
         return
 
+    if hasattr(tracks, 'get_df'):
+        tracks = tracks.get_df()
+
     if isinstance(tracks, pd.DataFrame):
         if tracks.empty:
             return

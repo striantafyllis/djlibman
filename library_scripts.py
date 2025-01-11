@@ -131,12 +131,14 @@ def djlib_values_sanity_check():
 
     errors = 0
 
-    bad_class_tracks = djlib.get_filtered(lambda track: pd.isna(track.Class) or not re.match(r'O?[ABCX][1-5]?', track.Class))
+    bad_class_tracks = djlib.get_filtered(
+        lambda track: not pd.isna(track.Class) and
+                      not re.match(r'[?O]?[ABCX][1-5]?', track.Class))
 
     if len(bad_class_tracks) > 0:
         errors += 1
 
-        print(f'{len(bad_class_tracks)} djilb tracks have a malformed Class field')
+        print(f'{len(bad_class_tracks)} djlib tracks have a malformed Class field')
         pretty_print_tracks(bad_class_tracks, indent=' '*4, enum=True)
 
     return (errors == 0)
@@ -318,7 +320,6 @@ def djlib_spotify_likes_maintenance():
 
     spotify_liked.write()
     return
-
 
 
 def library_maintenance():

@@ -78,14 +78,14 @@ class Container(object):
         self._df = df
         return
 
-    def write(self) -> None:
+    def write(self, force=False) -> None:
         if self._df is None:
             raise Exception('Nothing to write')
 
         if not self._modify:
             raise RuntimeError(f'{self._name} cannot be written back')
 
-        if not self._changed:
+        if not self._changed and not force:
             return
 
         self._write_back(self._df)

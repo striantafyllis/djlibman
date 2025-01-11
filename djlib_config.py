@@ -85,7 +85,7 @@ def init(config_file=None):
             if 'backups' in section:
                 rekordbox_backups = section.getint('backups')
             else:
-                rekordbox_backups = _backups
+                rekordbox_backups = 0
 
             for field in section.keys():
                 if field not in ['rekordbox_xml', 'backups']:

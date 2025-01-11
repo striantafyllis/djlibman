@@ -83,10 +83,6 @@ class RekordboxInterface:
         self._refresh()
         return RekordboxInterface._reduce_playlist(self._playlists)
 
-    def playlist_exists(self, playlist_name):
-        self._refresh()
-        return playlist_name in self.get_playlist_names()
-
     def pretty_print_playlist_names(self):
         pretty_print(self.get_playlist_names())
 
@@ -100,57 +96,23 @@ class RekordboxInterface:
         for i in range(len(playlist_name)):
             if not isinstance(playlist, dict):
                 raise ValueError('Playlist %s is not a folder playlist' % playlist_name[:(i-1)])
-            playlist = playlist[playlist_name[i]]
+            playlist = playlist.get(playlist_name[i])
+            if playlist is None:
+                return None
 
         if not isinstance(playlist, pd.Index):
             raise ValueError('Playlist %s is not a leaf playlist' % playlist_name)
 
         return pd.Index(playlist)
 
+    def playlist_exists(self, playlist_name):
+        return self.get_playlist_track_ids(playlist_name) is not None
+
     def get_playlist_tracks(self, playlist_name):
         self._refresh()
 
         track_ids = self.get_playlist_track_ids(playlist_name)
         return self._collection.loc[track_ids]
-
-    def _get_playlist_xml(self, playlist_name):
-        self._refresh()
-
-        if isinstance(playlist_name, str):
-            playlist_name = [playlist_name]
-
-        xml_root = self._xml.getroot()
-
-        playlists = None
-        for child in xml_root:
-            if child.tag == 'PLAYLISTS':
-                playlists = child
-                break
-        if playlists is None:
-            raise Exception('rekordbox.xml: no PLAYLISTS node')
-
-        playlist = playlists[0]
-        assert playlist.attrib['Name'] == 'ROOT'
-        assert playlist.attrib['Type'] == '0'
-
-        for i in range(len(playlist_name)):
-            name = playlist_name[i]
-
-            next_playlist = None
-            if playlist.attrib['Type'] != '0':
-                raise Exception('Playlist %s is not a folder playlist' % playlist_name[:(i-1)])
-
-            for child in playlist:
-                if child.attrib['Name'] == name:
-                    next_playlist = child
-                    break
-
-            if next_playlist is None:
-                raise Exception('Playlist %s not found in folder playlist %s' % (name, playlist_name[:(i-1)]))
-
-            playlist = next_playlist
-
-        return playlist
 
     def create_playlist(self, playlist_name, track_ids=[], overwrite=False):
         """Creates a new leaf playlist with the specified track IDs.

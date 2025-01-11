@@ -17,7 +17,9 @@ def track_is(
         song=None,
         uptempo=None,
         classes=None,
-        flavors=None
+        flavors=None,
+        before=None,
+        after=None
 ):
     if danceable is not None:
         if pd.isna(track['Danceable']):
@@ -63,6 +65,20 @@ def track_is(
                 found = True
                 break
         if not found:
+            return False
+
+    if before is not None:
+        if not isinstance(before, pd.Timestamp):
+            before = pd.to_datetime(before, utc=True)
+
+        if pd.isna(track['Date Added']) or track['Date Added'] >= before:
+            return False
+
+    if after is not None:
+        if not isinstance(after, pd.Timestamp):
+            after = pd.to_datetime(before, utc=True)
+
+        if pd.isna(track['Date Added']) or track['Date Added'] <= after:
             return False
 
     return True

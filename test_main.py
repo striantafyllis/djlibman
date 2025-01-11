@@ -185,25 +185,53 @@ def read_file_with_numbers(filename):
 
 
 def go_through_artist_list():
-    djlib_config.discography_verbose = 5
-    artists = read_file('./sample_artists.txt')
+    artists = read_file_with_numbers('./ready_artists.txt')
 
-    for artist in artists:
-        spotify_discography.get_artist_discography(artist)
-
-    # artists = read_file_with_numbers('./ready_artists.txt')
-    #
-    # for artist, number in artists:
-    #     sample_artist_to_queue(artist, latest=number, popular=number)
+    for artist, number in artists:
+        sample_artist_to_queue(artist, latest=number, popular=number)
 
     return
 
+
+def library_reorg_add_question_mark():
+    djlib = Doc('djlib')
+    bool_array = djlib.get_df().apply(
+        lambda track: track_is(track, classes=['A', 'B'], before='2024-10-19'),
+        axis=1
+    )
+
+    old_tracks_idx = djlib.get_df().index[bool_array]
+
+    progressive = RekordboxPlaylist(name=['managed', 'Progressive'])
+    progressive_idx = progressive.get_df().index
+
+    old_tracks_idx = old_tracks_idx.difference(progressive_idx, sort=False)
+
+    mixes = [
+        'mix 19b - asiento - prog',
+        'mix 18 - asiento - latin jazzy',
+        'mix 19 - asiento - prog',
+        'mix 17 - george - prog',
+        'mix 14 afro',
+        'mix 13 summer',
+        'mix 12 middle east'
+    ]
+
+    for mix in mixes:
+        mix_playlist = RekordboxPlaylist(name=['Mixes', mix])
+        mix_idx = mix_playlist.get_df().index
+
+        old_tracks_idx = old_tracks_idx.difference(mix_idx, sort=False)
+
+    djlib.get_df().loc[old_tracks_idx, 'Class'] = '?' + djlib.get_df().loc[old_tracks_idx, 'Class']
+
+    djlib.write(force=True)
+
+    return
+
+
 def main():
     # go_through_artist_list()
-
-    # spotify_discography.get_artist_discography('Dany Dz')
-
-    library_maintenance()
 
     return
 

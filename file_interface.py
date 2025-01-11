@@ -119,7 +119,8 @@ class FileDoc:
 
         df2 = pd.DataFrame(df)
         for column_name, deconverter in self._deconverters.items():
-            df2[column_name] = df2[column_name].apply(deconverter)
+            if column_name in self._contents.columns:
+                df2[column_name] = df2[column_name].apply(deconverter)
 
         self._raw_write(df2)
         return

@@ -4,8 +4,8 @@ import numpy as np
 
 from djlib_config import *
 from general_utils import *
-from playlist_scripts import *
 from containers import *
+import classification
 
 
 def add_spotify_fields_to_rekordbox(rekordbox_tracks: pd.DataFrame, *, drop_missing_ids=False):
@@ -307,8 +307,8 @@ def djlib_spotify_likes_maintenance():
 
     djlib = Doc('djlib')
 
-    ab_tracks = djlib.get_filtered(lambda track: track_is(track, classes=['A', 'B']))
-    c_tracks = djlib.get_filtered(lambda track: track_is(track, classes=['C']))
+    ab_tracks = djlib.get_filtered(lambda track: classification.track_is(track, classes=['A', 'B']))
+    c_tracks = djlib.get_filtered(lambda track: classification.track_is(track, classes=['C']))
 
     ab_tracks_with_spotify = add_spotify_fields_to_rekordbox(ab_tracks, drop_missing_ids=True)
     c_tracks_with_spotify = add_spotify_fields_to_rekordbox(c_tracks, drop_missing_ids=True)
@@ -319,6 +319,36 @@ def djlib_spotify_likes_maintenance():
     spotify_liked.remove(Wrapper(c_tracks_with_spotify, name='C library tracks'))
 
     spotify_liked.write()
+    return
+
+def playlists_maintenance(do_rekordbox=True, do_spotify=True):
+    djlib = Doc('djlib')
+
+    groups = classification.classify_tracks(djlib.get_df())
+
+    for name, group in groups.items():
+        if do_rekordbox:
+            rekordbox_playlist = RekordboxPlaylist(
+                name=['managed'] + list(name),
+                create=True,
+                overwrite=True
+            )
+            rekordbox_playlist.set_df(group)
+
+            print(f'Creating Rekordbox playlist {name}: {len(rekordbox_playlist)} tracks')
+            rekordbox_playlist.write(force=True)
+
+        if do_spotify and name[0] not in ['Pending', 'Old', 'CX']:
+            spotify_playlist = SpotifyPlaylist(
+                name=' '.join(['DJ'] + list(name)),
+                create=True,
+                overwrite=True
+            )
+            spotify_playlist.set_df(group)
+
+            print(f'Creating Spotify playlist {name}: {len(spotify_playlist)} tracks')
+            spotify_playlist.write(force=True)
+
     return
 
 
@@ -338,17 +368,7 @@ def library_maintenance():
 
     djlib_spotify_likes_maintenance()
 
-    # choice = get_user_choice('Rebuild Rekordbox playlists?')
-    # rebuild_rekordbox = (choice == 'yes')
-    #
-    # choice = get_user_choice('Rebuild Spotify playlists?')
-    # rebuild_spotify = (choice == 'yes')
-    #
-    # if rebuild_rekordbox or rebuild_spotify:
-    #     playlist_maintenance(
-    #         do_rekordbox=rebuild_rekordbox,
-    #         do_spotify=rebuild_spotify
-    #     )
+    playlists_maintenance()
 
     return
 

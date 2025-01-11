@@ -196,7 +196,7 @@ def go_through_artist_list():
 def library_reorg_add_question_mark():
     djlib = Doc('djlib')
     bool_array = djlib.get_df().apply(
-        lambda track: track_is(track, classes=['A', 'B'], before='2024-10-19'),
+        lambda track: classification.track_is(track, classes=['A', 'B'], before='2024-10-19'),
         axis=1
     )
 
@@ -232,6 +232,8 @@ def library_reorg_add_question_mark():
 
 def main():
     # go_through_artist_list()
+
+    playlists_maintenance(do_rekordbox=True, do_spotify=True)
 
     return
 

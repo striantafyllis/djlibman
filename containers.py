@@ -75,7 +75,7 @@ class Container(object):
     def set_df(self, df: pd.DataFrame) -> None:
         if self._exists and not self._overwrite:
             raise RuntimeError(f'{self._name} cannot be replaced')
-        self._df = df
+        self._df = self._reconcile_ids(df)
         return
 
     def write(self, force=False) -> None:
@@ -134,7 +134,7 @@ class Container(object):
                 raise ValueError(f"Unknown other index {other_df.index.name}")
         elif this_index_name == 'rekordbox_id':
             if other_df.index.name == 'spotify_id':
-                rekordbox_to_spotify_mapping = docs['rekordbox_to_spotify'].read()
+                rekordbox_to_spotify_mapping = djlib_config.docs['rekordbox_to_spotify'].read()
 
                 # remove empty mappings
                 rekordbox_to_spotify_mapping = rekordbox_to_spotify_mapping.loc[
@@ -574,6 +574,7 @@ class RekordboxPlaylist(Container):
 
     def _write_back(self, df):
         djlib_config.rekordbox.create_playlist(self._playlist_name, df, overwrite=True)
+        djlib_config.rekordbox.write()
         return
 
 class Wrapper(Container):

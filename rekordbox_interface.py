@@ -95,7 +95,7 @@ class RekordboxInterface:
         playlist = self._playlists
         for i in range(len(playlist_name)):
             if not isinstance(playlist, dict):
-                raise ValueError('Playlist %s is not a folder playlist' % playlist_name[:(i-1)])
+                raise ValueError('Playlist {playlist_name[:i]} is not a folder playlist')
             playlist = playlist.get(playlist_name[i])
             if playlist is None:
                 return None

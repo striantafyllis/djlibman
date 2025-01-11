@@ -12,7 +12,8 @@ import djlib_config
 import pandas as pd
 import numpy as np
 
-from scripts import *
+from library_scripts import *
+from spotify_scripts import *
 
 _should_quit = False
 

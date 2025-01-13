@@ -116,37 +116,37 @@ def promote_tracks_in_spotify_queues(
     print(f'{promote_queue_name}: {len(listened_liked_tracks)} of the '
           f'{len(listened_tracks)} listened tracks are liked')
     pretty_print_tracks(listened_liked_tracks, indent=' ' * 4, enum=True)
+    choice = get_user_choice('Is this correct?')
+    if choice != 'yes':
+        return
     print()
 
     if len(listened_liked_tracks) > 0:
-        print(f'Adding liked tracks to {promote_target_name}...')
-        promote_target.append(listened_liked_tracks)
+        promote_target.append(listened_liked_tracks, prompt=False)
         promote_target.write()
 
-        print(f'Removing from Spotify liked tracks...')
-        liked.remove(listened_liked_tracks)
+        liked.remove(listened_liked_tracks, prompt=False)
         liked.write()
 
-    print(f'Removing listened tracks from {promote_queue_name}...')
-    promote_queue.remove(listened_tracks)
+    promote_queue.remove(listened_tracks, prompt=False)
     promote_queue.write()
 
     if promote_queue_level == 1:
         print(f'Removing listened tracks from disk queue...')
         queue = Queue()
-        queue.remove(listened_tracks)
+        queue.remove(listened_tracks, prompt=False)
         queue.write()
 
     print(f'Adding listened tracks to listening history...')
     listening_history = Doc('listening_history')
-    listening_history.append(listened_tracks)
+    listening_history.append(listened_tracks, prompt=False)
     listening_history.write()
 
     return
 
 def replenish_spotify_queue(
         queue_name='L1 queue',
-        target_size=100):
+        target_size=200):
     spotify_queue = SpotifyPlaylist(queue_name)
     disk_queue = Queue()
 

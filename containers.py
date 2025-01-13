@@ -163,7 +163,7 @@ class Container(object):
     def deduplicate(self, prompt=None) -> None:
         self._ensure_df()
 
-        print(f'Deduplicating {self.get_name()}...')
+        # print(f'Deduplicating {self.get_name()}...')
 
         this_df = self._df
 

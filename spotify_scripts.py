@@ -99,7 +99,6 @@ def promote_tracks_in_spotify_queues(
 
     print(f'{promote_queue_name}: {len(listened_tracks)} listened tracks')
     pretty_print_tracks(listened_tracks, indent=' ' * 4, enum=True)
-    print()
     choice = get_user_choice('Is this correct?')
     if choice != 'yes':
         return
@@ -205,7 +204,7 @@ def sanity_check_spotify_queue(spotify_queue_name, is_level_1=False):
         print(f'WARNING: {len(queue_tracks_in_library)} tracks are already in the library')
         choice = get_user_choice('Remove?')
         if choice == 'yes':
-            spotify_queue.remove(queue_tracks_in_library)
+            spotify_queue.remove(queue_tracks_in_library, prompt=False)
 
     # Make sure all items in the queue are not liked
     spotify_liked = SpotifyLiked()
@@ -219,7 +218,7 @@ def sanity_check_spotify_queue(spotify_queue_name, is_level_1=False):
 
         choice = get_user_choice('Unlike?')
         if choice == 'yes':
-            spotify_liked.remove(queue_liked_tracks)
+            spotify_liked.remove(queue_liked_tracks, prompt=False)
             spotify_liked.write()
 
     spotify_queue.write()

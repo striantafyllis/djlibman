@@ -80,7 +80,31 @@ class FileDoc:
         if self._apply_converters:
             for column_name, converter in self._converters.items():
                 if column_name in self._contents.columns:
-                    self._contents[column_name] = self._contents[column_name].apply(converter)
+                    # I could do this with pd.Series.apply() but I'll do it the slow and
+                    # laborious way so we can have proper error reporting.
+                    # As to why I form the entire column first before assignment instead of assigning
+                    # one element at a time:
+                    # Pandas has a bug (or a feature?) that doesn't let me set a single element to a list
+                    # value. It thinks the list value is a list of values that should be put in a
+                    # list of cells, and I get this exception from indexing.py:
+                    # ValueError: Must have equal len keys and value when setting with an iterable
+
+                    column = self._contents[column_name]
+
+                    new_column = []
+                    for i in range(len(column)):
+                        try:
+                            orig_value = column.iloc[i]
+                            value = converter(orig_value)
+                            new_column.append(value)
+                        except Exception as e:
+                            raise ValueError(
+                                f"Document {self._path}, row {i+1}, column {column_name}: "
+                                f"conversion of value '{orig_value}' failed "
+                                f"with error: {e}"
+                            )
+
+                    self._contents[column_name] = new_column
 
         if self._index_column is not None:
             if self._index_column == '_FIRST_COLUMN' and len(self._contents.columns) > 0:

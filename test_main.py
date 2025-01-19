@@ -233,7 +233,9 @@ def library_reorg_add_question_mark():
 def main():
     # go_through_artist_list()
 
-    playlists_maintenance(do_rekordbox=True, do_spotify=True)
+    # playlists_maintenance(do_rekordbox=True, do_spotify=True)
+
+    library_maintenance()
 
     return
 

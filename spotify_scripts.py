@@ -262,7 +262,7 @@ def pretty_print_spotify_playlist(playlist_name):
     spotify_playlist = SpotifyPlaylist(playlist_name)
 
     print(f"Spotify playlist '{playlist_name}': {len(spotify_playlist)} tracks")
-    pretty_print_tracks(spotify_playlist.get_df(), enum=True)
+    pretty_print_tracks(spotify_playlist.get_df(), enum=True, ids=False)
     return
 
 def shuffle_spotify_playlist(playlist_name):

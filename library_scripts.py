@@ -373,3 +373,9 @@ def library_maintenance():
     return
 
 
+def pretty_print_rekordbox_playlist(playlist_name):
+    rekordbox_playlist = RekordboxPlaylist(playlist_name)
+
+    print(f"Rekordbox playlist '{playlist_name}': {len(rekordbox_playlist)} tracks")
+    pretty_print_tracks(rekordbox_playlist.get_df(), enum=True, ids=False)
+    return

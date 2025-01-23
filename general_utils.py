@@ -237,16 +237,17 @@ def back_up_file(path, max_backups):
     shutil.copyfile(path, backup)
     return
 
-def format_track(track, extra_attribs=[]):
+def format_track(track, id=True, extra_attribs=[]):
     if isinstance(extra_attribs, str):
         extra_attribs = [extra_attribs]
 
     s = ''
 
-    for id_field in ['rekordbox_id', 'spotify_id']:
-        if id_field in track:
-            s += f'{track[id_field]}: '
-            break
+    if id:
+        for id_field in ['rekordbox_id', 'spotify_id']:
+            if id_field in track:
+                s += f'{track[id_field]}: '
+                break
 
     if 'artist_names' in track:
         # Spotify-style track
@@ -315,7 +316,7 @@ def format_track_for_search(track):
     return string
 
 
-def pretty_print_tracks(tracks, indent='', enum=False, extra_attribs=[]):
+def pretty_print_tracks(tracks, indent='', enum=False, ids=True, extra_attribs=[]):
     num_tracks = len(tracks)
     if num_tracks == 0:
         return
@@ -331,9 +332,11 @@ def pretty_print_tracks(tracks, indent='', enum=False, extra_attribs=[]):
     for i in range(num_tracks):
         sys.stdout.write(indent)
         if enum:
-            sys.stdout.write('%d: ' % (i+1))
+            sys.stdout.write(f'{i+1}. ')
 
-        sys.stdout.write('%s\n' % format_track(tracks[i], extra_attribs))
+        sys.stdout.write(format_track(tracks[i], id=ids, extra_attribs=extra_attribs) + '\n')
+
+    sys.stdout.flush()
 
     return
 

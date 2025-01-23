@@ -116,6 +116,16 @@ def track_is(
 
     return True
 
+def filter_tracks(
+        tracks, **kwargs
+):
+    return tracks.loc[
+        tracks.apply(
+            lambda track: track_is(track, **kwargs),
+            axis=1
+        )
+    ]
+
 def _join_names(name1, name2):
     if not isinstance(name1, tuple):
         if name1 == '':
@@ -141,13 +151,9 @@ def classify_by_flavor(name, tracks):
                 if other_flavor_group is not None:
                     other_flavors += other_flavor_group
 
-            flavor_tracks = tracks.loc[
-                tracks.apply(lambda track: track_is(track, not_flavors=other_flavors), axis=1)
-            ]
+            flavor_tracks = filter_tracks(tracks, not_flavors=other_flavors)
         else:
-            flavor_tracks = tracks.loc[
-                tracks.apply(lambda track: track_is(track, flavors=flavor_group), axis=1)
-            ]
+            flavor_tracks = filter_tracks(tracks, flavors=flavor_group)
 
         groups[_join_names(name, flavor_name)] = flavor_tracks
 
@@ -164,25 +170,17 @@ def classify_by_class(name, tracks):
                 if other_class_group is not None:
                     other_classes += other_class_group
 
-            class_tracks = tracks.loc[
-                tracks.apply(lambda track: track_is(track, not_classes=other_classes), axis=1)
-            ]
+            class_tracks = filter_tracks(tracks, not_classes=other_classes)
         else:
-            class_tracks = tracks.loc[
-                tracks.apply(lambda track: track_is(track, classes=class_group), axis=1)
-            ]
+            class_tracks = filter_tracks(tracks, classes=class_group)
 
         groups[_join_names(name, class_name)] = class_tracks
 
     return groups
 
 def classify_by_danceability(name, tracks):
-    danceable_tracks = tracks.loc[
-        tracks.apply(lambda track: track_is(track, danceable=True), axis=1)
-    ]
-    ambient_tracks = tracks.loc[
-        tracks.apply(lambda track: track_is(track, ambient=True), axis=1)
-    ]
+    danceable_tracks = filter_tracks(tracks, danceable=True)
+    ambient_tracks = filter_tracks(tracks, ambient=True)
 
     return {
         _join_names(name, ''): danceable_tracks,
@@ -190,12 +188,8 @@ def classify_by_danceability(name, tracks):
     }
 
 def classify_by_tempo(name, tracks):
-    uptempo_tracks = tracks.loc[
-        tracks.apply(lambda track: track_is(track, uptempo=True), axis=1)
-    ]
-    downtempo_tracks = tracks.loc[
-        tracks.apply(lambda track: track_is(track, uptempo=False), axis=1)
-    ]
+    uptempo_tracks = filter_tracks(tracks, uptempo=True)
+    downtempo_tracks = filter_tracks(tracks, uptempo=False)
 
     return {
         _join_names(name, ''): uptempo_tracks,

@@ -5,6 +5,7 @@ import pandas as pd
 
 from djlibman import *
 from spotify_discography import get_artist_discography
+from classification import *
 
 
 def convert_listening_history():
@@ -230,12 +231,82 @@ def library_reorg_add_question_mark():
     return
 
 
+def promote_new_mix_tracks_to_a():
+    djlib = Doc('djlib')
+
+    new_mixes = [
+        'mix 17 - george - prog',
+        'mix 19 - asiento - prog',
+        'mix 20 - flowtoys - prog',
+        'mix 21 - winter blues - prog'
+    ]
+
+    track_ids = pd.Index([])
+    for mix_name in new_mixes:
+        rekordbox_playlist = RekordboxPlaylist(name=['Mixes', mix_name])
+        mix_track_ids = rekordbox_playlist.get_df().index
+
+        track_ids = track_ids.union(mix_track_ids, sort=False)
+
+    tracks = djlib.get_df().loc[track_ids]
+
+    print('Tracks in mixes:')
+    pretty_print_tracks(tracks, enum=True, ids=False)
+    print()
+
+    print('Tracks already at A:')
+    tracks_already_A = filter_tracks(tracks, classes=['A'])
+    pretty_print_tracks(tracks_already_A, enum=True, ids=False)
+    print()
+
+    print('Tracks to be promoted to A:')
+    tracks_to_promote = tracks.loc[tracks.index.difference(tracks_already_A.index, sort=False)]
+    if len(tracks_to_promote) == 0:
+        print('NONE')
+    else:
+        pretty_print_tracks(tracks_to_promote, enum=True, ids=False)
+        choice = get_user_choice('Proceed?')
+        if choice == 'yes':
+            djlib.get_df().loc[tracks_to_promote.index, 'Class'] = 'A'
+            djlib.write(force=True)
+
+    return
+
+def form_progressive_not_used():
+    prog_mixes = [
+        'mix 17 - george - prog',
+        'mix 19 - asiento - prog',
+        'mix 20 - flowtoys - prog',
+        'mix 21 - winter blues - prog'
+    ]
+
+    prog_tracks = RekordboxPlaylist(['managed', 'Progressive'])
+
+    prog_not_used_tracks = RekordboxPlaylist(['managed', 'Progressive Not Used'],
+                                             create=True, overwrite=True)
+    prog_not_used_tracks.append(prog_tracks, prompt=False)
+
+    for mix in prog_mixes:
+        mix_tracks = RekordboxPlaylist(['Mixes', mix])
+        prog_not_used_tracks.remove(mix_tracks, prompt=False)
+
+    prog_not_used_tracks.write()
+
+    return
+
+
+
+
 def main():
     # go_through_artist_list()
 
     # playlists_maintenance(do_rekordbox=True, do_spotify=True)
 
-    library_maintenance()
+    # library_maintenance()
+
+    # promote_new_mix_tracks_to_a()
+
+    form_progressive_not_used()
 
     return
 

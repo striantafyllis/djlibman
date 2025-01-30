@@ -76,6 +76,7 @@ class Container(object):
         if self._exists and not self._overwrite:
             raise RuntimeError(f'{self._name} cannot be replaced')
         self._df = self._reconcile_ids(df)
+        self._changed = True
         return
 
     def write(self, force=False) -> None:

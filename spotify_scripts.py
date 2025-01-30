@@ -246,8 +246,8 @@ def queue_maintenance(
         if choice == 'yes':
             l2_queue_name = djlib_config.get_default_spotify_queue_at_level(2)
             l2_queue = SpotifyPlaylist(l2_queue_name)
-            l2_queue.append(shazam)
-            shazam.truncate()
+            l2_queue.append(shazam, prompt=False)
+            shazam.truncate(prompt=False)
 
             l2_queue.write()
             shazam.write()

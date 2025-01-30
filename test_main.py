@@ -272,27 +272,6 @@ def promote_new_mix_tracks_to_a():
 
     return
 
-def form_progressive_not_used():
-    prog_mixes = [
-        'mix 17 - george - prog',
-        'mix 19 - asiento - prog',
-        'mix 20 - flowtoys - prog',
-        'mix 21 - winter blues - prog'
-    ]
-
-    prog_tracks = RekordboxPlaylist(['managed', 'Progressive'])
-
-    prog_not_used_tracks = RekordboxPlaylist(['managed', 'Progressive Not Used'],
-                                             create=True, overwrite=True)
-    prog_not_used_tracks.append(prog_tracks, prompt=False)
-
-    for mix in prog_mixes:
-        mix_tracks = RekordboxPlaylist(['Mixes', mix])
-        prog_not_used_tracks.remove(mix_tracks, prompt=False)
-
-    prog_not_used_tracks.write()
-
-    return
 
 
 

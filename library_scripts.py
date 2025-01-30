@@ -321,6 +321,32 @@ def djlib_spotify_likes_maintenance():
     spotify_liked.write()
     return
 
+
+def form_progressive_not_used():
+    """Special case code to form the Progressive - Not Used playlist. This will be generalized later."""
+
+    prog_mixes = [
+        'mix 17 - george - prog',
+        'mix 19 - asiento - prog',
+        'mix 20 - flowtoys - prog',
+        'mix 21 - winter blues - prog'
+    ]
+
+    prog_tracks = RekordboxPlaylist(['managed', 'Progressive'])
+
+    prog_not_used_tracks = RekordboxPlaylist(['managed', 'Progressive Not Used'],
+                                             create=True, overwrite=True)
+    prog_not_used_tracks.append(prog_tracks, prompt=False)
+
+    for mix in prog_mixes:
+        mix_tracks = RekordboxPlaylist(['Mixes', mix])
+        prog_not_used_tracks.remove(mix_tracks, prompt=False)
+
+    prog_not_used_tracks.write()
+
+    return
+
+
 def playlists_maintenance(do_rekordbox=True, do_spotify=True):
     djlib = Doc('djlib')
 
@@ -336,7 +362,7 @@ def playlists_maintenance(do_rekordbox=True, do_spotify=True):
             rekordbox_playlist.set_df(group)
 
             print(f'Creating Rekordbox playlist {name}: {len(rekordbox_playlist)} tracks')
-            rekordbox_playlist.write(force=True)
+            rekordbox_playlist.write()
 
         if do_spotify and name[0] not in ['Pending', 'Old', 'CX']:
             spotify_playlist = SpotifyPlaylist(
@@ -347,12 +373,14 @@ def playlists_maintenance(do_rekordbox=True, do_spotify=True):
             spotify_playlist.set_df(group)
 
             print(f'Creating Spotify playlist {name}: {len(spotify_playlist)} tracks')
-            spotify_playlist.write(force=True)
+            spotify_playlist.write()
+
+    # special-case code - will be generalized later
+    form_progressive_not_used()
 
     return
 
-
-def library_maintenance():
+def library_maintenance_sanity_checks():
     if not rekordbox_sanity_checks():
         return False
 
@@ -361,6 +389,35 @@ def library_maintenance():
 
     if not djlib_values_sanity_check():
         return False
+
+    return True
+
+
+
+def library_maintenance_after_purchase():
+    if not library_maintenance_sanity_checks():
+        return
+
+    djlib_maintenance()
+
+    rekordbox_to_spotify_maintenance()
+
+    return
+
+def library_maintenance_after_classification():
+    if not library_maintenance_sanity_checks():
+        return
+
+    djlib_spotify_likes_maintenance()
+
+    playlists_maintenance()
+
+    return
+
+
+def library_maintenance_all():
+    if not library_maintenance_sanity_checks():
+        return
 
     djlib_maintenance()
 

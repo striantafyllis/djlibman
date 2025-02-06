@@ -61,19 +61,25 @@ def get_playlist_listened_tracks(
 
         if last_listened_track_idx is None:
             # Try to find it as a prefix
+            candidate_tracks = []
             for i in range(len(playlist_tracks)):
                 if playlist_tracks.iloc[i]['name'].upper().startswith(last_listened_track.upper()):
-                    last_listened_track_idx = i
+                    candidate_tracks.append(i)
                     break
-            if last_listened_track_idx is None:
+            if len(candidate_tracks) > 1:
+                raise Exception(f"Last listened track {last_listened_track} is ambiguous; "
+                                f"{len(candidate_tracks)} matches")
+            elif len(candidate_tracks) == 0:
                 raise Exception(f"Track '{last_listened_track}' not found in playlist")
+            else:
+                last_listened_track_idx = candidate_tracks[0]
 
         return playlist_tracks.iloc[:(last_listened_track_idx+1)]
 
     raise Exception(f"Invalid type for last_listened_track: {type(last_listened_track)}")
 
 
-def promote_tracks_in_spotify_queues(
+def promote_tracks_in_spotify_queue(
         last_track,
         promote_queue_name=None,
         promote_target_name=None):
@@ -178,7 +184,7 @@ def replenish_spotify_queue(
 
     return
 
-def sanity_check_spotify_queue(spotify_queue_name, is_level_1=False):
+def sanity_check_spotify_queue(spotify_queue_name, *, is_level_1=False, is_promote_queue=False):
     spotify_queue = SpotifyPlaylist(spotify_queue_name)
     print(f'{spotify_queue_name}: {len(spotify_queue)} tracks')
 
@@ -207,19 +213,20 @@ def sanity_check_spotify_queue(spotify_queue_name, is_level_1=False):
             spotify_queue.remove(queue_tracks_in_library, prompt=False)
 
     # Make sure all items in the queue are not liked
-    spotify_liked = SpotifyLiked()
+    if not is_promote_queue:
+        spotify_liked = SpotifyLiked()
 
-    queue_liked_tracks = spotify_queue.get_intersection(spotify_liked)
+        queue_liked_tracks = spotify_queue.get_intersection(spotify_liked)
 
-    if len(queue_liked_tracks) > 0:
-        print(f'WARNING: {len(queue_liked_tracks)} {spotify_queue_name} tracks are already liked')
-        pretty_print_tracks(queue_liked_tracks, indent=' '*4, enum=True)
-        print()
+        if len(queue_liked_tracks) > 0:
+            print(f'WARNING: {len(queue_liked_tracks)} {spotify_queue_name} tracks are already liked')
+            pretty_print_tracks(queue_liked_tracks, indent=' '*4, enum=True)
+            print()
 
-        choice = get_user_choice('Unlike?')
-        if choice == 'yes':
-            spotify_liked.remove(queue_liked_tracks, prompt=False)
-            spotify_liked.write()
+            choice = get_user_choice('Unlike?')
+            if choice == 'yes':
+                spotify_liked.remove(queue_liked_tracks, prompt=False)
+                spotify_liked.write()
 
     spotify_queue.write()
 
@@ -231,14 +238,21 @@ def queue_maintenance(
         promote_queue_name=None,
         promote_target_name=None
 ):
-    # Sanity check! Queue and listening history must be disjoint
-    sanity_check_disk_queues()
-
     if last_track is None:
         if promote_queue_name is not None or promote_target_name is not None:
             raise ValueError('promote_queue or promote_target is specified without last_track')
+
+    # Sanity check! Queue and listening history must be disjoint
+    sanity_check_disk_queues()
+
+    for i, level in enumerate(djlib_config.spotify_queues):
+        for spotify_queue in level:
+            sanity_check_spotify_queue(spotify_queue,
+                                       is_level_1=(i==0),
+                                       is_promote_queue=(spotify_queue==promote_queue_name))
+
     else:
-        promote_tracks_in_spotify_queues(last_track, promote_queue_name, promote_target_name)
+        promote_tracks_in_spotify_queue(last_track, promote_queue_name, promote_target_name)
 
     shazam = SpotifyPlaylist('My Shazam Tracks', create=True)
     if len(shazam) > 0:
@@ -252,9 +266,7 @@ def queue_maintenance(
             l2_queue.write()
             shazam.write()
 
-    for i, level in enumerate(djlib_config.spotify_queues):
-        for spotify_queue in level:
-            sanity_check_spotify_queue(spotify_queue, i==0)
+            sanity_check_spotify_queue(l2_queue_name, is_level_1=False)
 
     return
 

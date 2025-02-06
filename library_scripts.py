@@ -436,3 +436,34 @@ def pretty_print_rekordbox_playlist(playlist_name):
     print(f"Rekordbox playlist '{playlist_name}': {len(rekordbox_playlist)} tracks")
     pretty_print_tracks(rekordbox_playlist.get_df(), enum=True, ids=False)
     return
+
+
+def promote_tracks_to_a(rekordbox_playlist_name):
+    rekordbox_playlist = RekordboxPlaylist(rekordbox_playlist_name)
+    track_ids = rekordbox_playlist.get_df().index
+
+    djlib = Doc('djlib')
+
+    tracks = djlib.get_df().loc[track_ids]
+
+    print(f'Tracks in {rekordbox_playlist_name}:')
+    pretty_print_tracks(tracks, enum=True, ids=False)
+    print()
+
+    print('Tracks already at A:')
+    tracks_already_A = classification.filter_tracks(tracks, classes=['A'])
+    pretty_print_tracks(tracks_already_A, enum=True, ids=False)
+    print()
+
+    print('Tracks to be promoted to A:')
+    tracks_to_promote = tracks.loc[tracks.index.difference(tracks_already_A.index, sort=False)]
+    if len(tracks_to_promote) == 0:
+        print('NONE')
+    else:
+        pretty_print_tracks(tracks_to_promote, enum=True, ids=False)
+        choice = get_user_choice('Proceed?')
+        if choice == 'yes':
+            djlib.get_df().loc[tracks_to_promote.index, 'Class'] = 'A'
+            djlib.write(force=True)
+
+    return

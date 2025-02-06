@@ -230,7 +230,6 @@ def library_reorg_add_question_mark():
 
     return
 
-
 def promote_new_mix_tracks_to_a():
     djlib = Doc('djlib')
 
@@ -241,34 +240,8 @@ def promote_new_mix_tracks_to_a():
         'mix 21 - winter blues - prog'
     ]
 
-    track_ids = pd.Index([])
     for mix_name in new_mixes:
-        rekordbox_playlist = RekordboxPlaylist(name=['Mixes', mix_name])
-        mix_track_ids = rekordbox_playlist.get_df().index
-
-        track_ids = track_ids.union(mix_track_ids, sort=False)
-
-    tracks = djlib.get_df().loc[track_ids]
-
-    print('Tracks in mixes:')
-    pretty_print_tracks(tracks, enum=True, ids=False)
-    print()
-
-    print('Tracks already at A:')
-    tracks_already_A = filter_tracks(tracks, classes=['A'])
-    pretty_print_tracks(tracks_already_A, enum=True, ids=False)
-    print()
-
-    print('Tracks to be promoted to A:')
-    tracks_to_promote = tracks.loc[tracks.index.difference(tracks_already_A.index, sort=False)]
-    if len(tracks_to_promote) == 0:
-        print('NONE')
-    else:
-        pretty_print_tracks(tracks_to_promote, enum=True, ids=False)
-        choice = get_user_choice('Proceed?')
-        if choice == 'yes':
-            djlib.get_df().loc[tracks_to_promote.index, 'Class'] = 'A'
-            djlib.write(force=True)
+        promote_tracks_to_a(['Mixes', mix_name])
 
     return
 

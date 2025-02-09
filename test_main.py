@@ -128,27 +128,6 @@ def remove_artist_old_entries_from_listening_history(
 
     return
 
-
-def read_file(filename):
-    fh = open(filename)
-
-    lines = []
-
-    for line in fh:
-        comment_start = line.find('#')
-        if comment_start != -1:
-            line = line[:comment_start]
-
-        line = line.strip()
-        if line == '':
-            continue
-
-        lines.append(line)
-
-    fh.close()
-
-    return lines
-
 def read_file_with_numbers(filename):
     fh = open(filename)
 
@@ -182,8 +161,6 @@ def read_file_with_numbers(filename):
     fh.close()
 
     return lines
-
-
 
 def go_through_artist_list():
     artists = read_file_with_numbers('./ready_artists.txt')
@@ -250,15 +227,7 @@ def promote_new_mix_tracks_to_a():
 
 
 def main():
-    # go_through_artist_list()
-
-    # playlists_maintenance(do_rekordbox=True, do_spotify=True)
-
-    # library_maintenance()
-
-    # promote_new_mix_tracks_to_a()
-
-    form_progressive_not_used()
+    text_file_to_spotify_tracks('./tracks.txt')
 
     return
 

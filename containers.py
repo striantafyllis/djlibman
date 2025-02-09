@@ -241,8 +241,7 @@ class Container(object):
         if len(other_df) == 0:
             return
 
-        if len(self._df) > 0:
-            other_df = self._reconcile_ids(other_df)
+        other_df = self._reconcile_ids(other_df)
 
         other_unique = dataframe_ensure_unique_index(other_df)
 

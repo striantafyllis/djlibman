@@ -514,3 +514,23 @@ def artist_stats(tracks, count_cutoff=10):
         print('%s: %d' % (artist_name, count))
 
     return
+
+def read_lines_from_file(filename):
+    fh = open(filename)
+
+    lines = []
+
+    for line in fh:
+        comment_start = line.find('#')
+        if comment_start != -1:
+            line = line[:comment_start]
+
+        line = line.strip()
+        if line == '':
+            continue
+
+        lines.append(line)
+
+    fh.close()
+
+    return lines

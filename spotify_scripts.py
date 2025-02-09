@@ -81,29 +81,29 @@ def get_playlist_listened_tracks(
 
 def promote_tracks_in_spotify_queue(
         last_track,
-        promote_queue_name=None,
+        promote_source_name=None,
         promote_target_name=None):
 
-    if promote_queue_name is None:
+    if promote_source_name is None:
         promote_queue_level = 1
-        promote_queue_name = djlib_config.get_default_spotify_queue_at_level(1)
+        promote_source_name = djlib_config.get_default_spotify_queue_at_level(1)
     else:
-        promote_queue_level = djlib_config.get_spotify_queue_level(promote_queue_name)
+        promote_queue_level = djlib_config.get_spotify_queue_level(promote_source_name)
 
     if promote_target_name is None:
         promote_target_name = djlib_config.get_default_spotify_queue_at_level(promote_queue_level + 1)
     else:
         promote_target_level = djlib_config.get_spotify_queue_level(promote_target_name)
         if promote_target_level != promote_queue_level + 1:
-            raise ValueError(f"Promote queue '{promote_queue_name}' is at level {promote_queue_level} "
+            raise ValueError(f"Promote queue '{promote_source_name}' is at level {promote_queue_level} "
                              f"but promote target '{promote_target_name}' is at level {promote_target_level}")
 
-    promote_queue = SpotifyPlaylist(promote_queue_name)
+    promote_queue = SpotifyPlaylist(promote_source_name)
     promote_target = SpotifyPlaylist(promote_target_name)
 
     listened_tracks = get_playlist_listened_tracks(promote_queue, last_track)
 
-    print(f'{promote_queue_name}: {len(listened_tracks)} listened tracks')
+    print(f'{promote_source_name}: {len(listened_tracks)} listened tracks')
     pretty_print_tracks(listened_tracks, indent=' ' * 4, enum=True)
     choice = get_user_choice('Is this correct?')
     if choice != 'yes':
@@ -118,7 +118,7 @@ def promote_tracks_in_spotify_queue(
     listened_liked_tracks_idx = listened_tracks.index.intersection(liked.get_df().index, sort=False)
     listened_liked_tracks = listened_tracks.loc[listened_liked_tracks_idx]
 
-    print(f'{promote_queue_name}: {len(listened_liked_tracks)} of the '
+    print(f'{promote_source_name}: {len(listened_liked_tracks)} of the '
           f'{len(listened_tracks)} listened tracks are liked')
     pretty_print_tracks(listened_liked_tracks, indent=' ' * 4, enum=True)
     choice = get_user_choice('Is this correct?')
@@ -235,11 +235,11 @@ def sanity_check_spotify_queue(spotify_queue_name, *, is_level_1=False, is_promo
 
 def queue_maintenance(
         last_track=None,
-        promote_queue_name=None,
-        promote_target_name=None
+        promote_source=None,
+        promote_target=None
 ):
     if last_track is None:
-        if promote_queue_name is not None or promote_target_name is not None:
+        if promote_source is not None or promote_target is not None:
             raise ValueError('promote_queue or promote_target is specified without last_track')
 
     # Sanity check! Queue and listening history must be disjoint
@@ -249,10 +249,10 @@ def queue_maintenance(
         for spotify_queue in level:
             sanity_check_spotify_queue(spotify_queue,
                                        is_level_1=(i==0),
-                                       is_promote_queue=(spotify_queue==promote_queue_name))
+                                       is_promote_queue=(spotify_queue == promote_source))
 
     else:
-        promote_tracks_in_spotify_queue(last_track, promote_queue_name, promote_target_name)
+        promote_tracks_in_spotify_queue(last_track, promote_source, promote_target)
 
     shazam = SpotifyPlaylist('My Shazam Tracks', create=True)
     if len(shazam) > 0:
@@ -383,3 +383,9 @@ def sample_artist_to_queue(artist_name, *, latest=10, popular=10):
 
     return
 
+def text_file_to_spotify_tracks(text_file):
+    lines = read_lines_from_file(text_file)
+
+    search_strings = [format_track_for_search(line) for line in lines]
+
+    return

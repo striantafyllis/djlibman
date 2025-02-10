@@ -242,7 +242,7 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
         pretty_print_tracks(unmapped_rekordbox_tracks, indent=' '*4, enum=True)
         choice = get_user_choice('Do Spotify search?')
         if choice == 'yes':
-            for rekordbox_track in unmapped_rekordbox_tracks.values:
+            for rekordbox_track in unmapped_rekordbox_tracks.itertuples(index=False):
                 rekordbox_id = rekordbox_track['rekordbox_id']
 
                 print(f'Searching for Rekordbox track: {format_track(rekordbox_track)}')

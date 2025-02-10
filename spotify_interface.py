@@ -71,7 +71,7 @@ _TRACK_COLUMNS = {
 
 _BASE_62 = re.compile(r'^[0-9A-Za-z]+$')
 
-_TTL = 600
+_TTL = 60
 
 def is_spotify_id(s: str):
     # Spotify playlist IDs are base-62 numbers and they are usually about 22 digits long
@@ -204,6 +204,10 @@ class SpotifyInterface:
 
         self._cache = cache.Cache()
 
+        return
+
+    def invalidate_cache(self):
+        self._cache = cache.Cache()
         return
 
 

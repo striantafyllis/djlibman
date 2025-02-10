@@ -240,7 +240,7 @@ def queue_maintenance(
 ):
     if last_track is None:
         if promote_source is not None or promote_target is not None:
-            raise ValueError('promote_queue or promote_target is specified without last_track')
+            raise ValueError('promote_source or promote_target is specified without last_track')
 
     # Sanity check! Queue and listening history must be disjoint
     sanity_check_disk_queues()
@@ -251,7 +251,7 @@ def queue_maintenance(
                                        is_level_1=(i==0),
                                        is_promote_queue=(spotify_queue == promote_source))
 
-    else:
+    if last_track is not None:
         promote_tracks_in_spotify_queue(last_track, promote_source, promote_target)
 
     shazam = SpotifyPlaylist('My Shazam Tracks', create=True)

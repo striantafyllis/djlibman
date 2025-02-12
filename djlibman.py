@@ -6,14 +6,14 @@ import code
 import time
 import logging
 
-import djlib_config
-
 # we want Pandas and NumPy to be available at the command line
 import pandas as pd
 import numpy as np
 
 from library_scripts import *
 from spotify_scripts import *
+
+logger = logging.getLogger(__name__)
 
 _should_quit = False
 
@@ -80,13 +80,16 @@ def _init(config_file=None):
         logging_args['filename'] = djlib_config._log_file
     logging.basicConfig(**logging_args)
 
-    logger = logging.getLogger(__name__)
+    # HACK; after basicConfig, we have to silence a few loggers that might log too much
+    # TODO better way: set logging to INFO everywhere and allow individual packages to increase their logging
+    if djlib_config._log_level <= logging.DEBUG:
+        import spotipy
+        spotipy.client.logger.setLevel(logging.INFO)
+        import urllib3
+        urllib3.connectionpool.log.setLevel(logging.INFO)
 
     logger.info('Logging started')
-
-    # import everything from scripts
-    # import scripts
-    # globals().update(scripts.__dict__)
+    logger.debug('Test debug message')
 
     return
 

@@ -163,7 +163,6 @@ def init(config_file=None):
         else:
             raise Exception("Unrecognized config section: '%s'" % section_name)
 
-
 def _add_doc(name, type, **kwargs):
     global google
     global docs

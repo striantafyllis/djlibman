@@ -4,8 +4,6 @@ import re
 import pandas as pd
 import numpy as np
 
-from djlib_config import *
-from general_utils import *
 from containers import *
 import classification
 
@@ -251,7 +249,7 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
 
                 search_string = format_track_for_search(rekordbox_track)
 
-                spotify_tracks = spotify.search(search_string)
+                spotify_tracks = djlib_config.spotify.search(search_string)
 
                 done = False
                 if len(spotify_tracks) == 0:

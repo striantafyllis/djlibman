@@ -1,7 +1,6 @@
 
 import random
 
-import djlib_config
 import spotify_discography
 from containers import *
 

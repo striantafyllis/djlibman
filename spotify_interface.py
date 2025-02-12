@@ -1,5 +1,4 @@
-import os
-import re
+import time
 import logging
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -196,6 +195,7 @@ class SpotifyInterface:
 
         # this just creates the wrapper object; the actual network connection
         # will be initialized when we first try to use it
+        logger.debug('Initializing Spotify connection with scope %s', _SCOPES)
         self._connection = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=','.join(_SCOPES),
                                                             cache_path=self._cached_token_file,
                                                             client_id=self._client_id,
@@ -206,23 +206,29 @@ class SpotifyInterface:
 
         return
 
+    def _spotify_request_wrapper(self, request_name, *args, **kwargs):
+        start_time = time.time()
+        result = getattr(self._connection, request_name)(*args, **kwargs)
+        end_time = time.time()
+        logger.debug('Spotify request %s(%s %s): %.3f s',
+                     request_name, args, kwargs, end_time - start_time)
+        return result
+
     def invalidate_cache(self):
         self._cache = cache.Cache()
         return
 
 
-    def get_connection(self):
-        """Provides access to the raw Spotify interface. When possible, use one of the
-        accessors below, which will also convert the results to Pandas DataFrames."""
-        return self._connection
-
     def get_user_id(self):
-        return self._connection.current_user()['id']
+        time.time()
+        return self._spotify_request_wrapper('current_user')['id']
+        logger.debug('Spotify request: current_user()')
 
     def get_playlists(self):
         def body():
             results = _batch_result(
-                lambda limit, offset: self._connection.current_user_playlists(limit, offset))
+                lambda limit, offset: self._spotify_request_wrapper(
+                    'current_user_playlists', limit, offset))
 
             df = pd.DataFrame.from_records(results)
             df = df.set_index(df.name)
@@ -250,10 +256,12 @@ class SpotifyInterface:
         return playlist_id
 
     def create_playlist(self, playlist_name):
-        self._connection.user_playlist_create(user=self._connection.current_user()['id'],
-                                              name=playlist_name,
-                                              public=False,
-                                              collaborative=False)
+        self._spotify_request_wrapper(
+            'user_playlist_create',
+            user=self.get_user_id(),
+            name=playlist_name,
+            public=False,
+            collaborative=False)
         self._cache.invalidate('playlists')
         return
 
@@ -269,7 +277,8 @@ class SpotifyInterface:
 
         def body():
             results = _batch_result(
-                lambda limit, offset: self._connection.playlist_items(
+                lambda limit, offset: self._spotify_request_wrapper(
+                    'playlist_items',
                     playlist_id=playlist_id,
                     limit=limit, offset=offset
                 ))
@@ -287,7 +296,8 @@ class SpotifyInterface:
     def get_liked_tracks(self):
         def body():
             results = _batch_result(
-                lambda limit, offset: self._connection.current_user_saved_tracks(
+                lambda limit, offset: self._spotify_request_wrapper(
+                    'current_user_saved_tracks',
                     limit=limit, offset=offset
                 ))
 
@@ -306,7 +316,8 @@ class SpotifyInterface:
         # during a run
 
         results = _batch_result(
-            lambda limit, offset: self._connection.artist_albums(artist_id=artist_id, limit=limit, offset=offset)
+            lambda limit, offset: self._spotify_request_wrapper(
+                'artist_albums', artist_id=artist_id, limit=limit, offset=offset)
         )
 
         results = _postprocess_albums(results)
@@ -323,11 +334,12 @@ class SpotifyInterface:
 
         # note: we need to repeat the album query even if we have the album entry from
         # get_artist_albums() because the get_artist_albums() result misses the popularity field
-        album_info = self._connection.album(album_id)
+        album_info = self._spotify_request_wrapper('album', album_id)
         album_entry = project(album_info, _ALBUM_COLUMNS)
 
         results = _batch_result(
-            lambda limit, offset: self._connection.album_tracks(album_id=album_id, limit=limit, offset=offset)
+            lambda limit, offset: self._spotify_request_wrapper(
+                'album_tracks', album_id=album_id, limit=limit, offset=offset)
         )
 
         # make these look like the track lists that come back from playlists etc.
@@ -357,7 +369,7 @@ class SpotifyInterface:
 
     def get_recently_played_tracks(self):
         """Access the last played tracks, up to 50; Spotify doesn't give us access to more."""
-        result = self._connection.current_user_recently_played()
+        result = self._spotify_request_wrapper('current_user_recently_played')
 
         results = result['items']
 
@@ -372,7 +384,7 @@ class SpotifyInterface:
 
     def get_tracks_by_id(self, ids, raw=False):
         results = _batch_request(
-            lambda items: self._connection.tracks(items),
+            lambda items: self._spotify_request_wrapper('tracks', items),
             ids,
             result_field = 'tracks'
         )
@@ -390,7 +402,7 @@ class SpotifyInterface:
 
     def search(self, search_string, limit=10, raw=False):
         # no batching
-        results = self._connection.search(q=search_string, limit=limit)
+        results = self._spotify_request_wrapper('search', q=search_string, limit=limit)
 
         if raw:
             return results
@@ -425,7 +437,7 @@ class SpotifyInterface:
             tracks = new_tracks
 
         _batch_request(
-            lambda x: self._connection.playlist_add_items(playlist_id, x),
+            lambda x: self._spotify_request_wrapper('playlist_add_items', playlist_id, x),
             tracks
         )
 
@@ -442,8 +454,8 @@ class SpotifyInterface:
             tracks = tracks.spotify_id
 
         _batch_request(
-            (lambda x: self._connection.playlist_replace_items(playlist_id, x),
-             lambda x: self._connection.playlist_add_items(playlist_id, x)
+            (lambda x: self._spotify_request_wrapper('playlist_replace_items', playlist_id, x),
+             lambda x: self._spotify_request_wrapper('playlist_add_items', playlist_id, x)
              ),
             tracks,
             run_at_least_once=True
@@ -463,7 +475,8 @@ class SpotifyInterface:
             tracks = tracks.spotify_id
 
         _batch_request(
-            lambda x: self._connection.playlist_remove_all_occurrences_of_items(playlist_id=playlist_id, items=x),
+            lambda x: self._spotify_request_wrapper(
+                'playlist_remove_all_occurrences_of_items', playlist_id=playlist_id, items=x),
             tracks
         )
 
@@ -487,7 +500,7 @@ class SpotifyInterface:
             print('Ignoring %d already liked tracks' % (len(tracks) - len(new_tracks)))
 
         _batch_request(
-            lambda x: self._connection.current_user_saved_tracks_add(x),
+            lambda x: self._spotify_request_wrapper('current_user_saved_tracks_add', x),
             new_tracks
         )
 
@@ -502,7 +515,7 @@ class SpotifyInterface:
             tracks = tracks.spotify_id
 
         _batch_request(
-            lambda x: self._connection.current_user_saved_tracks_delete(x),
+            lambda x: self._spotify_request_wrapper('current_user_saved_tracks_delete', x),
             tracks
         )
 

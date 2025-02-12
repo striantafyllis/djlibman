@@ -13,6 +13,8 @@ import difflib
 import numpy as np
 import pandas as pd
 
+import unidecode
+
 
 def to_boolean(s):
     if s is None or isinstance(s, bool):
@@ -277,7 +279,7 @@ def format_track_for_search(track):
 
     # Remove some things that are usually in Rekordbox but not in Spotify
     string = re.sub(r'(feat\.|featuring)', '', string, flags=re.IGNORECASE)
-    string = re.sub(r'original mix', '', string, flags=re.IGNORECASE)
+    string = re.sub(r'original( mix|$)', '', string, flags=re.IGNORECASE)
 
     if not isinstance(track, str):
         if 'artist_names' in track:
@@ -305,7 +307,10 @@ def format_track_for_search(track):
         string = ' '.join(artist_words) + ' ' + string
 
     # replace sequences of non-word characters with a single space
-    string = re.sub(r'\W+', ' ', string)
+    # EXCEPT: Special-case the hyphen because some names contain it (e.g. Kay-D)
+    # Then take care of hyphens that are not in names
+    string = re.sub(r'[^-\w]+', ' ', string)
+    string = re.sub(r'\B-\B', ' ', string)
 
     # replace multiple spaces with single space
     string = ' '.join(string.split())
@@ -404,7 +409,22 @@ def get_user_choice(prompt: str, options: list[str] = ['yes', 'no'], batch_mode:
         else:
             sys.stdout.write('Reply is ambiguous; try again.')
 
-def fuzzy_one_to_one_mapping(sequences1, sequences2, cutoff_ratio=0.6):
+def string_to_sorted_tokens(s, asciify=False):
+    words = s.split()
+
+    if asciify:
+        words = [unidecode.unidecode(w) for w in words]
+
+    word_set = set(words)
+    unique_word_list = list(word_set)
+    unique_word_list.sort()
+
+    return ' '.join(unique_word_list)
+
+
+def fuzzy_one_to_one_mapping(sequences1, sequences2, cutoff_ratio=0.6,
+                             tokenwise=False,
+                             asciify=False):
     """Creates a one-to-one mapping between two string lists using fuzzy text matching.
     Only pairings with a match ratio of at least cutoff_ratio are considered.
     It is assumed that both sequences are relatively short and contain relatively short strings.
@@ -419,6 +439,11 @@ def fuzzy_one_to_one_mapping(sequences1, sequences2, cutoff_ratio=0.6):
            unmatched_indices2: [ indices into sequences2 ...]
         }
     """
+
+    if tokenwise:
+        sequences1 = [string_to_sorted_tokens(s, asciify=asciify) for s in sequences1]
+        sequences2 = [string_to_sorted_tokens(s, asciify=asciify) for s in sequences2]
+        pass
 
     # using dict instead of set to preserve the order
     unmatched_indices1 = { index: None for index in range(len(sequences1))}

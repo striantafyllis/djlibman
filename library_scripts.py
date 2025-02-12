@@ -143,8 +143,6 @@ def djlib_values_sanity_check():
 
     return (errors == 0)
 
-_automatic_accept_threshold = 0.9
-
 def djlib_maintenance():
     djlib = Doc('djlib')
     main_library = RekordboxPlaylist('Main Library')
@@ -171,9 +169,8 @@ def djlib_maintenance():
     return
 
 
-def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
-                                     cutoff_ratio=0.6):
-    main_library = RekordboxPlaylist('Main Library')
+def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library'):
+    main_library = RekordboxPlaylist(rekordbox_main_playlist)
     print(f'Rekordbox main library: {len(main_library)} tracks')
 
     rekordbox_to_spotify = Doc('rekordbox_to_spotify')
@@ -209,8 +206,10 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
         rekordbox_sequences = unmapped_rekordbox_tracks.apply(format_track_for_search, axis=1)
         listened_sequences = unmapped_listened_tracks.apply(format_track_for_search, axis=1)
 
-        result = fuzzy_one_to_one_mapping(rekordbox_sequences.to_list(), listened_sequences.to_list(),
-                                          cutoff_ratio=cutoff_ratio)
+        result = fuzzy_one_to_one_mapping(
+            rekordbox_sequences.to_list(),
+            listened_sequences.to_list(),
+            cutoff_ratio=djlib_config.fuzzy_match_cutoff_threshold)
 
         for mapping in result['pairs']:
             rekordbox_idx = mapping['index1']
@@ -221,7 +220,7 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library',
             print(f'Rekordbox: {format_track(rekordbox_track)}')
             print(f'Spotify: {format_track(spotify_track)}')
             print(f'Match ratio: {mapping['ratio']:.2f}')
-            if mapping['ratio'] >= _automatic_accept_threshold:
+            if mapping['ratio'] >= djlib_config.fuzzy_match_automatic_accept_threshold:
                 print('Accepted automatically')
                 choice = 'yes'
             else:

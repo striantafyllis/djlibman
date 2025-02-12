@@ -25,6 +25,10 @@ discography_cache_dir = None
 discography_verbose = 1
 artist_albums_ttl_days = 7
 
+# TODO make these configurable
+fuzzy_match_cutoff_threshold = 0.6
+fuzzy_match_automatic_accept_threshold = 0.9
+
 _log_file = './djlibman.log'
 _log_level = logging.INFO
 

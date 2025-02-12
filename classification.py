@@ -5,7 +5,8 @@ import numpy as np
 _DOWNTEMPO_CUTOFF = 112
 
 flavor_groupings = {
-    'Progressive': ['Progressive', 'Progressive-Adjacent'],
+    'Progressive': ['Progressive'],
+    'Progressive-Adjacent': ['Progressive-Adjacent'],
     'Afro/Latin/Funky': ['Afro', 'Latin', 'Funky'],
     'Organic': ['Organic'],
     'Other': None

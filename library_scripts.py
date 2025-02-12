@@ -1,4 +1,6 @@
 
+import re
+
 import pandas as pd
 import numpy as np
 
@@ -322,15 +324,13 @@ def djlib_spotify_likes_maintenance():
     return
 
 
-def form_progressive_not_used():
+def form_progressive_not_used(do_rekordbox=True, do_spotify=True):
     """Special case code to form the Progressive - Not Used playlist. This will be generalized later."""
 
-    prog_mixes = [
-        'mix 17 - george - prog',
-        'mix 19 - asiento - prog',
-        'mix 20 - flowtoys - prog',
-        'mix 21 - winter blues - prog'
-    ]
+    rb_playlists = djlib_config.rekordbox.get_playlist_names()
+
+    prog_sets = [['Sets', name] for name in rb_playlists['Sets'].keys()
+                 if re.match(r'prog set [1-3]', name)]
 
     prog_tracks = RekordboxPlaylist(['managed', 'Progressive'])
 
@@ -338,11 +338,18 @@ def form_progressive_not_used():
                                              create=True, overwrite=True)
     prog_not_used_tracks.append(prog_tracks, prompt=False)
 
-    for mix in prog_mixes:
-        mix_tracks = RekordboxPlaylist(['Mixes', mix])
-        prog_not_used_tracks.remove(mix_tracks, prompt=False)
+    for prog_set in prog_sets:
+        set_tracks = RekordboxPlaylist(prog_set)
+        prog_not_used_tracks.remove(set_tracks, prompt=False)
 
-    prog_not_used_tracks.write()
+    if do_rekordbox:
+        prog_not_used_tracks.write()
+
+    if do_spotify:
+        prog_not_used_spotify = SpotifyPlaylist('DJ Progressive Not Used', create=True, overwrite=True)
+        prog_not_used_spotify.truncate(prompt=False)
+        prog_not_used_spotify.append(prog_not_used_tracks, prompt=False)
+        prog_not_used_spotify.write()
 
     return
 
@@ -376,7 +383,7 @@ def playlists_maintenance(do_rekordbox=True, do_spotify=True):
             spotify_playlist.write()
 
     # special-case code - will be generalized later
-    form_progressive_not_used()
+    form_progressive_not_used(do_rekordbox, do_spotify)
 
     return
 

@@ -193,11 +193,13 @@ def sanity_check_spotify_queue(spotify_queue_name, *, is_level_1=False, is_promo
     # Make sure items in the queue are unique
     spotify_queue.deduplicate()
 
+    listening_history = Doc('listening_history')
+
     if is_level_1:
-        pass
+        spotify_queue.remove(listening_history)
+        spotify_queue.write()
     else:
         # Make sure all items in the L2+ queues are already in the listening history
-        listening_history = Doc('listening_history')
         listening_history.append(spotify_queue)
         listening_history.write()
 
@@ -277,8 +279,7 @@ def pretty_print_spotify_playlist(playlist_name):
     return
 
 def shuffle_spotify_playlist(playlist_name):
-    playlist = SpotifyPlaylist(playlist_name)
-    new_playlist = SpotifyPlaylist(playlist_name + ' - shuffled', create=True, overwrite=False)
+    playlist = SpotifyPlaylist(playlist_name, overwrite=True)
 
     tracks = playlist.get_df()
 
@@ -286,8 +287,8 @@ def shuffle_spotify_playlist(playlist_name):
 
     new_tracks = tracks.loc[new_tracks_idx]
 
-    new_playlist.set_df(new_tracks)
-    new_playlist.write()
+    playlist.set_df(new_tracks)
+    playlist.write()
 
     return
 

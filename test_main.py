@@ -163,7 +163,7 @@ def read_file_with_numbers(filename):
     return lines
 
 def go_through_artist_list():
-    artists = read_file_with_numbers('./ready_artists.txt')
+    artists = read_file_with_numbers('data/ready_artists.txt')
 
     for artist, number in artists:
         sample_artist_to_queue(artist, latest=number, popular=number)
@@ -227,7 +227,7 @@ def promote_new_mix_tracks_to_a():
 
 
 def main():
-    text_file_to_spotify_tracks('./tracks.txt')
+    text_file_to_spotify_tracks('data/tracks.txt')
 
     return
 

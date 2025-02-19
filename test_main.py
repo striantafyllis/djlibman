@@ -237,7 +237,9 @@ def get_progressive_a_producers():
 
 
 def main():
-    get_progressive_a_producers()
+    # get_progressive_a_producers()
+
+    promote_tracks_in_spotify_queue(last_track='Storming', promote_source_name='L1 queue', promote_target_name='L2 queue')
 
     return
 

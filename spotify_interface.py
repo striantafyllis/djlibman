@@ -164,12 +164,12 @@ class SpotifyInterface:
             first_request_name, subsequent_request_name = request_name
         else:
             first_request_name = request_name
-        subsequent_request_name = request_name
+            subsequent_request_name = request_name
 
         # find the one kwarg that is a list; that's the one we have to batch
         list_kwarg = None
         for kwarg in kwargs:
-            if isinstance(kwargs[kwarg], list):
+            if isinstance(kwargs[kwarg], list) or isinstance(kwargs[kwarg], pd.Series) or isinstance(kwargs[kwarg], pd.Index):
                 if list_kwarg is None:
                     list_kwarg = kwarg
                 else:

@@ -77,89 +77,6 @@ def is_spotify_id(s: str):
     return len(s) > 20 and _BASE_62.match(s)
 
 
-def _batch_result(request_func, start=0, stop=None, stop_condition=None, use_offset=True):
-    """Stop condition is inclusive"""
-
-    assert stop is None or stop_condition is None
-
-    if start < 0:
-        raise ValueError('Negative start: %s' % start)
-
-    if stop is None:
-        stop = 1000000000
-    elif stop < 0:
-        raise ValueError('Negative stop: %s' % stop)
-    elif stop < start:
-        raise ValueError('Stop is less than start: [%s, %s]' % (start, stop))
-
-    all_items = []
-
-    offset = start
-
-    while True:
-        limit = min(_MAX_ITEMS_PER_REQUEST, stop-offset)
-
-        result = request_func(offset=offset, limit=limit)
-        items = result['items']
-
-        stop_idx = None
-
-        if stop_condition is not None:
-            for idx, item in enumerate(items):
-                if stop_condition(item):
-                    stop_idx = idx+1
-                    break
-
-        if stop_idx is not None:
-            all_items += items[:stop_idx]
-            break
-        else:
-            all_items += items
-
-        if stop is not None and len(all_items) >= (stop-start):
-            break
-
-        if not result['next']:
-            break
-
-        offset += len(items)
-
-    return all_items
-
-
-def _batch_request(request, items, result_field=None, run_at_least_once=False):
-    start = 0
-
-    if isinstance(request, tuple):
-        first_request, subsequent_request = request
-    else:
-        first_request = request
-        subsequent_request = request
-
-    results = [] if result_field is not None else None
-
-    is_first = True
-
-    if len(items) == 0 and run_at_least_once:
-        first_request([])
-
-    while start < len(items):
-        end = min(start + _MAX_ITEMS_PER_REQUEST, len(items))
-
-        batch = list(items[start:end])
-        if is_first:
-            result = first_request(batch)
-        else:
-            result = subsequent_request(batch)
-        is_first = False
-
-        if result_field is not None:
-            results += result[result_field]
-
-        start = end
-
-    return results
-
 def _postprocess_tracks(results):
     """Apply some common manipulations to Spotify API returns involving tracks"""
 
@@ -206,13 +123,101 @@ class SpotifyInterface:
 
         return
 
-    def _spotify_request_wrapper(self, request_name, *args, **kwargs):
+    def _wrap_request(self, request_name, **kwargs):
         start_time = time.time()
-        result = getattr(self._connection, request_name)(*args, **kwargs)
+        result = getattr(self._connection, request_name)(**kwargs)
         end_time = time.time()
-        logger.debug('Spotify request %s(%s %s): %.3f s',
-                     request_name, args, kwargs, end_time - start_time)
+        logger.debug('Spotify request %s(%s): %.3f s',
+                     request_name, kwargs, end_time - start_time)
         return result
+
+    def _batch_result(self,
+                      request_name,
+                      **kwargs):
+        start_time = time.time()
+
+        result = getattr(self._connection, request_name)(**kwargs)
+
+        items = result['items']
+
+        num_batches = 1
+
+        while result['next']:
+            num_batches += 1
+
+            result = self._connection.next(result)
+            items += result['items']
+
+        end_time = time.time()
+        logger.debug('Spotify batch result %s(%s): %.3f s, items %d, batches %d',
+                     request_name, kwargs, end_time - start_time, len(items), num_batches)
+
+        return items
+
+    def _batch_request(
+            self,
+            request_name, *,
+            result_field=None,
+            run_at_least_once=False,
+            ** kwargs):
+        if isinstance(request_name, tuple):
+            first_request_name, subsequent_request_name = request_name
+        else:
+            first_request_name = request_name
+        subsequent_request_name = request_name
+
+        # find the one kwarg that is a list; that's the one we have to batch
+        list_kwarg = None
+        for kwarg in kwargs:
+            if isinstance(kwargs[kwarg], list):
+                if list_kwarg is None:
+                    list_kwarg = kwarg
+                else:
+                    raise ValueError(f'More than one list argument: {list_kwarg}, {kwarg}')
+
+        if list_kwarg is None:
+            raise ValueError(f'No list arguments')
+
+        items = kwargs[list_kwarg]
+
+        results = [] if result_field is not None else None
+
+        is_first = True
+
+        start_time = time.time()
+        num_batches = 0
+
+        if len(items) == 0 and run_at_least_once:
+            num_batches += 1
+            result = getattr(self._connection, first_request_name)(**kwargs)
+            if result_field is not None:
+                results = result[result_field]
+
+        start = 0
+        while start < len(items):
+            num_batches += 1
+
+            end = min(start + _MAX_ITEMS_PER_REQUEST, len(items))
+
+            batch = list(items[start:end])
+            kwargs[list_kwarg] = batch
+            if is_first:
+                result = getattr(self._connection, first_request_name)(**kwargs)
+            else:
+                result = getattr(self._connection, subsequent_request_name)(**kwargs)
+            is_first = False
+
+            if result_field is not None:
+                results += result[result_field]
+
+            start = end
+
+        end_time = time.time()
+
+        logger.debug('Spotify batch request %s(%s): %.3f s, items %d, batches %d',
+                     request_name, kwargs, end_time - start_time, len(items), num_batches)
+
+        return results
 
     def invalidate_cache(self):
         self._cache = cache.Cache()
@@ -221,14 +226,12 @@ class SpotifyInterface:
 
     def get_user_id(self):
         time.time()
-        return self._spotify_request_wrapper('current_user')['id']
+        return self._wrap_request('current_user')['id']
         logger.debug('Spotify request: current_user()')
 
     def get_playlists(self):
         def body():
-            results = _batch_result(
-                lambda limit, offset: self._spotify_request_wrapper(
-                    'current_user_playlists', limit, offset))
+            results = self._batch_result('current_user_playlists')
 
             df = pd.DataFrame.from_records(results)
             df = df.set_index(df.name)
@@ -256,7 +259,7 @@ class SpotifyInterface:
         return playlist_id
 
     def create_playlist(self, playlist_name):
-        self._spotify_request_wrapper(
+        self._wrap_request(
             'user_playlist_create',
             user=self.get_user_id(),
             name=playlist_name,
@@ -276,12 +279,7 @@ class SpotifyInterface:
         playlist_id = self._get_playlist_id_if_necessary(playlist_name_or_id)
 
         def body():
-            results = _batch_result(
-                lambda limit, offset: self._spotify_request_wrapper(
-                    'playlist_items',
-                    playlist_id=playlist_id,
-                    limit=limit, offset=offset
-                ))
+            results = self._batch_result('playlist_items', playlist_id=playlist_id)
 
             results = _postprocess_tracks(results)
 
@@ -295,11 +293,7 @@ class SpotifyInterface:
 
     def get_liked_tracks(self):
         def body():
-            results = _batch_result(
-                lambda limit, offset: self._spotify_request_wrapper(
-                    'current_user_saved_tracks',
-                    limit=limit, offset=offset
-                ))
+            results = self._batch_result('current_user_saved_tracks')
 
             results = _postprocess_tracks(results)
 
@@ -315,10 +309,7 @@ class SpotifyInterface:
         # this bypasses the cache; these results are not usually accessed multiple times
         # during a run
 
-        results = _batch_result(
-            lambda limit, offset: self._spotify_request_wrapper(
-                'artist_albums', artist_id=artist_id, limit=limit, offset=offset)
-        )
+        results = self._batch_result('artist_albums', artist_id=artist_id)
 
         results = _postprocess_albums(results)
 
@@ -334,13 +325,10 @@ class SpotifyInterface:
 
         # note: we need to repeat the album query even if we have the album entry from
         # get_artist_albums() because the get_artist_albums() result misses the popularity field
-        album_info = self._spotify_request_wrapper('album', album_id)
+        album_info = self._wrap_request('album', album_id=album_id)
         album_entry = project(album_info, _ALBUM_COLUMNS)
 
-        results = _batch_result(
-            lambda limit, offset: self._spotify_request_wrapper(
-                'album_tracks', album_id=album_id, limit=limit, offset=offset)
-        )
+        results = self._batch_result('album_tracks', album_id=album_id)
 
         # make these look like the track lists that come back from playlists etc.
         projection = project(
@@ -369,7 +357,7 @@ class SpotifyInterface:
 
     def get_recently_played_tracks(self):
         """Access the last played tracks, up to 50; Spotify doesn't give us access to more."""
-        result = self._spotify_request_wrapper('current_user_recently_played')
+        result = self._wrap_request('current_user_recently_played')
 
         results = result['items']
 
@@ -383,9 +371,9 @@ class SpotifyInterface:
 
 
     def get_tracks_by_id(self, ids, raw=False):
-        results = _batch_request(
-            lambda items: self._spotify_request_wrapper('tracks', items),
-            ids,
+        results = self._batch_request(
+            'tracks',
+            tracks=ids,
             result_field = 'tracks'
         )
 
@@ -402,7 +390,7 @@ class SpotifyInterface:
 
     def search(self, search_string, limit=10, raw=False):
         # no batching
-        results = self._spotify_request_wrapper('search', q=search_string, limit=limit)
+        results = self._wrap_request('search', q=search_string, limit=limit)
 
         if raw:
             return results
@@ -436,9 +424,10 @@ class SpotifyInterface:
 
             tracks = new_tracks
 
-        _batch_request(
-            lambda x: self._spotify_request_wrapper('playlist_add_items', playlist_id, x),
-            tracks
+        self._batch_request(
+            'playlist_add_items',
+            playlist_id=playlist_id,
+            items=tracks
         )
 
         print("Added %d new tracks to playlist '%s'" % (len(tracks), playlist_name_or_id))
@@ -453,11 +442,10 @@ class SpotifyInterface:
         if isinstance(tracks, pd.DataFrame):
             tracks = tracks.spotify_id
 
-        _batch_request(
-            (lambda x: self._spotify_request_wrapper('playlist_replace_items', playlist_id, x),
-             lambda x: self._spotify_request_wrapper('playlist_add_items', playlist_id, x)
-             ),
-            tracks,
+        self._batch_request(
+            ('playlist_replace_items', 'playlist_add_items'),
+            playlist_id=playlist_id,
+            items=tracks,
             run_at_least_once=True
         )
 
@@ -474,10 +462,10 @@ class SpotifyInterface:
         if isinstance(tracks, pd.DataFrame):
             tracks = tracks.spotify_id
 
-        _batch_request(
-            lambda x: self._spotify_request_wrapper(
-                'playlist_remove_all_occurrences_of_items', playlist_id=playlist_id, items=x),
-            tracks
+        self._batch_request(
+            'playlist_remove_all_occurrences_of_items',
+            playlist_id=playlist_id,
+            items=tracks
         )
 
         self._cache.invalidate('playlist_tracks', playlist_id)
@@ -499,9 +487,9 @@ class SpotifyInterface:
         if len(new_tracks) < len(tracks):
             print('Ignoring %d already liked tracks' % (len(tracks) - len(new_tracks)))
 
-        _batch_request(
-            lambda x: self._spotify_request_wrapper('current_user_saved_tracks_add', x),
-            new_tracks
+        self._batch_request(
+            'current_user_saved_tracks_add',
+            tracks=new_tracks
         )
 
         print('Added %d liked tracks' % len(new_tracks))
@@ -514,9 +502,9 @@ class SpotifyInterface:
         if isinstance(tracks, pd.DataFrame):
             tracks = tracks.spotify_id
 
-        _batch_request(
-            lambda x: self._spotify_request_wrapper('current_user_saved_tracks_delete', x),
-            tracks
+        self._batch_request(
+            'current_user_saved_tracks_delete',
+            tracks=tracks
         )
 
         self._cache.invalidate('liked_tracks')

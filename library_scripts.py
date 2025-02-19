@@ -403,7 +403,6 @@ def library_maintenance_sanity_checks():
     return True
 
 
-
 def library_maintenance_after_purchase():
     if not library_maintenance_sanity_checks():
         return

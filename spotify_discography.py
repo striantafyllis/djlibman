@@ -20,45 +20,12 @@ import re
 
 import djlib_config
 from containers import *
-from djlib_config import discography_cache_dir
+from spotify_util import *
 
 def _verbose():
     return djlib_config.discography_verbose
 
 _SECONDS_PER_DAY = 24 * 3600
-
-
-def get_artists(tracks: Union[Container, pd.DataFrame]):
-    """Returns a dictionary - id to artist name - from the argument - which
-       should be a DF of Spotify tracks or similar."""
-
-    if isinstance(tracks, Container):
-        tracks = tracks.get_df()
-
-    artist_id_to_name = {}
-
-    for i in range(len(tracks)):
-        artist_ids = tracks.artist_ids.iat[i].split('|')
-        artist_names = tracks.artist_names.iat[i].split('|')
-
-        if not isinstance(artist_ids, list) and pd.isna(artist_ids):
-            continue
-
-        for j in range(len(artist_ids)):
-            id = artist_ids[j]
-            name = artist_names[j]
-
-            existing_name = artist_id_to_name.get(id)
-            if existing_name is None:
-                artist_id_to_name[id] = name
-            elif existing_name != name:
-                # Sometimes this happens if an artist changes their Spotify name.
-                # In that case, keep the latest name.
-                # print(f'Warning: Artist ID {id} associated with two different names: '
-                #       f'{existing_name} and {name}')
-                artist_id_to_name[id] = name
-
-    return artist_id_to_name
 
 
 def find_spotify_artist(artist_name):
@@ -68,7 +35,7 @@ def find_spotify_artist(artist_name):
 
     listening_history = Doc('listening_history')
 
-    artists = get_artists(listening_history)
+    artists = get_track_artists(listening_history)
 
     candidate_ids = []
 

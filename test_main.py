@@ -5,7 +5,7 @@ import pandas as pd
 from requests.packages import target
 
 from djlibman import *
-from spotify_discography import get_artist_discography
+from spotify_discography import *
 from classification import *
 
 
@@ -208,34 +208,39 @@ def library_reorg_add_question_mark():
 
     return
 
-def promote_new_mix_tracks_to_a():
+def promote_set_tracks_to_a():
+    rb_playlists = djlib_config.rekordbox.get_playlist_names()
+
+    sets = [['Sets', name] for name in rb_playlists['Sets']]
+
+    for set in sets:
+        promote_tracks_to_a(set)
+
+    return
+
+def get_progressive_a_producers():
     djlib = Doc('djlib')
 
-    new_mixes = [
-        'mix 17 - george - prog',
-        'mix 19 - asiento - prog',
-        'mix 20 - flowtoys - prog',
-        'mix 21 - winter blues - prog'
-    ]
+    prog_a_tracks = filter_tracks(
+        djlib.get_df(),
+        classes=['A'],
+        flavors=['Progressive', 'Progressive-Adjacent']
+    )
 
-    for mix_name in new_mixes:
-        promote_tracks_to_a(['Mixes', mix_name])
+    prog_a_tracks_with_spotify = add_spotify_fields_to_rekordbox(prog_a_tracks)
+
+    prog_a_artists = get_track_artists(prog_a_tracks_with_spotify)
+
+    prog_a_artists.sort_values(by='track_count', ascending=False, inplace=True)
 
     return
 
 
 def main():
-    # text_file_to_spotify_tracks('data/tracks.txt')
-    
-    start_time = time.time()
-    playlists_maintenance(do_rekordbox=True, do_spotify=False)
-    end_time = time.time()
-
-    print(f'{end_time - start_time:.1f} sec')
+    get_progressive_a_producers()
 
     return
 
 if __name__ == '__main__':
     main()
     sys.exit(0)
-

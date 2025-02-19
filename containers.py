@@ -79,7 +79,7 @@ class Container(object):
         self._changed = True
         return
 
-    def write(self, force=False) -> None:
+    def write(self, force=False, **kwargs) -> None:
         if self._df is None:
             raise Exception('Nothing to write')
 
@@ -89,7 +89,7 @@ class Container(object):
         if not self._changed and not force:
             return
 
-        self._write_back(self._df)
+        self._write_back(self._df, **kwargs)
         self._changed = False
         return
 
@@ -572,9 +572,10 @@ class RekordboxPlaylist(Container):
     def _read(self):
         return djlib_config.rekordbox.get_playlist_tracks(self._playlist_name)
 
-    def _write_back(self, df):
+    def _write_back(self, df, write_thru=True):
         djlib_config.rekordbox.create_playlist(self._playlist_name, df, overwrite=True)
-        djlib_config.rekordbox.write()
+        if write_thru:
+            djlib_config.rekordbox.write()
         return
 
 class Wrapper(Container):

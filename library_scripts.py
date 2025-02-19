@@ -321,13 +321,13 @@ def djlib_spotify_likes_maintenance():
     return
 
 
-def form_progressive_not_used(do_rekordbox=True, do_spotify=True):
+def form_progressive_not_used(do_rekordbox=True, do_spotify=True, write_thru=True):
     """Special case code to form the Progressive - Not Used playlist. This will be generalized later."""
 
     rb_playlists = djlib_config.rekordbox.get_playlist_names()
 
     prog_sets = [['Sets', name] for name in rb_playlists['Sets'].keys()
-                 if re.match(r'prog set [1-3]', name)]
+                 if re.match(r'prog set [1-4]', name)]
 
     prog_tracks = RekordboxPlaylist(['managed', 'Progressive'])
 
@@ -340,7 +340,7 @@ def form_progressive_not_used(do_rekordbox=True, do_spotify=True):
         prog_not_used_tracks.remove(set_tracks, prompt=False)
 
     if do_rekordbox:
-        prog_not_used_tracks.write()
+        prog_not_used_tracks.write(write_thru=write_thru)
 
     if do_spotify:
         prog_not_used_spotify = SpotifyPlaylist('DJ Progressive Not Used', create=True, overwrite=True)
@@ -366,7 +366,9 @@ def playlists_maintenance(do_rekordbox=True, do_spotify=True):
             rekordbox_playlist.set_df(group)
 
             print(f'Creating Rekordbox playlist {name}: {len(rekordbox_playlist)} tracks')
-            rekordbox_playlist.write()
+            # write the rekordbox playlist in the XML in memory, but don't dump the
+            # XML file to disk; that will be done at the end.
+            rekordbox_playlist.write(write_thru=False)
 
         if do_spotify and name[0] not in ['Pending', 'Old', 'CX']:
             spotify_playlist = SpotifyPlaylist(
@@ -380,7 +382,11 @@ def playlists_maintenance(do_rekordbox=True, do_spotify=True):
             spotify_playlist.write()
 
     # special-case code - will be generalized later
-    form_progressive_not_used(do_rekordbox, do_spotify)
+    form_progressive_not_used(do_rekordbox, do_spotify, write_thru=False)
+
+    if do_rekordbox:
+        # do this only once at the end; it's a lot faster
+        djlib_config.rekordbox.write()
 
     return
 

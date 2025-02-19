@@ -225,7 +225,13 @@ def promote_new_mix_tracks_to_a():
 
 
 def main():
-    text_file_to_spotify_tracks('data/tracks.txt')
+    # text_file_to_spotify_tracks('data/tracks.txt')
+    
+    start_time = time.time()
+    playlists_maintenance(do_rekordbox=True, do_spotify=False)
+    end_time = time.time()
+
+    print(f'{end_time - start_time:.1f} sec')
 
     return
 

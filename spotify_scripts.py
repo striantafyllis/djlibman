@@ -190,11 +190,11 @@ def sanity_check_spotify_queue(spotify_queue_name, *, is_level_1=False, is_promo
     listening_history = Doc('listening_history')
 
     if is_level_1:
-        spotify_queue.remove(listening_history)
+        spotify_queue.remove(listening_history, prompt=False)
         spotify_queue.write()
     else:
         # Make sure all items in the L2+ queues are already in the listening history
-        listening_history.append(spotify_queue)
+        listening_history.append(spotify_queue, prompt=False)
         listening_history.write()
 
     # Make sure items in the queue are not already in the library

@@ -326,8 +326,7 @@ def form_progressive_not_used(do_rekordbox=True, do_spotify=True, write_thru=Tru
 
     rb_playlists = djlib_config.rekordbox.get_playlist_names()
 
-    prog_sets = [['Sets', name] for name in rb_playlists['Sets'].keys()
-                 if re.match(r'prog set [1-4]', name)]
+    sets = [['Sets', name] for name in rb_playlists['Sets']]
 
     prog_tracks = RekordboxPlaylist(['managed', 'Progressive'])
 
@@ -335,7 +334,7 @@ def form_progressive_not_used(do_rekordbox=True, do_spotify=True, write_thru=Tru
                                              create=True, overwrite=True)
     prog_not_used_tracks.append(prog_tracks, prompt=False)
 
-    for prog_set in prog_sets:
+    for prog_set in sets:
         set_tracks = RekordboxPlaylist(prog_set)
         prog_not_used_tracks.remove(set_tracks, prompt=False)
 

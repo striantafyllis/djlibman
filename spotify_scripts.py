@@ -383,3 +383,37 @@ def sample_artist_to_queue(artist_name, *, latest=10, popular=10):
 
     return
 
+def text_file_to_spotify_playlist(text_file, target_playlist_name='tmp queue'):
+    if target_playlist_name is None:
+        target_playlist = None
+    else:
+        target_playlist = SpotifyPlaylist(target_playlist_name)
+
+    lines = read_lines_from_file(text_file)
+
+    print(f'Looking for {len(lines)} lines of text in Spotify' +
+          (f'; adding to playlist {target_playlist_name}'
+           if target_playlist_name is not None else ''))
+
+    unmatched_lines = []
+    for line in lines:
+        spotify_track = text_to_spotify_track(line)
+
+        if spotify_track is None:
+            unmatched_lines.append(line)
+        elif target_playlist is not None:
+            # this avoids a Pandas warning
+            spotify_track['added_at'] = pd.Timestamp.now()
+            target_playlist.get_df().loc[spotify_track['spotify_id']] = spotify_track
+
+
+    target_playlist.write(force=True)
+
+    if len(unmatched_lines) == 0:
+        print(f'Matched all {len(lines)} lines of text in Spotify')
+    else:
+        print(f'{len(unmatched_lines)} out of {len(lines)} were left unmatched:')
+        for unmatched_line in unmatched_lines:
+            print('    ' + unmatched_line)
+
+    return

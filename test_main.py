@@ -220,26 +220,59 @@ def promote_set_tracks_to_a():
 
 def get_progressive_a_producers():
     djlib = Doc('djlib')
+    listening_history = Doc('listening_history')
 
-    prog_a_tracks = filter_tracks(
-        djlib.get_df(),
-        classes=['A'],
-        flavors=['Progressive', 'Progressive-Adjacent']
-    )
+    prog_a_tracks = add_spotify_fields_to_rekordbox(
+        filter_tracks(
+            djlib.get_df(),
+            classes=['A'],
+            flavors=['Progressive', 'Progressive-Adjacent']
+    ), drop_missing_ids=True)
 
-    prog_a_tracks_with_spotify = add_spotify_fields_to_rekordbox(prog_a_tracks)
+    prog_a_artists = get_track_artists(prog_a_tracks)
 
-    prog_a_artists = get_track_artists(prog_a_tracks_with_spotify)
+    a_tracks = add_spotify_fields_to_rekordbox(
+        filter_tracks(
+            djlib.get_df(),
+            classes=['A']
+    ), drop_missing_ids=True)
 
-    prog_a_artists.sort_values(by='track_count', ascending=False, inplace=True)
+    b_tracks = add_spotify_fields_to_rekordbox(
+        filter_tracks(
+            djlib.get_df(),
+            classes=['B']
+    ), drop_missing_ids=True)
+    other_tracks = add_spotify_fields_to_rekordbox(
+        filter_tracks(
+            djlib.get_df(),
+            not_classes=['A', 'B']
+    ), drop_missing_ids=True)
+    listened_tracks = listening_history.get_df()
+
+    add_artist_track_counts(prog_a_artists, a_tracks, track_count_column='A')
+    add_artist_track_counts(prog_a_artists, b_tracks, track_count_column='B')
+    add_artist_track_counts(prog_a_artists, other_tracks, track_count_column='CX?')
+    add_artist_track_counts(prog_a_artists, listened_tracks, track_count_column='Listened')
+
+    prog_a_artists.sort_values(by='A', ascending=False, inplace=True)
+
+    doc = Doc('prog_a_artists', create=True, overwrite=True,
+              path='/Users/spyros/python/djlibman/data/prog_a_artists.csv',
+              backups=0,
+              type='csv'
+              )
+    doc.set_df(prog_a_artists)
+    doc.write()
 
     return
 
 
 def main():
-    # get_progressive_a_producers()
+    get_progressive_a_producers()
 
-    promote_tracks_in_spotify_queue(last_track='Storming', promote_source_name='L1 queue', promote_target_name='L2 queue')
+    # promote_tracks_in_spotify_queue(last_track='Storming', promote_source_name='L1 queue', promote_target_name='L2 queue')
+
+    # text_file_to_spotify_playlist('data/tracks.txt', target_playlist_name='tmp queue')
 
     return
 

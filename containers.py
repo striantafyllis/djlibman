@@ -102,6 +102,8 @@ class Container(object):
         this_index_name = self._df.index.name
         if this_index_name is None and len(self._df) == 0:
             this_index_name = self._get_index_name()
+            if this_index_name is None:
+                return other_df
 
         if this_index_name == other_df.index.name:
             return other_df

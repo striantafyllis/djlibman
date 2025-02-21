@@ -62,42 +62,6 @@ def text_to_spotify_track(text):
     return None
 
 
-def text_file_to_spotify_tracks(text_file, target_playlist_name='L1 queue'):
-    if target_playlist_name is None:
-        target_playlist = None
-    else:
-        target_playlist = SpotifyPlaylist(target_playlist_name)
-
-    lines = read_lines_from_file(text_file)
-
-    print(f'Looking for {len(lines)} lines of text in Spotify' +
-          (f'; adding to playlist {target_playlist_name}'
-           if target_playlist_name is not None else ''))
-
-    unmatched_lines = []
-    for line in lines:
-        spotify_track = text_to_spotify_track(line)
-
-        if spotify_track is None:
-            unmatched_lines.append(line)
-        elif target_playlist is not None:
-            # this avoids a Pandas warning
-            spotify_track['added_at'] = pd.Timestamp.now()
-            target_playlist.get_df().loc[spotify_track['spotify_id']] = spotify_track
-
-
-    target_playlist.write(force=True)
-
-    if len(unmatched_lines) == 0:
-        print(f'Matched all {len(lines)} lines of text in Spotify')
-    else:
-        print(f'{len(unmatched_lines)} out of {len(lines)} were left unmatched:')
-        for unmatched_line in unmatched_lines:
-            print('    ' + unmatched_line)
-
-    return
-
-
 def get_track_artists(tracks: Union[Container, pd.DataFrame]):
     """Forms a dataframe artist_id: artist from a tracks dataframe"""
     if isinstance(tracks, Container):
@@ -108,7 +72,7 @@ def get_track_artists(tracks: Union[Container, pd.DataFrame]):
     if 'artist_names' not in tracks.columns:
         raise ValueError('No artist_names column in tracks')
 
-    artists = pd.DataFrame(columns=['artist_id', 'artist_name', 'track_count'],
+    artists = pd.DataFrame(columns=['artist_id', 'artist_name'],
                            index=pd.Index([], name='artist_id'))
 
     for i in range(len(tracks)):
@@ -123,7 +87,6 @@ def get_track_artists(tracks: Union[Container, pd.DataFrame]):
             name = artist_names[j]
 
             if id in artists.index:
-                artists.loc[id, 'track_count'] += 1
                 if artists.loc[id, 'artist_name'] != name:
                     # Sometimes this happens if an artist changes their Spotify name.
                     # In that case, keep the latest name.
@@ -137,3 +100,33 @@ def get_track_artists(tracks: Union[Container, pd.DataFrame]):
 
     return artists
 
+def add_artist_track_counts(artists: pd.DataFrame, tracks: pd.DataFrame, track_count_column: str):
+    """Adds track counts for each artist.
+    """
+
+    if artists.index.name != 'artist_id':
+        raise ValueError(f'Artist dataframe is not indexed by artist_id')
+    if 'artist_ids' not in tracks.columns or 'artist_names' not in tracks.columns:
+        raise ValueError(f'Track dataframe does not contain artist_ids')
+
+    if track_count_column not in artists.columns:
+        artists[track_count_column] = 0
+
+    not_found_artists = {}
+
+    for track in tracks.itertuples(index=False):
+        if pd.isna(track.artist_ids):
+            continue
+        artist_ids = track.artist_ids.split('|')
+        artist_names = track.artist_names.split('|')
+
+        for i, artist_id in enumerate(artist_ids):
+            if artist_id not in artists.index:
+                not_found_artists[artist_id] = artist_names[i]
+            else:
+                artists.loc[artist_id, track_count_column] += 1
+
+    if len(not_found_artists) > 0:
+        print(f'{len(not_found_artists)} artists not found in artist dataframe')
+
+    return

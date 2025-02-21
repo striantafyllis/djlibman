@@ -225,8 +225,9 @@ def _form_track_from_signature_group(same_sig_tracks, listening_history):
     return track
 
 
-def get_artist_discography(artist_name):
-    artist_id = find_spotify_artist(artist_name)
+def get_artist_discography(artist_name, artist_id=None):
+    if artist_id is None:
+        artist_id = find_spotify_artist(artist_name)
 
     artist_albums = _get_artist_albums(artist_id, artist_name)
 

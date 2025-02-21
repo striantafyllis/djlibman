@@ -266,9 +266,31 @@ def get_progressive_a_producers():
 
     return
 
+def discog_report_for_prog_a_producers():
+    source_doc = Doc(
+        'prog_a_artists',
+        path='/Users/spyros/python/djlibman/data/prog_a_artists.csv',
+        backups=0,
+        type='csv'
+        )
+
+    prog_a_artists = source_doc.get_df()
+
+    for artist in prog_a_artists.itertuples(index=False):
+        artist_id = artist.artist_id
+        artist_name = artist.artist_name
+
+        print(f'** Getting discography for artist {artist_id} {artist_name}...')
+        spotify_discography.get_artist_discography(artist_name, artist_id=artist_id)
+
+    return
+
+
 
 def main():
-    get_progressive_a_producers()
+    # get_progressive_a_producers()
+
+    discog_report_for_prog_a_producers()
 
     # promote_tracks_in_spotify_queue(last_track='Storming', promote_source_name='L1 queue', promote_target_name='L2 queue')
 

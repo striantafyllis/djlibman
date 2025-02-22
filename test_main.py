@@ -275,7 +275,13 @@ def discog_report_for_prog_a_producers(cache_only=False):
 
     prog_a_artists = source_doc.get_df()
 
+    i = 0
     for artist in prog_a_artists.itertuples(index=False):
+        i += 1
+
+        if i > 4:
+            break
+
         artist_id = artist.artist_id
         artist_name = artist.artist_name
 

@@ -126,65 +126,55 @@ def _filter_tracks_by_artist(artist_id, tracks):
         )
     ]
 
-def _form_track_from_signature_group(same_sig_tracks, listening_history):
+def _form_track_from_signature_group(same_sig_tracks):
     """Returns a dataframe with a single row that's the best representative of the
        entire track group.
     """
     # a good place to insert complicated breakpoints...
-    # signature = same_sig_tracks.signature[0]
-    # if 'A LONELY PINK CLOUD' in signature:
-    #     pass
+    # signature = same_sig_tracks.signature.iloc[0]
 
-    if len(same_sig_tracks) == 1:
-        track = same_sig_tracks
-    else:
-        # if possible, select the track ID that is in listening history; this way it will get filtered.
-        ids_in_lh = same_sig_tracks.index.intersection(listening_history.get_df().index, sort=False)
+    # remove undesirable edits
+    def is_desirable_edit(track):
+        name = track['name'].upper()
+        is_undesirable = (
+                name.endswith(' - MIXED') or
+                name.endswith('(MIXED)') or
+                name.endswith('[MIXED]') or
+                'RADIO EDIT' in name
+        )
+        return not is_undesirable
 
-        if len(ids_in_lh) >= 1:
-            track = same_sig_tracks.loc[[ids_in_lh[0]]]
-        else:
-            # remove undesirable edits
-            def is_desirable_edit(track):
-                name = track['name'].upper()
-                is_undesirable = (
-                        name.endswith(' - MIXED') or
-                        name.endswith('(MIXED)') or
-                        name.endswith('[MIXED]') or
-                        'RADIO EDIT' in name
-                )
-                return not is_undesirable
+    def is_extended_edit(track):
+        name = track['name'].upper()
+        is_extended = 'EXTENDED' in name or ' X ' in name
+        return is_extended
 
-            def is_extended_edit(track):
-                name = track['name'].upper()
-                is_extended = 'EXTENDED' in name or ' X ' in name
-                return is_extended
+    desirable_tracks = same_sig_tracks.loc[
+        same_sig_tracks.apply(is_desirable_edit, axis=1)
+    ]
 
-            desirable_tracks = same_sig_tracks.loc[
-                same_sig_tracks.apply(is_desirable_edit, axis=1)
-            ]
+    if len(desirable_tracks) == 0:
+        # this usually happens in very pathological situations that don't interest us
+        return desirable_tracks
+        # desirable_tracks = same_sig_tracks
 
-            if len(desirable_tracks) == 0:
-                # This happens very rarely - e.g. all versions of a track on Spotify are radio edits -
-                # but it does happen. Often Beatport has a normal version, so we don't want to exclude these.
-                desirable_tracks = same_sig_tracks
+    # try to find an extended mix if possible
+    extended_tracks = desirable_tracks.loc[
+        desirable_tracks.apply(is_extended_edit, axis=1)
+    ]
+    if len(extended_tracks) > 0:
+        desirable_tracks = extended_tracks
 
-            # try to find an extended mix if possible
-            extended_tracks = desirable_tracks.loc[
-                desirable_tracks.apply(is_extended_edit, axis=1)
-            ]
-            if len(extended_tracks) > 0:
-                desirable_tracks = extended_tracks
+    # select the oldest ID
+    if len(desirable_tracks) > 1:
+       desirable_tracks.sort_values(by='release_date', inplace=True)
+    track = desirable_tracks.iloc[:1]
 
-            # select the oldest ID
-            desirable_tracks.sort_values(by='release_date', inplace=True)
-            track = same_sig_tracks.iloc[:1]
-
-        # Combine the popularities of the tracks. For now I just add them up,
-        # and then also add the number of duplicates - because a track that gets
-        # reposted in more albums is arguably more popular.
-        popularity = same_sig_tracks.popularity.sum() + len(same_sig_tracks) - 1
-        track['popularity'] = popularity
+    # Combine the popularities of the tracks. For now I just add them up,
+    # and then also add the number of duplicates - because a track that gets
+    # reposted in more albums is arguably more popular.
+    popularity = same_sig_tracks.popularity.sum() + len(same_sig_tracks) - 1
+    track['popularity'] = popularity
 
     assert isinstance(track, pd.DataFrame)
     assert len(track) == 1
@@ -197,6 +187,9 @@ def get_artist_discography(artist_name, artist_id=None, cache_only=False):
         artist_id = find_spotify_artist(artist_name)
 
     artist_albums = _get_artist_albums(artist_id, artist_name, cache_only=cache_only)
+
+    # not necessary but helps debugging
+    # artist_albums.sort_values(by='name', inplace=True)
 
     if artist_albums is None:
         return None
@@ -223,17 +216,14 @@ def get_artist_discography(artist_name, artist_id=None, cache_only=False):
         axis=1
     )
 
-    artist_tracks.sort_values(by='name', inplace=True)
+    # not necessary but helps debugging
+    # artist_tracks.sort_values(by='name', inplace=True)
 
     gby = artist_tracks.groupby(by='signature', as_index=False, sort=False, group_keys=False)
 
-    listening_history = ListeningHistory()
-
     dedup_tracks = gby.apply(
-        func=lambda group: _form_track_from_signature_group(group, listening_history)
+        func=lambda group: _form_track_from_signature_group(group)
     )
-
-    assert len(dedup_tracks) == len(gby)
 
     # not necessary but makes debugging easier
     # dedup_tracks.sort_values(by='name', inplace=True)

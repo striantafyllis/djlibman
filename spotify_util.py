@@ -6,7 +6,7 @@ def get_track_signature(track):
     """Returns a value that should uniquely identify the track in most contexts;
        the value is a tuple contains the artist names and the track title"""
     name = track['name']
-    artist_names = track['artist_names'].split('|')
+    artist_names = track['artist_names'].upper().split('|')
 
     # get rid of parenthesized combinations of uppercase letters and numbers - these are usually label codes
     name = re.sub(r'(\[|\()[A-Z]{3,100} ?[0-9]+(\]|\))', '', name)

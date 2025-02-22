@@ -2,6 +2,27 @@
 import djlib_config
 from containers import *
 
+def find_spotify_artist(artist_name):
+    """Returns the Spotify entry for the artist with the given name as a dictionary.
+    The ID is in there also.
+    The search is first done in the library, then expands to all of Spotify if necessary."""
+
+    listening_history = Doc('listening_history')
+
+    artists = get_track_artists(listening_history)
+
+    candidate_ids = []
+
+    for id, name in artists.items():
+        if name == artist_name:
+            candidate_ids.append(id)
+
+    if len(candidate_ids) > 1:
+        raise ValueError(f'Multiple IDs found for artist {artist_name}: {candidate_ids}')
+    elif len(candidate_ids) == 0:
+        raise ValueError(f'Artist {artist_name} not found')
+
+    return candidate_ids[0]
 
 def text_to_spotify_track(text):
     # Remove everything until the first letter character - e.g. numbers like 1.

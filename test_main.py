@@ -280,8 +280,13 @@ def discog_report_for_prog_a_producers():
         artist_id = artist.artist_id
         artist_name = artist.artist_name
 
-        print(f'** Getting discography for artist {artist_id} {artist_name}...')
+        print(f'** Getting discography for artist {artist_id} {artist_name}... ', end='')
+
+        start_time = time.time()
         spotify_discography.get_artist_discography(artist_name, artist_id=artist_id)
+        end_time = time.time()
+
+        print(f' {end_time - start_time:.1f} seconds')
 
     return
 

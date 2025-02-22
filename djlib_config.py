@@ -22,8 +22,7 @@ docs = {}
 _backups = 0
 spotify_queues = []
 discography_cache_dir = None
-discography_verbose = 5
-artist_albums_ttl_days = 7
+artist_albums_ttl_days = 30
 
 # TODO make these configurable
 fuzzy_match_cutoff_threshold = 0.6

@@ -17,38 +17,17 @@ import os
 import os.path
 import time
 import re
+import logging
 
 import djlib_config
 from containers import *
 from spotify_util import *
 
-def _verbose():
-    return djlib_config.discography_verbose
+logger = logging.getLogger(__name__)
+
 
 _SECONDS_PER_DAY = 24 * 3600
 
-
-def find_spotify_artist(artist_name):
-    """Returns the Spotify entry for the artist with the given name as a dictionary.
-    The ID is in there also.
-    The search is first done in the library, then expands to all of Spotify if necessary."""
-
-    listening_history = Doc('listening_history')
-
-    artists = get_track_artists(listening_history)
-
-    candidate_ids = []
-
-    for id, name in artists.items():
-        if name == artist_name:
-            candidate_ids.append(id)
-
-    if len(candidate_ids) > 1:
-        raise ValueError(f'Multiple IDs found for artist {artist_name}: {candidate_ids}')
-    elif len(candidate_ids) == 0:
-        raise ValueError(f'Artist {artist_name} not found')
-
-    return candidate_ids[0]
 
 def _get_from_cache(name, cache_file_name, ttl_days=None):
     cache_file_path = os.path.join(djlib_config.discography_cache_dir, cache_file_name)
@@ -61,8 +40,7 @@ def _get_from_cache(name, cache_file_name, ttl_days=None):
 
     # try to find the artist albums in the cache
     if cache_file_doc.exists():
-        if _verbose() >= 4:
-            print(f'{name} found in cache: {cache_file_path}')
+        logger.debug('%s found in cache: %s', name, cache_file_path)
 
         if ttl_days is not None:
             file_creation_time = cache_file_doc.getmtime()
@@ -70,14 +48,12 @@ def _get_from_cache(name, cache_file_name, ttl_days=None):
             file_age = time.time() - file_creation_time
 
             if file_age > ttl_days * _SECONDS_PER_DAY:
-                if _verbose() >= 4:
-                    print(f'{cache_file_path} is too old; file age {file_age:.0f}, '
-                          f'TTL {djlib_config.artist_albums_ttl_days}')
+                logger.debug('%s %s too old; file age %.1f days, TTL %d days',
+                             name, cache_file_path, file_age / _SECONDS_PER_DAY, ttl_days)
 
                 cache_file_doc.delete()
     else:
-        if _verbose() >= 4:
-            print(f'{name} not found in cache')
+        logger.debug('%s NOT found in cache: %s', name, cache_file_path)
 
     return cache_file_doc
 
@@ -92,13 +68,19 @@ def _get_artist_albums(artist_id, artist_name):
     else:
         artist_albums = djlib_config.spotify.get_artist_albums(artist_id)
 
-    if _verbose() >= 2:
-        total_tracks = artist_albums.total_tracks.sum()
-        print(f'Artist {artist_name}: found {len(artist_albums)} albums with {total_tracks} total tracks')
+    total_tracks = artist_albums.total_tracks.sum()
+    logger.debug('Artist %s %s: found %d albums with %d total tracks',
+                 artist_id,
+                 artist_name,
+                 len(artist_albums),
+                 total_tracks)
 
     if not cache_file_doc.exists() and djlib_config.artist_albums_ttl_days > 0:
-        if _verbose() >= 4:
-            print(f'Artist albums for {artist_name}: writing cache file {cache_file_doc._doc._path}')
+        logger.debug('Artist %s %s: writing albums cache file %s',
+                     artist_id,
+                     artist_name,
+                     cache_file_doc._doc._path
+                     )
 
         cache_file_doc.append(artist_albums, prompt=False)
         cache_file_doc.write()
@@ -115,12 +97,16 @@ def _get_album_tracks(album_id, album_name):
     else:
         album_tracks = djlib_config.spotify.get_album_tracks(album_id)
 
-    if _verbose() >= 3:
-        print(f'Album {album_name}: found {len(album_tracks)} tracks')
+    logger.debug('Album %s %s: found %d tracks',
+                 album_id,
+                 album_name,
+                 len(album_tracks))
 
     if not cache_file_doc.exists():
-        if _verbose() >= 4:
-            print(f'Album {album_name}: writing cache file {cache_file_doc._doc._path}')
+        logger.debug('Album %s %s: writing tracks cache file %s',
+                     album_id,
+                     album_name,
+                     cache_file_doc._doc._path)
 
         cache_file_doc.append(album_tracks, prompt=False)
         cache_file_doc.write()
@@ -243,14 +229,6 @@ def get_artist_discography(artist_name, artist_id=None):
 
     assert len(artist_tracks) >= len(artist_albums)
 
-    # for debugging - remove
-    # artist_tracks = artist_tracks.loc[
-    #     artist_tracks.apply(lambda t: 'Getting Closer' in t['name'], axis=1)
-    # ]
-
-    if _verbose() >= 2:
-        print(f'{artist_name}: found {len(artist_tracks)} tracks')
-
     artist_tracks['signature'] = artist_tracks.apply(
         _get_track_signature,
         axis=1
@@ -271,8 +249,13 @@ def get_artist_discography(artist_name, artist_id=None):
     # not necessary but makes debugging easier
     # dedup_tracks.sort_values(by='name', inplace=True)
 
-    if _verbose() >= 1:
-        print(f'{artist_name}: {len(dedup_tracks)} tracks left after deduplication')
+    logger.debug('Artist %s %s: %d albums, %d total tracks, %d deduplicated tracks',
+                 artist_id,
+                 artist_name,
+                 len(artist_albums),
+                 len(artist_tracks),
+                 len(dedup_tracks)
+                 )
 
     dedup_tracks.drop(labels='signature', axis=1, inplace=True)
 

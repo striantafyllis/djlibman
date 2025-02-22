@@ -58,13 +58,16 @@ def _get_from_cache(name, cache_file_name, ttl_days=None):
     return cache_file_doc
 
 
-def _get_artist_albums(artist_id, artist_name):
-    cache_file_doc = _get_from_cache(f'artist albums for {artist_name}',
-                                     f'artist-albums-{artist_id}-{artist_name.replace('/', '-')}.csv',
-                                     ttl_days=djlib_config.artist_albums_ttl_days)
+def _get_artist_albums(artist_id, artist_name, cache_only=False):
+    cache_file_doc = _get_from_cache(
+        f'artist albums for {artist_name}',
+        f'artist-albums-{artist_id}-{artist_name.replace('/', '-')}.csv',
+        ttl_days=(djlib_config.artist_albums_ttl_days if not cache_only else None))
 
     if cache_file_doc.exists():
         artist_albums = cache_file_doc.get_df()
+    elif cache_only:
+        return None
     else:
         artist_albums = djlib_config.spotify.get_artist_albums(artist_id)
 
@@ -87,13 +90,15 @@ def _get_artist_albums(artist_id, artist_name):
 
     return artist_albums
 
-def _get_album_tracks(album_id, album_name):
+def _get_album_tracks(album_id, album_name, cache_only=False):
     cache_file_doc = _get_from_cache(
         f'album tracks for {album_name}',
         f'album-tracks-{album_id}-{album_name.replace('/', '-')}.csv')
 
     if cache_file_doc.exists():
         album_tracks = cache_file_doc.get_df()
+    elif cache_only:
+        return None
     else:
         album_tracks = djlib_config.spotify.get_album_tracks(album_id)
 
@@ -211,21 +216,29 @@ def _form_track_from_signature_group(same_sig_tracks, listening_history):
     return track
 
 
-def get_artist_discography(artist_name, artist_id=None):
+def get_artist_discography(artist_name, artist_id=None, cache_only=False):
     if artist_id is None:
         artist_id = find_spotify_artist(artist_name)
 
-    artist_albums = _get_artist_albums(artist_id, artist_name)
+    artist_albums = _get_artist_albums(artist_id, artist_name, cache_only=cache_only)
 
-    artist_tracks = pd.concat(
-        artist_albums.apply(
-            lambda album: _filter_tracks_by_artist(
-                artist_id,
-                _get_album_tracks(album['album_id'], album['name'])),
-            axis=1
-        )
-        .values
-    )
+    if artist_albums is None:
+        return None
+
+    artist_album_tracks = []
+
+    for album in artist_albums.itertuples(index=False):
+        album_tracks = _get_album_tracks(
+            album.album_id, album.name, cache_only=cache_only)
+        if album_tracks is None:
+            continue
+        filtered_album_tracks = _filter_tracks_by_artist(artist_id, album_tracks)
+        artist_album_tracks.append(filtered_album_tracks)
+
+    if artist_album_tracks == []:
+        return None
+
+    artist_tracks = pd.concat(artist_album_tracks)
 
     assert len(artist_tracks) >= len(artist_albums)
 

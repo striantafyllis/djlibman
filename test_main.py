@@ -266,7 +266,7 @@ def get_progressive_a_producers():
 
     return
 
-def discog_report_for_prog_a_producers():
+def discog_report_for_prog_a_producers(cache_only=False):
     source_doc = Doc(
         'prog_a_artists',
         path='/Users/spyros/python/djlibman/data/prog_a_artists.csv',
@@ -283,8 +283,13 @@ def discog_report_for_prog_a_producers():
         print(f'** Getting discography for artist {artist_id} {artist_name}... ', end='')
 
         start_time = time.time()
-        spotify_discography.get_artist_discography(artist_name, artist_id=artist_id)
+        result = spotify_discography.get_artist_discography(artist_name, artist_id=artist_id, cache_only=cache_only)
         end_time = time.time()
+
+        if result is None:
+            print(f' (no result)', end='')
+        else:
+            print(f' {len(result)} tracks', end='')
 
         print(f' {end_time - start_time:.1f} seconds')
 
@@ -295,7 +300,7 @@ def discog_report_for_prog_a_producers():
 def main():
     # get_progressive_a_producers()
 
-    discog_report_for_prog_a_producers()
+    discog_report_for_prog_a_producers(cache_only=True)
 
     # promote_tracks_in_spotify_queue(last_track='Storming', promote_source_name='L1 queue', promote_target_name='L2 queue')
 

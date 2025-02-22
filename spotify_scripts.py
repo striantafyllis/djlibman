@@ -2,7 +2,7 @@
 import random
 
 import djlib_config
-import spotify_discography
+import spotify_discography_v1
 from containers import *
 from spotify_util import *
 
@@ -344,7 +344,7 @@ def filter_spotify_playlist(playlist_name):
 
 def sample_artist_to_queue(artist_name, *, latest=10, popular=10):
     print(f'Sampling artist {artist_name} to queue...')
-    discogs = Wrapper(spotify_discography.get_artist_discography(artist_name),
+    discogs = Wrapper(spotify_discography_v1.get_artist_discography(artist_name),
                       name=f'discography for artist {artist_name}')
 
     print(f'Found {len(discogs)} tracks')

@@ -96,7 +96,7 @@ def get_track_artists(tracks: Union[Container, pd.DataFrame]):
     if 'artist_names' not in tracks.columns:
         raise ValueError('No artist_names column in tracks')
 
-    artists = pd.DataFrame(columns=['artist_id', 'artist_name'],
+    artists = pd.DataFrame(columns=['artist_name'],
                            index=pd.Index([], name='artist_id'))
 
     for i in range(len(tracks)):
@@ -118,9 +118,7 @@ def get_track_artists(tracks: Union[Container, pd.DataFrame]):
                     #       f'{existing_name} and {name}')
                     artists.loc[id, 'artist_name'] = name
             else:
-                artists.loc[id] = {'artist_id': id, 'artist_name' : name, 'track_count' : 1}
-
-    artists = artists.convert_dtypes()
+                artists.loc[id, 'artist_name'] = name
 
     return artists
 

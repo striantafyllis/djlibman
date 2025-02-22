@@ -1,4 +1,6 @@
 
+import logging
+import time
 
 import pandas as pd
 import numpy as np
@@ -9,6 +11,8 @@ from pandas import Timestamp
 from general_utils import *
 
 # some basic conversion functions
+
+logger = logging.getLogger(__name__)
 
 def _is_empty(value):
     return pd.isna(value) or value == ''
@@ -75,7 +79,12 @@ class FileDoc:
 
     def _parse(self):
         self._last_read_time = os.path.getmtime(self._path)
+        time1 = time.time()
         self._contents = self._raw_read()
+        time2 = time.time()
+        logger.debug("Reading file '%s': %.3f sec",
+                     self._path,
+                     time2-time1)
 
         if self._apply_converters:
             for column_name, converter in self._converters.items():
@@ -111,6 +120,11 @@ class FileDoc:
                 self._contents.set_index(self._contents.columns[0], drop=False, inplace=True)
             else:
                 self._contents.set_index(self._index_column, drop=False, inplace=True)
+
+        time3 = time.time()
+        logger.debug("Parsing '%s': %.3f sec",
+                     self._path,
+                     time3-time2)
 
         return
 

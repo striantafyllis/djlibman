@@ -171,22 +171,23 @@ class Container(object):
     def deduplicate(self, prompt=None) -> None:
         self._ensure_df()
 
-        # print(f'Deduplicating {self.get_name()}...')
-
         this_df = self._df
 
-        dup_pos = dataframe_duplicate_index_labels(this_df)
+        dup_bool_array = this_df.index.duplicated()
+        num_dups = dup_bool_array.sum()
 
-        if len(dup_pos) > 0:
-            print(f'{self.get_name()}: removing {len(dup_pos)} duplicate entries')
+        if num_dups > 0:
+            print(f'{self.get_name()}: removing {num_dups} duplicate entries')
             if self._should_prompt(prompt):
                 choice = get_user_choice('Remove?')
                 if choice != 'yes':
                     return
 
-            this_df = dataframe_drop_rows_at_positions(self._df, dup_pos)
+            this_df_uniq = this_df[~dup_bool_array]
 
-            self._df = this_df
+            assert len(this_df_uniq) == len(this_df) - num_dups
+
+            self._df = this_df_uniq
 
             self._changed = True
 
@@ -251,7 +252,7 @@ class Container(object):
 
         other_df = self._reconcile_ids(other_df)
 
-        other_unique = dataframe_ensure_unique_index(other_df)
+        other_unique = other_df[~other_df.index.duplicated()]
 
         num_dups = len(other_df) - len(other_unique)
 

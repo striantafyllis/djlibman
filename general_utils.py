@@ -143,35 +143,6 @@ def duplicate_positions(iterable):
     return positions
 
 
-def dataframe_duplicate_index_labels(df):
-    """Returns the positions of duplicate index labels in a dataframe.
-    I'm surprised that Pandas doesn't already offer this."""
-
-    unique_idx = df.index.unique()
-
-    if len(df.index) == len(unique_idx):
-        return []
-
-    return duplicate_positions(df.index)
-
-
-def dataframe_drop_rows_at_positions(df, positions):
-    """Returns a new dataframe without the rows indicated by the positions.
-    I'm surprised pandas doesn't already offer this."""
-
-    new_df_index = [(i not in positions) for i in range(len(df))]
-
-    new_df = df.loc[new_df_index]
-
-    return new_df
-
-def dataframe_ensure_unique_index(df):
-    """Makes sure that all dataframe index entries are unique by removing rows that
-    have the same index label as a previous row. I'm surprised pandas doesn't already offer this."""
-
-    pos = dataframe_duplicate_index_labels(df)
-    return dataframe_drop_rows_at_positions(df, pos)
-
 def dataframe_filter(df, filter):
     bool_array = df.apply(filter, axis=1)
     return df.loc[bool_array]

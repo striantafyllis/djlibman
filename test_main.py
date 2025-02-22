@@ -4,7 +4,8 @@ import sys
 import pandas as pd
 
 from djlibman import *
-from spotify_discography import *
+from spotify_discography_v1 import *
+import spotify_discography
 from classification import *
 
 
@@ -279,8 +280,8 @@ def discog_report_for_prog_a_producers(cache_only=False):
     for artist in prog_a_artists.itertuples(index=False):
         i += 1
 
-        if i > 4:
-            break
+        # if i > 4:
+        #     break
 
         artist_id = artist.artist_id
         artist_name = artist.artist_name
@@ -302,16 +303,22 @@ def discog_report_for_prog_a_producers(cache_only=False):
 
 
 
-def main():
+def old_main():
     # get_progressive_a_producers()
 
-    discog_report_for_prog_a_producers(cache_only=True)
+    # discog_report_for_prog_a_producers(cache_only=False)
 
     # promote_tracks_in_spotify_queue(last_track='Storming', promote_source_name='L1 queue', promote_target_name='L2 queue')
 
     # text_file_to_spotify_playlist('data/tracks.txt', target_playlist_name='tmp queue')
 
     return
+
+def main():
+    discogs = spotify_discography.get_instance()
+
+    return
+
 
 if __name__ == '__main__':
     main()

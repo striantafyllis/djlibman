@@ -59,6 +59,11 @@ class Container(object):
                 self._df = pd.DataFrame()
         return
 
+    def _rvalue_check(self, operation):
+        """Placeholder for checking whether this container can be added to / removed from
+        another container"""
+        return
+
     def get_name(self) -> str:
         return self._name
 
@@ -228,10 +233,11 @@ class Container(object):
     def _preprocess_before_append(self, df: pd.DataFrame):
         return df
 
-    def append(self, other, prompt=None) -> None:
+    def append(self, other, prompt=False) -> None:
         self._ensure_df()
 
         if isinstance(other, Container):
+            other._rvalue_check('append')
             other_df = other.get_df()
             other_name = other.get_name()
         elif isinstance(other, pd.DataFrame):
@@ -322,6 +328,7 @@ class Container(object):
             other_idx = other
         else:
             if isinstance(other, Container):
+                other._rvalue_check('remove')
                 other_df = other.get_df()
                 other_name = other.get_name()
             elif isinstance(other, pd.DataFrame):
@@ -460,27 +467,6 @@ class Doc(Container):
             return self._df.index.name
         return self._index_name
 
-class Queue(Doc):
-    def __init__(
-            self,
-            name: str = 'queue', *,
-            modify=True,
-            create=True,
-            overwrite=True,
-            index_name='spotify_id',
-            **kwargs):
-        super(Queue, self).__init__(
-            name=name,
-            modify=modify,
-            create=create,
-            overwrite=overwrite,
-            index_name=index_name,
-            **kwargs
-        )
-
-    def _preprocess_before_append(self, df: pd.DataFrame):
-        df = df.assign(added_at=pd.Timestamp.utcnow())
-        return df
 
 class SpotifyPlaylist(Container):
     def __init__(self, name: str, modify=True, create=False, overwrite=False):

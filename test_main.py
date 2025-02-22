@@ -2,7 +2,6 @@
 import sys
 
 import pandas as pd
-from requests.packages import target
 
 from djlibman import *
 from spotify_discography import *
@@ -10,7 +9,7 @@ from classification import *
 
 
 def convert_listening_history():
-    listening_history = Doc('listening_history')
+    listening_history = ListeningHistory()
 
     old_df = listening_history.get_df()
 

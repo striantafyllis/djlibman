@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 
 from containers import *
+from spotify_util import *
 import classification
 
 
@@ -189,7 +190,7 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library'):
     print(f'{len(unmapped_rekordbox_tracks)} Rekordbox main playlist tracks do not have a Spotify mapping')
 
     # look for mappings in listening history first
-    listening_history = Doc('listening_history')
+    listening_history = ListeningHistory()
 
     unmapped_listened_tracks = listening_history.get_difference(
         pd.Index(rekordbox_to_spotify.get_df().spotify_id))

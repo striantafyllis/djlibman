@@ -10,7 +10,7 @@ def sanity_check_disk_queues():
     queue = Queue()
     print(f'Queue: {len(queue)} tracks')
 
-    listening_history = Doc('listening_history')
+    listening_history = ListeningHistory()
     print(f'Listening history: {len(listening_history)} tracks')
 
     library = RekordboxPlaylist('Main Library')
@@ -23,7 +23,7 @@ def sanity_check_disk_queues():
     listening_history.deduplicate()
 
     # queue tracks should not be in listening history
-    queue.remove(listening_history)
+    listening_history.filter(queue)
 
     # library tracks should be in listening history and should not be in queue
     listening_history.append(library)
@@ -137,7 +137,7 @@ def promote_tracks_in_spotify_queue(
         queue.write()
 
     print(f'Adding listened tracks to listening history...')
-    listening_history = Doc('listening_history')
+    listening_history = ListeningHistory()
     listening_history.append(listened_tracks, prompt=False)
     listening_history.write()
 
@@ -188,10 +188,10 @@ def sanity_check_spotify_queue(spotify_queue_name, *, is_level_1=False, is_promo
     # Make sure items in the queue are unique
     spotify_queue.deduplicate()
 
-    listening_history = Doc('listening_history')
+    listening_history = ListeningHistory()
 
     if is_level_1:
-        spotify_queue.remove(listening_history, prompt=False)
+        listening_history.filter(spotify_queue, prompt=False)
         spotify_queue.write()
     else:
         # Make sure all items in the L2+ queues are already in the listening history
@@ -306,9 +306,9 @@ def add_to_queue(tracks):
     if len(tracks_wrapper) == 0:
         return
 
-    listening_history = Doc('listening_history')
+    listening_history = ListeningHistory()
 
-    tracks_wrapper.remove(listening_history)
+    listening_history.filter(tracks_wrapper)
 
     if len(tracks_wrapper) == 0:
         return
@@ -332,10 +332,10 @@ def filter_spotify_playlist(playlist_name):
 
     playlist = SpotifyPlaylist(playlist_name)
 
-    listening_history = Doc('listening_history')
+    listening_history = ListeningHistory()
     queue = Queue()
 
-    playlist.remove(listening_history)
+    listening_history.filter(playlist)
     playlist.remove(queue)
     playlist.write()
 
@@ -349,10 +349,10 @@ def sample_artist_to_queue(artist_name, *, latest=10, popular=10):
 
     print(f'Found {len(discogs)} tracks')
 
-    listening_history = Doc('listening_history')
+    listening_history = ListeningHistory()
     queue = Queue()
 
-    discogs.remove(listening_history, prompt=False)
+    listening_history.filter(discogs, prompt=False)
     discogs.remove(queue, prompt=False)
 
     print(f'Left after removing listening history and queue: {len(discogs)} tracks')

@@ -126,30 +126,6 @@ def _filter_tracks_by_artist(artist_id, tracks):
         )
     ]
 
-def _get_track_signature(track):
-    """Returns a string that should uniquely identify the track in most contexts;
-       the string contains the artist names and the track title separated by \u2013"""
-    name = track['name']
-    artist_ids = track['artist_ids'].split('|')
-
-    # get rid of parenthesized combinations of uppercase letters and numbers - these are usually label codes
-    name = re.sub(r'(\[|\()[A-Z]{3,100} ?[0-9]+(\]|\))', '', name)
-
-    name = name.upper()
-
-    # get read of "featuring ...", "feat. " etc.
-    name = re.sub(r'FEAT(\.|URING) .*', '', name)
-
-    for s in ['(', ')', '[', ']', '-', ' AND ', ' X ', 'EXTENDED', 'ORIGINAL', 'REMIX', 'MIXED', 'MIX', 'RADIO', 'EDIT']:
-        name = name.replace(s, '')
-
-    # get rid of whitespace differences
-    name = ' '.join(name.split())
-
-    artist_ids.sort()
-
-    return tuple(artist_ids + [name])
-
 def _form_track_from_signature_group(same_sig_tracks, listening_history):
     """Returns a dataframe with a single row that's the best representative of the
        entire track group.
@@ -243,7 +219,7 @@ def get_artist_discography(artist_name, artist_id=None, cache_only=False):
     assert len(artist_tracks) >= len(artist_albums)
 
     artist_tracks['signature'] = artist_tracks.apply(
-        _get_track_signature,
+        get_track_signature,
         axis=1
     )
 
@@ -251,7 +227,7 @@ def get_artist_discography(artist_name, artist_id=None, cache_only=False):
 
     gby = artist_tracks.groupby(by='signature', as_index=False, sort=False, group_keys=False)
 
-    listening_history = Doc('listening_history')
+    listening_history = ListeningHistory()
 
     dedup_tracks = gby.apply(
         func=lambda group: _form_track_from_signature_group(group, listening_history)

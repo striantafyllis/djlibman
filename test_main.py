@@ -266,7 +266,7 @@ def get_progressive_a_producers():
 
     return
 
-def discog_report_for_prog_a_producers(cache_only=False):
+def discog_report_for_prog_a_producers(cache_only=False, use_v2=False):
     source_doc = Doc(
         'prog_a_artists',
         path='/Users/spyros/python/djlibman/data/prog_a_artists.csv',
@@ -275,6 +275,9 @@ def discog_report_for_prog_a_producers(cache_only=False):
         )
 
     prog_a_artists = source_doc.get_df()
+
+    if use_v2:
+        discogs = spotify_discography.get_instance()
 
     i = 0
     for artist in prog_a_artists.itertuples(index=False):
@@ -289,7 +292,15 @@ def discog_report_for_prog_a_producers(cache_only=False):
         print(f'** Getting discography for artist {artist_id} {artist_name}... ', end='')
 
         start_time = time.time()
-        result = spotify_discography_v1.get_artist_discography(artist_name, artist_id=artist_id, cache_only=cache_only)
+        if use_v2:
+            result = discogs.get_artist_discography(
+                artist_id=artist_id,
+                artist_name=artist_name,
+                refresh_days=None if cache_only else 30,
+                deduplicate_tracks=True
+            )
+        else:
+            result = spotify_discography_v1.get_artist_discography(artist_name, artist_id=artist_id, cache_only=cache_only)
         end_time = time.time()
 
         if result is None:
@@ -318,7 +329,7 @@ def main():
     # old script: 115.9 seconds
 
     start_time = time.time()
-    discog_report_for_prog_a_producers(cache_only=False)
+    discog_report_for_prog_a_producers(cache_only=True, use_v2=True)
     end_time = time.time()
 
     print(f'Total time: {end_time - start_time:.1f} seconds')

@@ -4,7 +4,7 @@ import sys
 import pandas as pd
 
 from djlibman import *
-from spotify_discography_v1 import *
+import spotify_discography_v1
 import spotify_discography
 from classification import *
 
@@ -289,7 +289,7 @@ def discog_report_for_prog_a_producers(cache_only=False):
         print(f'** Getting discography for artist {artist_id} {artist_name}... ', end='')
 
         start_time = time.time()
-        result = spotify_discography.get_artist_discography(artist_name, artist_id=artist_id, cache_only=cache_only)
+        result = spotify_discography_v1.get_artist_discography(artist_name, artist_id=artist_id, cache_only=cache_only)
         end_time = time.time()
 
         if result is None:
@@ -306,8 +306,6 @@ def discog_report_for_prog_a_producers(cache_only=False):
 def old_main():
     # get_progressive_a_producers()
 
-    # discog_report_for_prog_a_producers(cache_only=False)
-
     # promote_tracks_in_spotify_queue(last_track='Storming', promote_source_name='L1 queue', promote_target_name='L2 queue')
 
     # text_file_to_spotify_playlist('data/tracks.txt', target_playlist_name='tmp queue')
@@ -315,7 +313,15 @@ def old_main():
     return
 
 def main():
-    discogs = spotify_discography.get_instance()
+    # discogs = spotify_discography.get_instance()
+
+    # old script: 115.9 seconds
+
+    start_time = time.time()
+    discog_report_for_prog_a_producers(cache_only=False)
+    end_time = time.time()
+
+    print(f'Total time: {end_time - start_time:.1f} seconds')
 
     return
 

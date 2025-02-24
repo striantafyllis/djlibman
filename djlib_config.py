@@ -13,7 +13,7 @@ import spotify_interface
 import google_interface
 import file_interface
 
-_default_dir = None
+default_dir = None
 
 rekordbox = None
 google = None
@@ -32,7 +32,7 @@ _log_file = './djlibman.log'
 _log_level = logging.INFO
 
 def init(config_file=None):
-    global _default_dir
+    global default_dir
     global rekordbox
     global google
     global spotify
@@ -69,7 +69,7 @@ def init(config_file=None):
         if section_name == 'general':
             for field in section.keys():
                 if field == 'default_dir':
-                    _default_dir = section[field]
+                    default_dir = section[field]
                 elif field == 'backups':
                     _backups = section.getint(field)
                 elif field == 'logfile':
@@ -141,7 +141,7 @@ def init(config_file=None):
                     raise Exception(f'Unknown field in config section {section_name}: {field}')
 
             if discography_cache_dir is None:
-                discography_cache_dir = _default_dir + '/discography_cache'
+                discography_cache_dir = default_dir + '/discography_cache'
 
         elif section_name.startswith('docs.'):
             name = section_name[5:]
@@ -189,7 +189,7 @@ def create_doc(name, type='csv', **kwargs):
 
         doc = google_interface.GoogleSheet(google, **kwargs)
     else:
-        if _default_dir is None:
+        if default_dir is None:
             raise Exception(f'Doc {name}: no default dir and no path specified')
 
         if 'path' not in kwargs:
@@ -200,7 +200,7 @@ def create_doc(name, type='csv', **kwargs):
             else:
                 raise Exception("Unsupported doc type: '%s'" % type)
 
-            path = os.path.join(_default_dir, name)
+            path = os.path.join(default_dir, name)
             if not name.endswith(extension):
                 path += extension
 

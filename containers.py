@@ -104,8 +104,8 @@ class Container(object):
         if len(other_df) == 0:
             return other_df
 
-        this_index_name = self._df.index.name
-        if this_index_name is None and len(self._df) == 0:
+        this_index_name = self._df.index.name if self._df is not None else None
+        if this_index_name is None and (self._df is None or len(self._df) == 0):
             this_index_name = self._get_index_name()
             if this_index_name is None:
                 return other_df
@@ -464,8 +464,11 @@ class Doc(Container):
 
     def _get_index_name(self):
         if self._index_name is None:
+            if self._doc._index_column is not None and self._doc._index_column != '_FIRST_COLUMN':
+                return self._doc._index_column
             self._ensure_df()
-            return self._df.index.name
+            if self._df is not None:
+                return self._df.index.name
         return self._index_name
 
 

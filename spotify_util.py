@@ -216,9 +216,12 @@ class ListeningHistory(Doc):
         self._ensure_df()
 
         self._track_signatures = pd.Index(
-            get_track_signature,
-            axis=1
+            self._df.apply(
+                get_track_signature,
+                axis=1
+            )
         )
+
         return
 
     def filter(self, other: Container, prompt=None):
@@ -239,17 +242,22 @@ class ListeningHistory(Doc):
         if filtered_through_spotify_id != 0:
             other_df = other_df.loc[other_not_listened_index]
 
-        other_not_listened_sigs = other_df.apply(
-            lambda track: get_track_signature(track) not in self._track_signatures,
-            axis=1
-        )
+        # for some reason Pandas.apply doesn't work correctly if the dataframe is empty;
+        # it returns an empty dataframe instead of a boolean array
+        if len(other_df) > 0:
+            other_not_listened_sigs = other_df.apply(
+                lambda track: get_track_signature(track) not in self._track_signatures,
+                axis=1
+            )
 
-        other_df_not_listened_sigs = other_df.loc[other_not_listened_sigs]
+            other_df_not_listened_sigs = other_df.loc[other_not_listened_sigs]
 
-        filtered_through_track_sigs = len(other_df_not_listened_sigs) - len(other_df)
+            filtered_through_track_sigs = len(other_df) - len(other_df_not_listened_sigs)
 
-        if filtered_through_track_sigs != 0:
-            other_df = other_df_not_listened_sigs
+            if filtered_through_track_sigs != 0:
+                other_df = other_df_not_listened_sigs
+        else:
+            filtered_through_track_sigs = 0
 
         filtered = filtered_through_spotify_id + filtered_through_track_sigs
 
@@ -263,10 +271,10 @@ class ListeningHistory(Doc):
                 if choice != 'yes':
                     return
 
-                # not calling set_df() here because we don't want the overwrite
-                # check and the ID reconciliation
-                other._df = other_df
-                other._changed = True
+            # not calling set_df() here because we don't want the overwrite
+            # check and the ID reconciliation
+            other._df = other_df
+            other._changed = True
         else:
             print(f'{other.get_name()}: no tracks in listening history')
 

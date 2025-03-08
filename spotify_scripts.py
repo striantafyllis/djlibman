@@ -253,6 +253,8 @@ def queue_maintenance(
                                        is_level_1=(i==0),
                                        is_promote_queue=(spotify_queue == promote_source))
 
+    sys.stdout.flush()
+
     if last_track is not None:
         promote_tracks_in_spotify_queue(last_track, promote_source, promote_target)
 
@@ -294,27 +296,28 @@ def shuffle_spotify_playlist(playlist_name):
     return
 
 def add_to_queue(tracks):
-    """Adds tracks to the disk queue. The tracks have to be either a Container or a DataFrame."""
+    """Adds tracks to the disk queue. The tracks have to be either a Container or a DataFrame or
+       a string that's the name of a Spotify playlist."""
 
     if isinstance(tracks, str):
         tracks = SpotifyPlaylist(tracks)
+    elif isinstance(tracks, pd.DataFrame):
+        tracks = Wrapper(tracks)
 
-    tracks_wrapper = Wrapper(tracks)
+    print(f'Attempting to add {len(tracks)} tracks to the disk queue...')
 
-    print(f'Attempting to add {len(tracks_wrapper)} tracks to the disk queue...')
-
-    if len(tracks_wrapper) == 0:
+    if len(tracks) == 0:
         return
 
     listening_history = ListeningHistory()
 
-    listening_history.filter(tracks_wrapper)
+    listening_history.filter(tracks, prompt=False)
 
-    if len(tracks_wrapper) == 0:
+    if len(tracks) == 0:
         return
 
     queue = Queue()
-    queue.append(tracks_wrapper)
+    queue.append(tracks)
     queue.write()
 
     choice = get_user_choice('Add to L1 queue also?')
@@ -322,7 +325,7 @@ def add_to_queue(tracks):
         l1_queue_name = djlib_config.get_default_spotify_queue_at_level(1)
 
         l1_queue = SpotifyPlaylist(l1_queue_name)
-        l1_queue.append(tracks_wrapper, prompt=False)
+        l1_queue.append(tracks, prompt=False)
         l1_queue.write()
 
     return
@@ -415,5 +418,60 @@ def text_file_to_spotify_playlist(text_file, target_playlist_name='tmp queue'):
         print(f'{len(unmatched_lines)} out of {len(lines)} were left unmatched:')
         for unmatched_line in unmatched_lines:
             print('    ' + unmatched_line)
+
+    return
+
+def remove_artist_from_queue(artist_name):
+    queue = Queue()
+
+    if len(queue) == 0:
+        return
+
+    tracks_to_remove_bool = queue.get_df().apply(
+        lambda track: artist_name in track['artist_names'].split('|'),
+        axis=1
+    )
+
+    choice = get_user_choice(
+        prompt=f'Remove {tracks_to_remove_bool.sum()} tracks from artist {artist_name} from queue?',
+        options=['proceed', 'show', 'abort']
+    )
+
+    if choice == 'show':
+        tracks_to_remove = queue.get_df().loc[tracks_to_remove_bool]
+        pretty_print_tracks(tracks_to_remove, enum=True)
+        choice = get_user_choice('Proceed?')
+        if choice != 'yes':
+            return
+    elif choice == 'abort':
+        return
+
+    queue.set_df(queue.get_df()[~tracks_to_remove_bool])
+
+    print(f'Queue now has {len(queue)} tracks.')
+
+    queue.write(force=True)
+    return
+
+def spotify_playlist_from_rekordbox_playlist(spotify_playlist_name, rekordbox_playlist_name):
+    spotify_playlist = SpotifyPlaylist(spotify_playlist_name, create=True, overwrite=True)
+
+    rekordbox_playlist = RekordboxPlaylist(rekordbox_playlist_name)
+
+    if spotify_playlist.exists():
+        spotify_playlist.truncate()
+
+    spotify_playlist.append(rekordbox_playlist)
+    spotify_playlist.write()
+
+    return
+
+def unlike_spotify_playlist(spotify_playlist_name):
+    spotify_playlist = SpotifyPlaylist(spotify_playlist_name)
+
+    spotify_liked = SpotifyLiked()
+
+    spotify_liked.remove(spotify_playlist)
+    spotify_liked.write()
 
     return

@@ -214,7 +214,7 @@ def promote_set_tracks_to_a():
     sets = [['Sets', name] for name in rb_playlists['Sets']]
 
     for set in sets:
-        promote_tracks_to_a(set)
+        reclassify_tracks_as(set, 'A')
 
     return
 

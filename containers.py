@@ -13,6 +13,55 @@ from general_utils import *
 
 import djlib_config
 
+
+def translate_spotify_id_to_rekordbox(spotify_df: pd.DataFrame) -> pd.DataFrame:
+    """Converts a dataframe indexed by spotify_id to one indexed by rekordbox_id"""
+    # TODO this should really be in a different file and passed in as a function argument
+
+    if spotify_df.index.name != 'spotify_id':
+        raise ValueError('Expected a DF indexed by spotify_id')
+
+    rekordbox_to_spotify_mapping = djlib_config.docs['rekordbox_to_spotify'].read()
+
+    # remove empty mappings
+    rekordbox_to_spotify_mapping = rekordbox_to_spotify_mapping.loc[
+        ~pd.isna(rekordbox_to_spotify_mapping.spotify_id)
+    ]
+
+    spotify_df = spotify_df.merge(
+        right=rekordbox_to_spotify_mapping,
+        how='inner',
+        left_index=True,
+        right_on='spotify_id'
+    )
+
+    spotify_df = spotify_df.set_index(keys='rekordbox_id', drop=False)
+
+    return spotify_df
+
+def translate_rekordbox_id_to_spotify(rekordbox_df: pd.DataFrame) -> pd.DataFrame:
+    if rekordbox_df.index.name != 'rekordbox_id':
+        raise ValueError('Expected a DF indexed by rekordbox_id')
+
+    rekordbox_to_spotify_mapping = djlib_config.docs['rekordbox_to_spotify'].read()
+
+    # remove empty mappings
+    rekordbox_to_spotify_mapping = rekordbox_to_spotify_mapping.loc[
+        ~pd.isna(rekordbox_to_spotify_mapping.spotify_id)
+    ]
+
+    rekordbox_df = rekordbox_df.merge(
+        right=rekordbox_to_spotify_mapping,
+        how='inner',
+        left_index=True,
+        right_index=True
+    )
+
+    rekordbox_df = rekordbox_df.set_index(keys='spotify_id', drop=False)
+
+    return rekordbox_df
+
+
 class Container(object):
     """Root of the hierarchy; abstract class"""
     def __init__(self, name: str, *, create=False, modify=True, overwrite=False, prompt=None):
@@ -119,48 +168,12 @@ class Container(object):
 
         if this_index_name == 'spotify_id':
             if other_df.index.name == 'rekordbox_id':
-                rekordbox_to_spotify_mapping = djlib_config.docs['rekordbox_to_spotify'].read()
-
-                # remove empty mappings
-                rekordbox_to_spotify_mapping = rekordbox_to_spotify_mapping.loc[
-                    ~pd.isna(rekordbox_to_spotify_mapping.spotify_id)
-                ]
-
-                if this_index_name != 'spotify_id':
-                    rekordbox_to_spotify_mapping = rekordbox_to_spotify_mapping.rename(
-                        columns={'spotify_id': this_index_name})
-
-                other_df = other_df.merge(
-                    right=rekordbox_to_spotify_mapping,
-                    how='inner',
-                    left_index=True,
-                    right_index=True
-                )
-
-                other_df = other_df.set_index(keys=this_index_name, drop=False)
+                other_df = translate_rekordbox_id_to_spotify(other_df)
             else:
                 raise ValueError(f"Unknown other index {other_df.index.name}")
         elif this_index_name == 'rekordbox_id':
             if other_df.index.name == 'spotify_id':
-                rekordbox_to_spotify_mapping = djlib_config.docs['rekordbox_to_spotify'].read()
-
-                # remove empty mappings
-                rekordbox_to_spotify_mapping = rekordbox_to_spotify_mapping.loc[
-                    ~pd.isna(rekordbox_to_spotify_mapping.spotify_id)
-                ]
-
-                if this_index_name != 'rekordbox_id':
-                    rekordbox_to_spotify_mapping = rekordbox_to_spotify_mapping.rename(
-                        columns={'rekordbox_id': this_index_name})
-
-                other_df = other_df.merge(
-                    right=rekordbox_to_spotify_mapping,
-                    how='inner',
-                    left_index=True,
-                    right_on='spotify_id'
-                )
-
-                other_df = other_df.set_index(keys=this_index_name, drop=False)
+                other_df = translate_spotify_id_to_rekordbox(other_df)
             else:
                 raise ValueError(f"Unknown other index {other_df.index.name}")
         else:

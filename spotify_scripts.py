@@ -1,7 +1,10 @@
 
 import random
 
+from spotipy import Spotify
+
 import djlib_config
+import library_scripts
 import spotify_discography_v1
 from containers import *
 from spotify_util import *
@@ -274,11 +277,20 @@ def queue_maintenance(
 
     return
 
-def pretty_print_spotify_playlist(playlist_name):
+def pretty_print_spotify_playlist(playlist_name, *, liked_only=False):
     spotify_playlist = SpotifyPlaylist(playlist_name)
 
-    print(f"Spotify playlist '{playlist_name}': {len(spotify_playlist)} tracks")
-    pretty_print_tracks(spotify_playlist.get_df(), enum=True, ids=False)
+    if liked_only:
+        liked = SpotifyLiked()
+
+        tracks = spotify_playlist.get_intersection(liked)
+
+        print(f"Spotify playlist '{playlist_name}': {len(spotify_playlist)} tracks, {len(tracks)} liked tracks")
+    else:
+        print(f"Spotify playlist '{playlist_name}': {len(spotify_playlist)} tracks")
+        tracks = spotify_playlist.get_df()
+
+    pretty_print_tracks(tracks, enum=True, ids=False)
     return
 
 def shuffle_spotify_playlist(playlist_name):
@@ -473,5 +485,59 @@ def unlike_spotify_playlist(spotify_playlist_name):
 
     spotify_liked.remove(spotify_playlist)
     spotify_liked.write()
+
+    return
+
+def review_maintenance(
+        *,
+        review_playlist,
+        next_level_playlist,
+        last_track
+):
+    review_playlist = SpotifyPlaylist(review_playlist)
+    next_level_playlist = SpotifyPlaylist(next_level_playlist)
+
+    listened_tracks = get_playlist_listened_tracks(review_playlist, last_track)
+
+    print(f'{review_playlist.get_name()}: {len(listened_tracks)} listened_tracks')
+    pretty_print_tracks(listened_tracks, indent=' '*4, enum=True)
+
+    choice = get_user_choice('Is this correct?')
+    if choice != 'yes':
+        return
+
+    if len(listened_tracks) == 0:
+        return
+
+    # find how many of the listened tracks are liked
+    liked = SpotifyLiked()
+
+    listened_liked_tracks_idx = listened_tracks.index.intersection(liked.get_df().index, sort=False)
+    listened_liked_tracks = listened_tracks.loc[listened_liked_tracks_idx]
+
+    print(f'{review_playlist.get_name()}: {len(listened_liked_tracks)} of the '
+          f'{len(listened_tracks)} listened tracks are liked')
+    pretty_print_tracks(listened_liked_tracks, indent=' ' * 4, enum=True)
+    choice = get_user_choice('Is this correct?')
+    if choice != 'yes':
+        return
+    print()
+
+    if len(listened_liked_tracks) > 0:
+        next_level_playlist.append(listened_liked_tracks, prompt=False)
+        next_level_playlist.write()
+
+        liked.remove(listened_liked_tracks, prompt=False)
+        liked.write()
+
+    listened_not_liked_tracks_idx = listened_tracks.index.difference(listened_liked_tracks_idx)
+    listened_not_liked_tracks = listened_tracks.loc[listened_not_liked_tracks_idx]
+
+    print(f'Classifying {len(listened_not_liked_tracks)} non-liked listened tracks as C...')
+
+    library_scripts.reclassify_tracks_as(listened_not_liked_tracks, 'C')
+
+    review_playlist.remove(listened_tracks)
+    review_playlist.write()
 
     return

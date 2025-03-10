@@ -447,32 +447,41 @@ def pretty_print_rekordbox_playlist(playlist_name):
     return
 
 
-def promote_tracks_to_a(rekordbox_playlist_name):
-    rekordbox_playlist = RekordboxPlaylist(rekordbox_playlist_name)
-    track_ids = rekordbox_playlist.get_df().index
+def reclassify_tracks_as(tracks, new_class):
+    if isinstance(tracks, Container):
+        tracks = tracks.get_df()
+
+    if tracks.index.name == 'rekordbox_id':
+        pass
+    elif tracks.index.name == 'spotify_id':
+        tracks = translate_spotify_id_to_rekordbox(tracks)
+    else:
+        raise ValueError(f'Unrecognizable index ID: {tracks.index.name}')
+
+    track_ids = tracks.index
 
     djlib = Doc('djlib')
 
     tracks = djlib.get_df().loc[track_ids]
 
-    print(f'Tracks in {rekordbox_playlist_name}:')
+    print(f'Tracks to reclassify as {new_class}:')
     pretty_print_tracks(tracks, enum=True, ids=False)
     print()
 
-    print('Tracks already at A:')
-    tracks_already_A = classification.filter_tracks(tracks, classes=['A'])
-    pretty_print_tracks(tracks_already_A, enum=True, ids=False)
+    print(f'Tracks already at {new_class}:')
+    tracks_already_new_class = classification.filter_tracks(tracks, classes=[new_class])
+    pretty_print_tracks(tracks_already_new_class, enum=True, ids=False)
     print()
 
-    print('Tracks to be promoted to A:')
-    tracks_to_promote = tracks.loc[tracks.index.difference(tracks_already_A.index, sort=False)]
-    if len(tracks_to_promote) == 0:
+    print(f'Tracks to be reclassified as {new_class}:')
+    tracks_to_reclassify = tracks.loc[tracks.index.difference(tracks_already_new_class.index, sort=False)]
+    if len(tracks_to_reclassify) == 0:
         print('NONE')
     else:
-        pretty_print_tracks(tracks_to_promote, enum=True, ids=False)
+        pretty_print_tracks(tracks_to_reclassify, enum=True, ids=False)
         choice = get_user_choice('Proceed?')
         if choice == 'yes':
-            djlib.get_df().loc[tracks_to_promote.index, 'Class'] = 'A'
+            djlib.get_df().loc[tracks_to_reclassify.index, 'Class'] = new_class
             djlib.write(force=True)
 
     return

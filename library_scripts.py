@@ -381,6 +381,11 @@ def playlists_maintenance(do_rekordbox=True, do_spotify=True):
             print(f'Creating Spotify playlist {name}: {len(spotify_playlist)} tracks')
             spotify_playlist.write()
 
+    if do_rekordbox:
+        # do this right before form_progressive_not_used, because it uses the Progressive playlist
+        # which was updated above
+        djlib_config.rekordbox.write()
+
     # special-case code - will be generalized later
     form_progressive_not_used(do_rekordbox, do_spotify, write_thru=False)
 

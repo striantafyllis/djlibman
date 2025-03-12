@@ -36,24 +36,28 @@ def track_is(
     if danceable is not None:
         if pd.isna(track['Danceable']):
             return False
-        return bool(danceable) == bool(track['Danceable'])
+        if bool(danceable) != bool(track['Danceable']):
+            return False
 
     if ambient is not None:
         if pd.isna(track['Ambient']):
             return False
-        return bool(ambient) == bool(track['Ambient'])
+        if bool(ambient) != bool(track['Ambient']):
+            return False
 
     if song is not None:
         if pd.isna(track['Song']):
             return False
-        return bool(song) == bool(track['Song'])
+        if bool(song) != bool(track['Song']):
+            return False
 
     if uptempo is not None:
         if pd.isna(track['BPM']):
             return False
         if not isinstance(track['BPM'], float):
             raise ValueError('BPM must be float')
-        return bool(uptempo) == (track['BPM'] >= _DOWNTEMPO_CUTOFF)
+        if bool(uptempo) != (track['BPM'] >= _DOWNTEMPO_CUTOFF):
+            return False
 
     if classes is not None:
         if pd.isna(track['Class']):

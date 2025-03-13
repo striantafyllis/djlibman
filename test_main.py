@@ -4,7 +4,7 @@ import sys
 import pandas as pd
 
 from djlibman import *
-import spotify_discography_v1
+# import spotify_discography_v1
 import spotify_discography
 from classification import *
 
@@ -211,10 +211,18 @@ def library_reorg_add_question_mark():
 def promote_set_tracks_to_a():
     rb_playlists = djlib_config.rekordbox.get_playlist_names()
 
-    sets = [['Sets', name] for name in rb_playlists['Sets']]
+    set_names = [['Sets', name] for name in rb_playlists['Sets']]
 
-    for set in sets:
-        reclassify_tracks_as(set, 'A')
+    tracks = None
+    for set_name in set_names:
+        set = RekordboxPlaylist(set_name)
+
+        if tracks is None:
+            tracks = Wrapper(contents=set, name='set tracks')
+        else:
+            tracks.append(set, prompt=False)
+
+    reclassify_tracks_as(tracks, 'A')
 
     return
 
@@ -226,7 +234,7 @@ def get_progressive_a_producers():
         filter_tracks(
             djlib.get_df(),
             classes=['A'],
-            flavors=['Progressive', 'Progressive-Adjacent']
+            flavors=['Progressive']
     ), drop_missing_ids=True)
 
     prog_a_artists = get_track_artists(prog_a_tracks)
@@ -266,7 +274,7 @@ def get_progressive_a_producers():
 
     return
 
-def discog_report_for_prog_a_producers(cache_only=False, use_v2=False):
+def discog_report_for_prog_a_producers(cache_only=False):
     source_doc = Doc(
         'prog_a_artists',
         path='/Users/spyros/python/djlibman/data/prog_a_artists.csv',
@@ -276,31 +284,29 @@ def discog_report_for_prog_a_producers(cache_only=False, use_v2=False):
 
     prog_a_artists = source_doc.get_df()
 
-    if use_v2:
-        discogs = spotify_discography.get_instance()
+    discogs = spotify_discography.get_instance()
 
     i = 0
     for artist in prog_a_artists.itertuples(index=False):
         i += 1
 
-        # if i > 4:
-        #     break
+        if i > 2:
+            break
 
         artist_id = artist.artist_id
         artist_name = artist.artist_name
 
-        print(f'** Getting discography for artist {artist_id} {artist_name}... ', end='')
+        print(f'** Getting discography for artist {artist_id} {artist_name}... ')
 
         start_time = time.time()
-        if use_v2:
-            result = discogs.get_artist_discography(
-                artist_id=artist_id,
-                artist_name=artist_name,
-                refresh_days=None if cache_only else 30,
-                deduplicate_tracks=True
-            )
-        else:
-            result = spotify_discography_v1.get_artist_discography(artist_name, artist_id=artist_id, cache_only=cache_only)
+        result = discogs.get_artist_discography(
+            artist_id=artist_id,
+            artist_name=artist_name,
+            deduplicate_tracks=True,
+            cache_only=cache_only,
+            refresh_days=0
+        )
+
         end_time = time.time()
 
         if result is None:
@@ -324,15 +330,11 @@ def old_main():
     return
 
 def main():
-    # discogs = spotify_discography.get_instance()
+    # promote_set_tracks_to_a()
 
-    # old script: 115.9 seconds
+    # get_progressive_a_producers()
 
-    start_time = time.time()
-    discog_report_for_prog_a_producers(cache_only=True, use_v2=True)
-    end_time = time.time()
-
-    print(f'Total time: {end_time - start_time:.1f} seconds')
+    discog_report_for_prog_a_producers(cache_only=False)
 
     return
 

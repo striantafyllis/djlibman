@@ -134,22 +134,23 @@ def add_artist_track_counts(artists: pd.DataFrame, tracks: pd.DataFrame, track_c
     if track_count_column not in artists.columns:
         artists[track_count_column] = 0
 
-    not_found_artists = {}
+    # not_found_artists = {}
 
     for track in tracks.itertuples(index=False):
         if pd.isna(track.artist_ids):
             continue
         artist_ids = track.artist_ids.split('|')
-        artist_names = track.artist_names.split('|')
+        # artist_names = track.artist_names.split('|')
 
         for i, artist_id in enumerate(artist_ids):
             if artist_id not in artists.index:
-                not_found_artists[artist_id] = artist_names[i]
+                pass
+                # not_found_artists[artist_id] = artist_names[i]
             else:
                 artists.loc[artist_id, track_count_column] += 1
 
-    if len(not_found_artists) > 0:
-        print(f'{len(not_found_artists)} artists not found in artist dataframe')
+    # if len(not_found_artists) > 0:
+    #     print(f'{len(not_found_artists)} artists not found in artist dataframe')
 
     return
 

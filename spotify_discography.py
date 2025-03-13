@@ -16,6 +16,8 @@ Both these stages can be cached to disk, so that they don't have to be repeated 
 import time
 import logging
 
+import pytz
+
 import djlib_config
 from containers import *
 from spotify_util import *
@@ -114,7 +116,7 @@ class _SpotifyDiscography:
 
     def _refresh_artist_albums(self, artist_id, artist_name, refresh_days):
         if refresh_days is None or refresh_days < 0:
-            return
+            raise ValueError(f'Invalid value for refresh_days: {refresh_days}')
 
         artist_albums_last_check = self._artist_albums_last_check.get_df()
 
@@ -124,7 +126,7 @@ class _SpotifyDiscography:
         else:
             last_check_time = artist_albums_last_check.loc[artist_id, 'check_time']
 
-            now = pd.Timestamp.now()
+            now = pd.Timestamp.utcnow()
             past_days = (now - last_check_time).days
 
             refresh = past_days >= refresh_days
@@ -136,7 +138,20 @@ class _SpotifyDiscography:
                          )
 
         if refresh:
-            raise NotImplementedError('Refreshing artist albums')
+            print(f'Fetching albums for artist: {artist_id} {artist_name}...', end='')
+
+            artist_albums = djlib_config.spotify.get_artist_albums(artist_id)
+
+            new_artist_albums_idx = artist_albums.index.difference(self._albums.get_df().index, sort=False)
+            new_artist_albums = artist_albums.loc[new_artist_albums_idx]
+
+            print(f' {len(artist_albums)} fetched, {len(new_artist_albums)} new')
+
+            self._albums.append(new_artist_albums, prompt=False)
+            self._albums.write()
+
+            self._artist_albums_last_check.get_df().loc[artist_id, 'check_time'] = pd.Timestamp.utcnow()
+            self._artist_albums_last_check.write(force=True)
 
         return
 
@@ -217,7 +232,8 @@ class _SpotifyDiscography:
                                artist_name=None,
                                artist_id=None,
                                refresh_days=30,
-                               deduplicate_tracks=False):
+                               deduplicate_tracks=False,
+                               cache_only=False):
         """
         Returns all known tracks for the artist. At least one of (artist_id, artist_name)
         must be specified.
@@ -234,7 +250,8 @@ class _SpotifyDiscography:
         if artist_name is None:
             artist_name = self.get_spotify_artist_name(artist_id)
 
-        self._refresh_artist_albums(artist_id, artist_name, refresh_days)
+        if not cache_only:
+            self._refresh_artist_albums(artist_id, artist_name, refresh_days)
 
         artist_tracks = self._get_artist_tracks_doc(artist_id, artist_name).get_df()
 

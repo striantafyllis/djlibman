@@ -11,3 +11,5 @@ code_examples/grammar/*.py
 /data/prog_a_artists.csv
 /data/tracks.txt
 /data/tracks2.txt
+/data/prog_a_artists_enhanced.csv
+/data/next_q_artists.csv

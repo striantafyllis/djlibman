@@ -233,8 +233,8 @@ def get_progressive_a_producers():
         filter_tracks(
             djlib.get_df(),
             classes=['A'],
-            flavors=['Progressive'],
-            # flavors=['Progressive', 'Progressive-Adjacent'],
+            # flavors=['Progressive'],
+            flavors=['Progressive', 'Progressive-Adjacent'],
         ), drop_missing_ids=True)
 
     prog_a_artists = get_track_artists(prog_a_tracks)
@@ -259,8 +259,8 @@ def get_progressive_a_producers():
 
     add_artist_track_counts(prog_a_artists, a_tracks, track_count_column='A')
     add_artist_track_counts(prog_a_artists, b_tracks, track_count_column='B')
-    add_artist_track_counts(prog_a_artists, other_tracks, track_count_column='CX?')
-    add_artist_track_counts(prog_a_artists, listened_tracks, track_count_column='Listened')
+    add_artist_track_counts(prog_a_artists, other_tracks, track_count_column='CXQ')
+    add_artist_track_counts(prog_a_artists, listened_tracks, track_count_column='listened')
 
     prog_a_artists.sort_values(by='A', ascending=False, inplace=True)
 
@@ -341,7 +341,18 @@ def discog_report_for_prog_a_producers():
         type='csv'
         )
 
+    target_doc = Doc(
+        'prog_a_artists_enhanced',
+        path='/Users/spyros/python/djlibman/data/prog_a_artists_enhanced.csv',
+        backups=0,
+        type='csv',
+        create=True,
+        overwrite=True
+        )
+
     prog_a_artists = source_doc.get_df()
+
+    prog_a_artists['total_tracks'] = 0
 
     discogs = spotify_discography.get_instance()
 
@@ -349,8 +360,8 @@ def discog_report_for_prog_a_producers():
     for artist in prog_a_artists.itertuples(index=False):
         i += 1
 
-        if i > 2:
-            break
+        # if i > 2:
+        #     break
 
         artist_id = artist.artist_id
         artist_name = artist.artist_name
@@ -364,6 +375,8 @@ def discog_report_for_prog_a_producers():
             deduplicate_tracks=True,
         )
 
+        prog_a_artists.loc[artist_id, 'total_tracks'] = len(result)
+
         end_time = time.time()
 
         if result is None:
@@ -372,6 +385,12 @@ def discog_report_for_prog_a_producers():
             print(f' {len(result)} tracks', end='')
 
         print(f' {end_time - start_time:.1f} seconds')
+
+    prog_a_artists['frac_listened'] = prog_a_artists.listened / prog_a_artists.total_tracks
+    prog_a_artists['frac_selected'] = (prog_a_artists.A + prog_a_artists.B) / prog_a_artists.listened
+
+    target_doc.set_df(prog_a_artists)
+    target_doc.write()
 
     return
 
@@ -406,7 +425,7 @@ def refresh_prog_a_producers():
         discogs.refresh_artist(
             artist_id=artist_id,
             artist_name=artist_name,
-            refresh_days=1/24,
+            refresh_days=1,
             force=False)
 
         end_time = time.time()
@@ -423,6 +442,29 @@ def old_main():
 
     return
 
+def populate_queue():
+    next_q_artists = Doc(
+        'next_q_artists',
+        path='/Users/spyros/python/djlibman/data/next_q_artists.csv',
+        backups=0,
+        type='csv'
+        )
+
+    i=0
+    for artist in next_q_artists.get_df().itertuples(index=False):
+        i += 1
+
+        # if i <= 5:
+        #     continue
+
+        sample_artist_to_queue(
+            artist_id = artist.artist_id,
+            artist_name = artist.artist_name,
+            latest=artist.num_latest,
+            popular=artist.num_most_popular)
+
+    return
+
 def main():
     # promote_set_tracks_to_a()
 
@@ -436,7 +478,9 @@ def main():
 
     # get_progressive_a_producers()
 
-    refresh_prog_a_producers()
+    # refresh_prog_a_producers()
+
+    populate_queue()
 
     return
 

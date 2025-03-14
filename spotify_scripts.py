@@ -5,6 +5,7 @@ from spotipy import Spotify
 
 import djlib_config
 import library_scripts
+import spotify_discography
 from containers import *
 from spotify_util import *
 
@@ -356,45 +357,50 @@ def filter_spotify_playlist(playlist_name):
     return
 
 
-def sample_artist_to_queue(artist_name, *, latest=10, popular=10):
-    # TODO
+def sample_artist_to_queue(*, artist_id=None, artist_name=None, latest=10, popular=10):
     print(f'Sampling artist {artist_name} to queue...')
-    discogs = Wrapper(spotify_discography_v1.get_artist_discography(artist_name),
-                      name=f'discography for artist {artist_name}')
 
-    print(f'Found {len(discogs)} tracks')
+    discography = spotify_discography.get_instance()
+
+    artist_discography = Wrapper(
+        contents=discography.get_artist_discography(artist_id=artist_id,
+                                                    artist_name=artist_name,
+                                                    deduplicate_tracks=True),
+        name=f'discography for {artist_name}')
+
+    print(f'Found {len(artist_discography)} tracks')
 
     listening_history = ListeningHistory()
     queue = Queue()
 
-    listening_history.filter(discogs, prompt=False)
-    discogs.remove(queue, prompt=False)
+    listening_history.filter(artist_discography, prompt=False)
+    artist_discography.remove(queue, prompt=False)
 
-    print(f'Left after removing listening history and queue: {len(discogs)} tracks')
+    print(f'Left after removing listening history and queue: {len(artist_discography)} tracks')
 
     if latest > 0:
-        discogs.sort('release_date', ascending=False)
+        artist_discography.sort('release_date', ascending=False)
 
-        latest_tracks = discogs.get_df()[:latest]
+        latest_tracks = artist_discography.get_df()[:latest]
 
-        discogs.remove(latest_tracks, prompt=False)
+        artist_discography.remove(latest_tracks, prompt=False)
 
         print('Latest tracks:')
         pretty_print_tracks(latest_tracks, indent=' '*4, enum=True, extra_attribs='release_date')
 
         queue.append(latest_tracks)
+        queue.write()
 
     if popular > 0:
-        discogs.sort('popularity', ascending=False)
+        artist_discography.sort('popularity', ascending=False)
 
-        most_popular_tracks = discogs.get_df()[:popular]
+        most_popular_tracks = artist_discography.get_df()[:popular]
 
         print('Most popular tracks:')
         pretty_print_tracks(most_popular_tracks, indent=' '*4, enum=True, extra_attribs='popularity')
 
         queue.append(most_popular_tracks)
-
-    queue.write()
+        queue.write()
 
     return
 

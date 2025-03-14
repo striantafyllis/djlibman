@@ -4,7 +4,6 @@ import sys
 import pandas as pd
 
 from djlibman import *
-# import spotify_discography_v1
 import spotify_discography
 from classification import *
 
@@ -234,7 +233,7 @@ def get_progressive_a_producers():
         filter_tracks(
             djlib.get_df(),
             classes=['A'],
-            flavors=['Progressive']
+            flavors=['Progressive', 'Progressive-Adjacent']
     ), drop_missing_ids=True)
 
     prog_a_artists = get_track_artists(prog_a_tracks)
@@ -273,6 +272,65 @@ def get_progressive_a_producers():
     doc.write()
 
     return
+
+def build_artist_albums():
+    source_doc = Doc(
+        'prog_a_artists',
+        path='/Users/spyros/python/djlibman/data/prog_a_artists.csv',
+        backups=0,
+        type='csv'
+        )
+
+    prog_a_artists = source_doc.get_df()
+
+    discogs = spotify_discography.get_instance()
+
+    i = 0
+    for artist in prog_a_artists.itertuples(index=False):
+        i += 1
+
+        artist_id = artist.artist_id
+        artist_name = artist.artist_name
+
+        discogs.initialize_artist_albums(artist_id, artist_name)
+
+    return
+
+def clean_up_artist_tracks():
+    source_doc = Doc(
+        'prog_a_artists',
+        path='/Users/spyros/python/djlibman/data/prog_a_artists.csv',
+        backups=0,
+        type='csv'
+        )
+
+    prog_a_artists = source_doc.get_df()
+
+    prog_a_artist_ids = pd.Index(prog_a_artists.artist_id)
+
+    spotify_artist_tracks_dir = os.path.join(djlib_config.default_dir, 'spotify-artist-tracks')
+
+    spotify_artist_tracks_files = os.listdir(spotify_artist_tracks_dir)
+
+    spotify_artist_tracks_files_to_delete = []
+
+    for spotify_artist_tracks_file in spotify_artist_tracks_files:
+        m = re.match(r'artist-tracks-([^-]*)-.*\.csv', spotify_artist_tracks_file)
+
+        if m is None:
+            assert False
+
+        artist_id = m.group(1)
+
+        if artist_id not in prog_a_artist_ids:
+            spotify_artist_tracks_files_to_delete.append(spotify_artist_tracks_file)
+
+    for spotify_artist_tracks_file in spotify_artist_tracks_files_to_delete:
+        os.remove(os.path.join(spotify_artist_tracks_dir, spotify_artist_tracks_file))
+
+    return
+
+
 
 def discog_report_for_prog_a_producers(cache_only=False):
     source_doc = Doc(
@@ -334,7 +392,11 @@ def main():
 
     # get_progressive_a_producers()
 
-    discog_report_for_prog_a_producers(cache_only=False)
+    # build_artist_albums()
+
+    clean_up_artist_tracks()
+
+    # discog_report_for_prog_a_producers(cache_only=False)
 
     return
 

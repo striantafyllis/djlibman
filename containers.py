@@ -196,7 +196,7 @@ class Container(object):
                 if choice != 'yes':
                     return
 
-            this_df_uniq = this_df[~dup_bool_array]
+            this_df_uniq = this_df.loc[~dup_bool_array]
 
             assert len(this_df_uniq) == len(this_df) - num_dups
 

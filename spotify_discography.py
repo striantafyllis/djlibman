@@ -31,12 +31,10 @@ class _SpotifyDiscography:
         self._artists_by_id = None
         self._artists_by_name = None
 
-        self._albums = Doc('spotify_albums')
-        self._artist_albums_last_check = Doc('spotify_artist_albums_last_check')
-
-        self._open_artist_docs = {
-            'tracks': {},
-            'albums': {}
+        self._open_docs = {
+            'artist-tracks': {},
+            'artist-albums': {},
+            'album-tracks': {},
         }
 
         return
@@ -44,8 +42,6 @@ class _SpotifyDiscography:
     def _init_artists(self):
         if self._artists_by_id is not None:
             return
-
-        start_time = time.time()
 
         listening_history = ListeningHistory()
 
@@ -80,95 +76,212 @@ class _SpotifyDiscography:
         else:
             raise ValueError(f'Spotify artist with id {artist_id} not found.')
 
-    def _get_artist_doc(self, doc_type: str, artist_id: str, artist_name: str) -> Doc:
-        assert doc_type in ['albums', 'tracks']
+    def _get_doc(self, doc_type: str, id: str, name: str, force=False) -> Doc:
+        if doc_type not in self._open_docs:
+            raise ValueError(f'Unknown doc type {doc_type}')
 
-        if artist_id in self._open_artist_docs[doc_type]:
-            return self._open_artist_docs[doc_type][artist_id]
+        if id in self._open_docs[doc_type]:
+            return self._open_docs[doc_type][id]
 
-        artist_doc_dir = os.path.join(djlib_config.default_dir, f'spotify-artist-{doc_type}')
+        doc_dir = os.path.join(djlib_config.default_dir, 'spotify-' + doc_type)
 
-        artist_doc_files = os.listdir(artist_doc_dir)
+        doc_files = os.listdir(doc_dir)
 
-        artist_doc_file = None
-        artist_doc_pattern = re.compile(r'^artist-%s-%s-.*\.csv$' % (doc_type, artist_id))
-        for file in artist_doc_files:
-            if re.match(artist_doc_pattern, file):
-                artist_doc_file = file
+        doc_file = None
+        doc_pattern = re.compile(r'^%s-%s-.*\.csv$' % (doc_type, id))
+        for file in doc_files:
+            if re.match(doc_pattern, file):
+                doc_file = file
                 break
 
-        if artist_doc_file is None:
-            artist_doc_file = f'artist-{doc_type}-{artist_id}-{artist_name.replace('/', '-')}.csv'
+        if doc_file is None:
+            doc_file = f'{doc_type}-{id}-{name.replace('/', '-')}.csv'
             new_file = True
         else:
             new_file = False
 
-        if doc_type == 'albums':
+        if doc_type.endswith('albums'):
             index_column = 'album_id'
             datetime_columns = ['release_date']
-        elif doc_type == 'tracks':
+        elif doc_type.endswith('tracks'):
             index_column = 'spotify_id'
             datetime_columns = ['release_date', 'added_at']
         else:
             assert False
 
-        artist_doc = Doc(
-            name=f'artist {doc_type} {artist_id} {artist_name}',
-            path=os.path.join(artist_doc_dir, artist_doc_file),
+        doc = Doc(
+            name=f'{doc_type} {id} {name}',
+            path=os.path.join(doc_dir, doc_file),
             type='csv',
             index_column=index_column,
             datetime_columns=datetime_columns,
             backups=0,
             create=new_file,
-            overwrite=new_file,
+            overwrite=new_file or force,
             modify=True
         )
 
-        self._open_artist_docs[doc_type][artist_id] = artist_doc
+        self._open_docs[doc_type][id] = doc
 
-        return artist_doc
+        return doc
 
-    def _refresh_artist_albums(self, artist_id, artist_name, refresh_days):
+    def _refresh_artist_albums(self, artist_id, artist_name, refresh_days, force=False):
         if refresh_days is None or refresh_days < 0:
             raise ValueError(f'Invalid value for refresh_days: {refresh_days}')
 
-        artist_albums_last_check = self._artist_albums_last_check.get_df()
+        artist_albums_doc = self._get_doc('artist-albums', artist_id, artist_name, force=force)
 
-        if artist_id not in artist_albums_last_check.index:
+        if force:
+            refresh = True
+        elif not artist_albums_doc.exists():
             logger.debug('Artist %s %s: albums have never been fetched', artist_id, artist_name)
             refresh = True
-
         else:
-            last_check_time = artist_albums_last_check.loc[artist_id, 'check_time']
+            last_update = artist_albums_doc.getmtime()
+            now = time.time()
 
-            now = pd.Timestamp.utcnow()
-            past_days = (now - last_check_time).days
+            past_days = (now - last_update) / 24 / 3600
 
             refresh = past_days >= refresh_days
 
-            logger.debug('Artist %s %s: albums were last fetched %s, %d days ago; %srefreshing',
+            logger.debug('Artist %s %s: albums were last updated at %s, %.1f days ago; '
+                         '%srefreshing',
                          artist_id, artist_name,
-                         last_check_time, past_days,
+                         pd.Timestamp(last_update), past_days,
                          ('' if refresh else 'not ')
                          )
 
-        if refresh:
-            print(f'Fetching albums for artist: {artist_id} {artist_name}...', end='')
+        if not refresh:
+            return
 
-            artist_albums = djlib_config.spotify.get_artist_albums(artist_id)
+        print(f'Fetching albums for artist: {artist_id} {artist_name}...', end='')
 
-            new_artist_albums_idx = artist_albums.index.difference(self._albums.get_df().index, sort=False)
+        artist_albums = djlib_config.spotify.get_artist_albums(artist_id)
+
+        if force:
+            print(f' {len(artist_albums)} fetched; replacing {len(artist_albums_doc)} existing albums')
+
+            artist_albums_doc.set_df(artist_albums)
+        else:
+            new_artist_albums_idx = artist_albums.index.difference(
+                artist_albums_doc.get_df().index, sort=False)
             new_artist_albums = artist_albums.loc[new_artist_albums_idx]
 
-            print(f' {len(artist_albums)} fetched, {len(new_artist_albums)} new')
+            not_found_artist_albums_idx = artist_albums_doc.get_df().index.difference(
+                artist_albums.index, sort=False)
 
-            self._albums.append(new_artist_albums, prompt=False)
-            self._albums.write()
+            if len(not_found_artist_albums_idx) > 0:
+                raise Exception(
+                    f'Artist {artist_id} {artist_name}: {len(not_found_artist_albums_idx)} '
+                    f'out of {len(artist_albums_doc)} existing albums were not found in the '
+                    f'latest update; use force=True to replace the existing artist albums file')
 
-            self._artist_albums_last_check.get_df().loc[artist_id, 'check_time'] = pd.Timestamp.utcnow()
-            self._artist_albums_last_check.write(force=True)
+            print(f' {len(artist_albums)} fetched, {len(new_artist_albums)} new, '
+                  f'{len(artist_albums_doc) - len(new_artist_albums)} already there')
+
+            artist_albums_doc.append(new_artist_albums, prompt=False)
+
+        # write it even if we found no new albums, so that the file's mtime moves to now
+        artist_albums_doc.write(force=True)
 
         return
+
+
+    def _refresh_artist_tracks(self, artist_id, artist_name, refresh_days, force=False):
+        self._refresh_artist_albums(artist_id, artist_name, refresh_days, force)
+
+        artist_tracks_doc = self._get_doc('artist-tracks', artist_id, artist_name, force=force)
+        artist_albums_doc = self._get_doc('artist-albums', artist_id, artist_name)
+
+        if not artist_albums_doc.exists():
+            logger.debug('Artist %s %s: albums have never been fetched, nothing to do',
+                         artist_id, artist_name)
+            return
+
+        if force:
+            refresh = True
+        elif not artist_tracks_doc.exists():
+            logger.debug('Artist %s %s: tracks have never been written', artist_id, artist_name)
+            refresh = True
+        else:
+            last_update = artist_tracks_doc.getmtime()
+
+            artist_albums_last_update = artist_albums_doc.getmtime()
+
+            refresh = last_update >= artist_albums_last_update
+
+            logger.debug('Artist %s %s: albums were last updated at %s, tracks were last updated '
+                         'at %s; %srefreshing',
+                         artist_id, artist_name,
+                         pd.Timestamp(artist_albums_last_update), pd.Timestamp(last_update),
+                         ('' if refresh else 'not ')
+                         )
+
+        if not refresh:
+            return
+
+        print(f'Writing tracks for artist: {artist_id} {artist_name}...', end='')
+
+        if force:
+            print(f" replacing {len(artist_tracks_doc)} existing tracks with tracks from "
+                  f"{len(artist_albums_doc)} albums")
+
+            artist_tracks_doc.truncate(prompt=False)
+            new_artist_albums = artist_albums_doc.get_df()
+        else:
+            albums_in_artist_tracks = pd.Index(artist_tracks_doc.get_df().album_id).unique()
+
+            not_found_artist_albums = albums_in_artist_tracks.difference(
+                artist_albums_doc.get_df().index, sort=False)
+
+            if len(not_found_artist_albums) > 0:
+                raise Exception(
+                    f'Artist {artist_id} {artist_name}: artist tracks contain {len(not_found_artist_albums)} '
+                    f'albums that are not in artist albums; use force=True to replace the existing '
+                    f'artist tracks file'
+                )
+
+            new_artist_albums_idx = artist_albums_doc.get_df().index.difference(
+                albums_in_artist_tracks, sort=False)
+
+            new_artist_albums = artist_albums_doc.get_df().loc[new_artist_albums_idx]
+
+            print(f" {len(albums_in_artist_tracks)} albums' tracks already there, getting "
+                  f" {len(new_artist_albums)} new albums' tracks")
+
+        for album in new_artist_albums.itertuples():
+            album_tracks = self._get_album_tracks(album.album_id, album.album_name)
+
+            artist_album_tracks = album_tracks.get_df().loc[
+                album_tracks.get_df().apply(
+                    lambda track: artist_id in track['artist_ids'].split('|'),
+                    axis=1
+                )
+            ]
+
+            artist_tracks_doc.append(artist_album_tracks, prompt=False, silent=True)
+
+        # write even if nothing changed, so that the mtime updates
+        artist_tracks_doc.write(force=True)
+
+        return
+
+    def _get_album_tracks(self, album_id, album_name):
+        # TODO there is no way to force a refresh here; add something?
+        album_tracks_doc = self._get_doc('album-tracks', album_id, album_name)
+
+        if album_tracks_doc.exists():
+            return album_tracks_doc
+
+        print(f'Fetching tracks for album: {album_id} {album_name}...', end='')
+
+        album_tracks = djlib_config.spotify.get_album_tracks(album_id)
+
+        album_tracks_doc.set_df(album_tracks)
+        album_tracks_doc.write()
+
+        return album_tracks_doc
+
 
     def _form_track_from_signature_group(self, same_sig_tracks):
         """Returns a dataframe with a single row that's the best representative of the
@@ -264,16 +377,15 @@ class _SpotifyDiscography:
 
         print(f'Building artist albums doc for {artist_id} {artist_name}')
 
-        artist_tracks = self._get_artist_doc('tracks', artist_id, artist_name)
+        artist_tracks = self._get_doc('artist-tracks', artist_id, artist_name)
 
         if len(artist_tracks) == 0:
             print(f'    No tracks; nothing to do.')
             return
 
-        artist_albums = self._get_artist_doc('albums', artist_id, artist_name)
+        artist_albums = self._get_doc('artist-albums', artist_id, artist_name)
 
-        artist_album_ids = pd.Index(artist_tracks.get_df().album_id)
-        artist_album_ids = artist_album_ids[~artist_album_ids.duplicated()]
+        artist_album_ids = pd.Index(artist_tracks.get_df().album_id).unique()
 
         print(f'    {len(artist_tracks)} tracks, {len(artist_album_ids)} albums')
 
@@ -297,34 +409,34 @@ class _SpotifyDiscography:
 
         artist_albums = spotify_albums.get_df().loc[artist_album_ids_in_doc]
 
-        artist_albums_doc = self._get_artist_doc('albums', artist_id, artist_name)
+        artist_albums_doc = self._get_doc('artist-albums', artist_id, artist_name)
 
         artist_albums_doc.set_df(artist_albums)
         artist_albums_doc.write()
 
         return
 
+    def refresh_artist(self, artist_id=None, artist_name=None, refresh_days=30, force=False):
+        """Refreshes the track database for the specified artist."""
+
+
+
     def get_artist_discography(self, *,
                                artist_id=None,
                                artist_name=None,
-                               refresh_days=30,
-                               deduplicate_tracks=False,
-                               cache_only=False):
+                               deduplicate_tracks=False):
         """
         Returns all known tracks for the artist. At least one of (artist_id, artist_name)
         must be specified.
-           refresh_days (default 30): check for new tracks if the last check was more than
-                                      this many days ago. If None, don't check.
+        Note that this relies on the current track database on disk. To get the latest tracks,
+        call refresh_artist() first.
            deduplicate_tracks (default False): try to filter out duplicate releases of the same track
                                                (potentially expensive)
         """
 
         artist_id, artist_name = self._artist_id_and_name(artist_id, artist_name)
 
-        if not cache_only:
-            self._refresh_artist_albums(artist_id, artist_name, refresh_days)
-
-        artist_tracks = self._get_artist_doc('tracks', artist_id, artist_name).get_df()
+        artist_tracks = self._get_doc('artist-tracks', artist_id, artist_name).get_df()
 
         if len(artist_tracks) > 0 and deduplicate_tracks:
             artist_tracks = self._deduplicate_tracks(artist_tracks)

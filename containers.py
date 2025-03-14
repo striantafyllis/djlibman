@@ -247,7 +247,7 @@ class Container(object):
     def _preprocess_before_append(self, df: pd.DataFrame):
         return df
 
-    def append(self, other, prompt=False) -> None:
+    def append(self, other, prompt=None, silent=False) -> None:
         self._ensure_df()
 
         if isinstance(other, Container):
@@ -316,7 +316,8 @@ class Container(object):
 
             status_str += ')'
 
-        print(status_str)
+        if not silent:
+            print(status_str)
 
         if num_added == 0:
             return
@@ -327,7 +328,8 @@ class Container(object):
                 return
 
         self._df = new_df
-        print(f'{self.get_name()} now has {len(self._df)} entries')
+        if not silent:
+            print(f'{self.get_name()} now has {len(self._df)} entries')
         self._changed = True
 
         return

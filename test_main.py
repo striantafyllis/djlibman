@@ -233,8 +233,9 @@ def get_progressive_a_producers():
         filter_tracks(
             djlib.get_df(),
             classes=['A'],
-            flavors=['Progressive', 'Progressive-Adjacent']
-    ), drop_missing_ids=True)
+            flavors=['Progressive'],
+            # flavors=['Progressive', 'Progressive-Adjacent'],
+        ), drop_missing_ids=True)
 
     prog_a_artists = get_track_artists(prog_a_tracks)
 
@@ -332,7 +333,7 @@ def clean_up_artist_tracks():
 
 
 
-def discog_report_for_prog_a_producers(cache_only=False):
+def discog_report_for_prog_a_producers():
     source_doc = Doc(
         'prog_a_artists',
         path='/Users/spyros/python/djlibman/data/prog_a_artists.csv',
@@ -361,8 +362,6 @@ def discog_report_for_prog_a_producers(cache_only=False):
             artist_id=artist_id,
             artist_name=artist_name,
             deduplicate_tracks=True,
-            cache_only=cache_only,
-            refresh_days=0
         )
 
         end_time = time.time()
@@ -376,6 +375,43 @@ def discog_report_for_prog_a_producers(cache_only=False):
 
     return
 
+def refresh_prog_a_producers():
+    source_doc = Doc(
+        'prog_a_artists',
+        path='/Users/spyros/python/djlibman/data/prog_a_artists.csv',
+        backups=0,
+        type='csv'
+        )
+
+    prog_a_artists = source_doc.get_df()
+
+    discogs = spotify_discography.get_instance()
+
+    i = 0
+    for artist in prog_a_artists.itertuples(index=False):
+        i += 1
+
+        # if i <= 2:
+        #     continue
+
+        # if i > 3:
+        #     break
+
+        artist_id = artist.artist_id
+        artist_name = artist.artist_name
+
+        print(f'** Refreshing artist {artist_id} {artist_name}... ')
+
+        start_time = time.time()
+        discogs.refresh_artist(
+            artist_id=artist_id,
+            artist_name=artist_name,
+            refresh_days=1/24,
+            force=False)
+
+        end_time = time.time()
+
+        print(f'** Refreshed artist {artist_id} {artist_name}: {end_time-start_time:.1f} seconds')
 
 
 def old_main():
@@ -394,9 +430,13 @@ def main():
 
     # build_artist_albums()
 
-    clean_up_artist_tracks()
+    # clean_up_artist_tracks()
 
-    # discog_report_for_prog_a_producers(cache_only=False)
+    # discog_report_for_prog_a_producers()
+
+    # get_progressive_a_producers()
+
+    refresh_prog_a_producers()
 
     return
 

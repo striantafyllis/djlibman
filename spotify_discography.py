@@ -125,7 +125,8 @@ class _SpotifyDiscography:
 
         return doc
 
-    def _refresh_artist_albums(self, artist_id, artist_name, refresh_days, force=False):
+    def _refresh_artist_albums(self, artist_id, artist_name, *,
+                               refresh_days=30, force=False):
         if refresh_days is None or refresh_days < 0:
             raise ValueError(f'Invalid value for refresh_days: {refresh_days}')
 
@@ -187,11 +188,11 @@ class _SpotifyDiscography:
         return
 
 
-    def _refresh_artist_tracks(self, artist_id, artist_name, refresh_days, force=False):
-        self._refresh_artist_albums(artist_id, artist_name, refresh_days, force)
-
+    def _refresh_artist_tracks(self, artist_id, artist_name, *, force=False):
         artist_tracks_doc = self._get_doc('artist-tracks', artist_id, artist_name, force=force)
         artist_albums_doc = self._get_doc('artist-albums', artist_id, artist_name)
+
+        orig_num_tracks = len(artist_tracks_doc)
 
         if not artist_albums_doc.exists():
             logger.debug('Artist %s %s: albums have never been fetched, nothing to do',
@@ -208,7 +209,7 @@ class _SpotifyDiscography:
 
             artist_albums_last_update = artist_albums_doc.getmtime()
 
-            refresh = last_update >= artist_albums_last_update
+            refresh = last_update < artist_albums_last_update
 
             logger.debug('Artist %s %s: albums were last updated at %s, tracks were last updated '
                          'at %s; %srefreshing',
@@ -226,7 +227,7 @@ class _SpotifyDiscography:
             print(f" replacing {len(artist_tracks_doc)} existing tracks with tracks from "
                   f"{len(artist_albums_doc)} albums")
 
-            artist_tracks_doc.truncate(prompt=False)
+            artist_tracks_doc.truncate(prompt=False, silent=True)
             new_artist_albums = artist_albums_doc.get_df()
         else:
             albums_in_artist_tracks = pd.Index(artist_tracks_doc.get_df().album_id).unique()
@@ -250,7 +251,7 @@ class _SpotifyDiscography:
                   f" {len(new_artist_albums)} new albums' tracks")
 
         for album in new_artist_albums.itertuples():
-            album_tracks = self._get_album_tracks(album.album_id, album.album_name)
+            album_tracks = self._get_album_tracks(album.album_id, album.name)
 
             artist_album_tracks = album_tracks.get_df().loc[
                 album_tracks.get_df().apply(
@@ -261,6 +262,9 @@ class _SpotifyDiscography:
 
             artist_tracks_doc.append(artist_album_tracks, prompt=False, silent=True)
 
+
+        print(f'Tracks for artist: {artist_id} {artist_name} went from {orig_num_tracks} to '
+              f'{len(artist_tracks_doc)}')
         # write even if nothing changed, so that the mtime updates
         artist_tracks_doc.write(force=True)
 
@@ -279,6 +283,7 @@ class _SpotifyDiscography:
 
         album_tracks_doc.set_df(album_tracks)
         album_tracks_doc.write()
+        print(f' {len(album_tracks_doc)} tracks')
 
         return album_tracks_doc
 
@@ -368,56 +373,22 @@ class _SpotifyDiscography:
         return artist_id, artist_name
 
 
-    def initialize_artist_albums(self,
-                                 artist_id=None,
-                                 artist_name=None):
-        """One-time code to switch the database format"""
+
+    def refresh_artist(self, artist_id=None, artist_name=None, refresh_days=30,
+                       force=False,
+                       force_albums=False,
+                       force_tracks=False):
+        """Refreshes the track database for the specified artist."""
 
         artist_id, artist_name = self._artist_id_and_name(artist_id, artist_name)
 
-        print(f'Building artist albums doc for {artist_id} {artist_name}')
-
-        artist_tracks = self._get_doc('artist-tracks', artist_id, artist_name)
-
-        if len(artist_tracks) == 0:
-            print(f'    No tracks; nothing to do.')
-            return
-
-        artist_albums = self._get_doc('artist-albums', artist_id, artist_name)
-
-        artist_album_ids = pd.Index(artist_tracks.get_df().album_id).unique()
-
-        print(f'    {len(artist_tracks)} tracks, {len(artist_album_ids)} albums')
-
-        spotify_albums = Doc('spotify_albums')
-
-        artist_album_ids_in_doc = artist_album_ids.intersection(spotify_albums.get_df().index, sort=False)
-
-        missing_artist_album_ids = artist_album_ids.difference(artist_album_ids_in_doc, sort=False)
-
-        if len(missing_artist_album_ids) > 0:
-            tracks_with_missing_artist_album_ids = artist_tracks.get_df().loc[
-                artist_tracks.get_df().apply(
-                    lambda track: track['album_id'] in missing_artist_album_ids,
-                    axis=1
-                )
-            ]
-            print(f'    *** {len(missing_artist_album_ids)} albums with '
-                  f'{len(tracks_with_missing_artist_album_ids)} tracks missing from spotify_albums')
-            artist_tracks.remove(tracks_with_missing_artist_album_ids)
-            artist_tracks.write()
-
-        artist_albums = spotify_albums.get_df().loc[artist_album_ids_in_doc]
-
-        artist_albums_doc = self._get_doc('artist-albums', artist_id, artist_name)
-
-        artist_albums_doc.set_df(artist_albums)
-        artist_albums_doc.write()
+        self._refresh_artist_albums(artist_id, artist_name, refresh_days=refresh_days,
+                                    force=(force or force_albums))
+        self._refresh_artist_tracks(artist_id, artist_name,
+                                    force=(force or force_tracks))
 
         return
 
-    def refresh_artist(self, artist_id=None, artist_name=None, refresh_days=30, force=False):
-        """Refreshes the track database for the specified artist."""
 
 
 

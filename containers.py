@@ -412,11 +412,12 @@ class Container(object):
 
         return
 
-    def truncate(self, prompt=None):
+    def truncate(self, prompt=None, silent=False):
         if len(self) == 0:
             return
 
-        print(f'{self.get_name()}: truncating, removing {len(self)} entries')
+        if not silent:
+            print(f'{self.get_name()}: truncating, removing {len(self)} entries')
 
         if self._should_prompt(prompt):
             choice = get_user_choice('Proceed?')

@@ -151,7 +151,7 @@ def djlib_maintenance():
     missing_from_djlib = main_library.get_difference(djlib)
     # filter out local edits
     missing_from_djlib = dataframe_filter(missing_from_djlib,
-                                          lambda track: not track['Title'].endswith('[Local Edit]'))
+                                          lambda track: not track['Title'].endswith(' - EDIT'))
 
     djlib_auto_columns = djlib.get_df().columns.intersection(
         main_library.get_df().columns, sort=False)
@@ -181,7 +181,7 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library'):
 
     # filter out local edits
     unmapped_rekordbox_tracks = dataframe_filter(unmapped_rekordbox_tracks,
-                                  lambda track: not track['Title'].endswith('[Local Edit]'))
+                                  lambda track: not track['Title'].endswith(' - EDIT'))
 
     if len(unmapped_rekordbox_tracks) == 0:
         print('All Rekordbox main playlist tracks have Spotify mappings')

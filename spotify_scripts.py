@@ -148,7 +148,7 @@ def promote_tracks_in_spotify_queue(
 
 def replenish_spotify_queue(
         queue_name='L1 queue',
-        target_size=200):
+        target_size=100):
     spotify_queue = SpotifyPlaylist(queue_name)
     disk_queue = Queue()
 
@@ -176,7 +176,7 @@ def replenish_spotify_queue(
         print(f'Adding {num_tracks_to_add} tracks to {queue_name}')
         pretty_print_tracks(tracks_to_add, indent=' '*4, enum=True)
 
-        spotify_queue.append(tracks_to_add)
+        spotify_queue.append(tracks_to_add, prompt=False)
         spotify_queue.write()
 
     return
@@ -194,7 +194,7 @@ def sanity_check_spotify_queue(spotify_queue_name, *, is_level_1=False, is_promo
     listening_history = ListeningHistory()
 
     if is_level_1:
-        listening_history.filter(spotify_queue, prompt=False)
+        listening_history.filter(spotify_queue)
         spotify_queue.write()
     else:
         # Make sure all items in the L2+ queues are already in the listening history
@@ -323,7 +323,7 @@ def add_to_queue(tracks):
 
     listening_history = ListeningHistory()
 
-    listening_history.filter(tracks, prompt=False)
+    listening_history.filter(tracks)
 
     if len(tracks) == 0:
         return
@@ -547,3 +547,4 @@ def review_maintenance(
     review_playlist.write()
 
     return
+

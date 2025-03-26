@@ -242,7 +242,7 @@ def get_spotify_queue_level(queue_name):
         if queue_name in level:
             return i+1
 
-    raise ValueError(f"Unknown Spotify queue '{queue_name}'")
+    return None
 
 def get_default_spotify_queue_at_level(level):
     if level <= 0:

@@ -8,15 +8,17 @@ flavor_groupings = {
     'Progressive': ['Progressive'],
     'Progressive-Adjacent': ['Progressive-Adjacent'],
     'Afro/Latin/Funky': ['Afro', 'Latin', 'Funky'],
+    'Organic/Afro/Latin/Funky': ['Organic', 'Afro', 'Latin', 'Funky'],
     'Organic': ['Organic'],
     'Other': None
 }
 
 class_groupings = {
     '': ['A', 'B'],
+    'C': ['C'],
+    'X': ['X'],
     'Pending': ['?'],
-    'Old': ['O'],
-    'CX': None
+    'D': ['D'],
 }
 
 def track_is(
@@ -189,7 +191,8 @@ def classify_by_danceability(name, tracks):
 
     return {
         _join_names(name, ''): danceable_tracks,
-        _join_names(name, 'Ambient'): ambient_tracks
+        _join_names(name, 'Ambient'): ambient_tracks,
+        _join_names(name, 'Danceable|Ambient'): tracks
     }
 
 def classify_by_tempo(name, tracks):

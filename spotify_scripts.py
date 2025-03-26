@@ -90,15 +90,10 @@ def promote_tracks_in_spotify_queue(
 
     promote_queue_level = djlib_config.get_spotify_queue_level(promote_source_name)
 
-    promote_target_level = djlib_config.get_spotify_queue_level(promote_target_name)
-    if promote_target_level != promote_queue_level + 1:
-        raise ValueError(f"Promote queue '{promote_source_name}' is at level {promote_queue_level} "
-                         f"but promote target '{promote_target_name}' is at level {promote_target_level}")
-
-    promote_queue = SpotifyPlaylist(promote_source_name)
+    promote_source = SpotifyPlaylist(promote_source_name)
     promote_target = SpotifyPlaylist(promote_target_name)
 
-    listened_tracks = get_playlist_listened_tracks(promote_queue, last_track)
+    listened_tracks = get_playlist_listened_tracks(promote_source, last_track)
 
     print(f'{promote_source_name}: {len(listened_tracks)} listened tracks')
     pretty_print_tracks(listened_tracks, indent=' ' * 4, enum=True)
@@ -130,8 +125,8 @@ def promote_tracks_in_spotify_queue(
         liked.remove(listened_liked_tracks, prompt=False)
         liked.write()
 
-    promote_queue.remove(listened_tracks, prompt=False)
-    promote_queue.write()
+    promote_source.remove(listened_tracks, prompt=False)
+    promote_source.write()
 
     if promote_queue_level == 1:
         print(f'Removing listened tracks from disk queue...')
@@ -241,11 +236,29 @@ def queue_maintenance(
         if promote_source is not None or promote_target is not None:
             raise ValueError('promote_source or promote_target is specified without last_track')
     else:
-        if promote_source is None:
-            promote_source = djlib_config.get_default_spotify_queue_at_level(1)
-        if promote_target is None:
-            promote_target = djlib_config.get_default_spotify_queue_at_level(
-                djlib_config.get_spotify_queue_level(promote_source) + 1)
+        if promote_source is not None and promote_target is not None:
+            promote_source_level = djlib_config.get_spotify_queue_level(promote_source)
+            promote_target_level = djlib_config.get_spotify_queue_level(promote_target)
+
+            if promote_source_level is not None and promote_target_level is not None:
+                if promote_target_level != promote_source_level + 1:
+                    raise ValueError(f"Promote queue '{promote_source}' is at level {promote_source_level} "
+                                     f"but promote target '{promote_target}' is at level {promote_target_level}")
+
+        else:
+            if promote_source is None:
+                promote_source = djlib_config.get_default_spotify_queue_at_level(1)
+            if promote_target is None:
+                promote_source_level = djlib_config.get_spotify_queue_level(promote_source)
+                if promote_source_level is None:
+                    choice = get_user_choice(f"Unknown source queue {promote_source}; assume it's level 1?")
+                    if choice == 'yes':
+                        promote_source_level = 1
+                    else:
+                        print(f"Cannot determine the level of promote source {promote_source}; quitting.")
+                        return
+
+                promote_target = djlib_config.get_default_spotify_queue_at_level(promote_source_level+1)
 
     # Sanity check! Queue and listening history must be disjoint
     sanity_check_disk_queues()

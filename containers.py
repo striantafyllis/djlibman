@@ -369,7 +369,7 @@ class Container(object):
         new_idx = this_df.index.difference(other_unique, sort=False)
 
         num_removed = len(this_df) - len(new_idx)
-        num_absent = len(other_unique) - num_removed
+        num_absent = len(other_unique) - len(this_df.index.unique()) + len(new_idx.unique())
 
         assert num_dups >= 0
         assert num_removed >= 0

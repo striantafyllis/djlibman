@@ -134,7 +134,7 @@ def djlib_values_sanity_check():
 
     bad_class_tracks = djlib.get_filtered(
         lambda track: not pd.isna(track.Class) and
-                      not re.match(r'[?O]?[ABCX][1-5]?', track.Class))
+                      not re.match(r'[?O]?[ABCDX][1-5]?', track.Class))
 
     if len(bad_class_tracks) > 0:
         errors += 1
@@ -308,7 +308,7 @@ def djlib_spotify_likes_maintenance():
     djlib = Doc('djlib')
 
     ab_tracks = djlib.get_filtered(lambda track: classification.track_is(track, classes=['A', 'B']))
-    c_tracks = djlib.get_filtered(lambda track: classification.track_is(track, classes=['C']))
+    c_tracks = djlib.get_filtered(lambda track: classification.track_is(track, classes=['C', 'D']))
 
     ab_tracks_with_spotify = add_spotify_fields_to_rekordbox(ab_tracks, drop_missing_ids=True)
     c_tracks_with_spotify = add_spotify_fields_to_rekordbox(c_tracks, drop_missing_ids=True)
@@ -370,9 +370,9 @@ def playlists_maintenance(do_rekordbox=True, do_spotify=True):
             # XML file to disk; that will be done at the end.
             rekordbox_playlist.write(write_thru=False)
 
-        if do_spotify and name[0] not in ['Pending', 'Old', 'CX']:
+        if do_spotify and name[0] == 'Danceable|Ambient':
             spotify_playlist = SpotifyPlaylist(
-                name=' '.join(['DJ'] + list(name)),
+                name=' '.join(['DJ'] + list(name[1:])),
                 create=True,
                 overwrite=True
             )

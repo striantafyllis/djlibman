@@ -51,7 +51,7 @@ class _SpotifyDiscography:
 
         # if there are names with multiple IDs, keep the last one
         self._artists_by_name = self._artists_by_name.loc[
-            self._artists_by_name.index.duplicated(keep='last')
+            ~self._artists_by_name.index.duplicated(keep='last')
         ]
 
         return

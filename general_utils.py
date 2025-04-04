@@ -530,3 +530,12 @@ def read_lines_from_file(filename):
     fh.close()
 
     return lines
+
+def series_to_dataframe(series):
+    """Turns a series into a dataframe rowwise - unlike pd.Series.to_frame(), which does it columnwise."""
+
+    return pd.DataFrame(
+        data=[series],
+        columns=series.index,
+        index=pd.Index(data=[series.iloc[0]],
+                       name=series.index[0]))

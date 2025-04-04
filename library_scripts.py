@@ -316,7 +316,7 @@ def djlib_spotify_likes_maintenance():
     spotify_liked = SpotifyLiked()
 
     spotify_liked.append(Wrapper(ab_tracks_with_spotify, name='A and B library tracks'))
-    spotify_liked.remove(Wrapper(c_tracks_with_spotify, name='C library tracks'))
+    spotify_liked.remove(Wrapper(c_tracks_with_spotify, name='C and D library tracks'))
 
     spotify_liked.write()
     return

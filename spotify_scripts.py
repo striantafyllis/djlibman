@@ -438,7 +438,11 @@ def text_file_to_spotify_playlist(text_file, target_playlist_name='tmp queue'):
         elif target_playlist is not None:
             # this avoids a Pandas warning
             spotify_track['added_at'] = pd.Timestamp.now()
-            target_playlist.get_df().loc[spotify_track['spotify_id']] = spotify_track
+
+            if len(target_playlist.get_df()) == 0:
+                target_playlist.set_df(series_to_dataframe(spotify_track))
+            else:
+                target_playlist.get_df().loc[spotify_track['spotify_id']] = spotify_track
 
 
     target_playlist.write(force=True)

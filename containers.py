@@ -127,7 +127,7 @@ class Container(object):
         return len(self.get_df())
 
     def set_df(self, df: pd.DataFrame) -> None:
-        if self._exists and not self._overwrite:
+        if self._exists and len(self) > 0 and not self._overwrite:
             raise RuntimeError(f'{self._name} cannot be replaced')
         self._df = self._reconcile_ids(df)
         self._changed = True

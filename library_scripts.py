@@ -337,15 +337,16 @@ def form_progressive_not_used(do_rekordbox=True, do_spotify=True, write_thru=Tru
 
     for prog_set in sets:
         set_tracks = RekordboxPlaylist(prog_set)
-        prog_not_used_tracks.remove(set_tracks, prompt=False)
+        prog_not_used_tracks.remove(set_tracks, prompt=False, silent=True)
 
     if do_rekordbox:
+        print(f'Creating Rekordbox playlist Progressive Not Used: {len(prog_not_used_tracks)} tracks')
         prog_not_used_tracks.write(write_thru=write_thru)
 
     if do_spotify:
         prog_not_used_spotify = SpotifyPlaylist('DJ Progressive Not Used', create=True, overwrite=True)
-        prog_not_used_spotify.truncate(prompt=False)
-        prog_not_used_spotify.append(prog_not_used_tracks, prompt=False)
+        prog_not_used_spotify.truncate(prompt=False, silent=True)
+        prog_not_used_spotify.append(prog_not_used_tracks, prompt=False, silent=True)
         prog_not_used_spotify.write()
 
     return

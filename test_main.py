@@ -259,7 +259,7 @@ def get_progressive_a_producers():
 
     add_artist_track_counts(prog_a_artists, a_tracks, track_count_column='A')
     add_artist_track_counts(prog_a_artists, b_tracks, track_count_column='B')
-    add_artist_track_counts(prog_a_artists, other_tracks, track_count_column='CXQ')
+    add_artist_track_counts(prog_a_artists, other_tracks, track_count_column='CDX')
     add_artist_track_counts(prog_a_artists, listened_tracks, track_count_column='listened')
 
     prog_a_artists.sort_values(by='A', ascending=False, inplace=True)
@@ -480,7 +480,7 @@ def main():
 
     # refresh_prog_a_producers()
 
-    populate_queue()
+    # populate_queue()
 
     return
 

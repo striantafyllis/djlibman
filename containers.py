@@ -296,27 +296,27 @@ class Container(object):
         assert num_already_present >= 0
         assert num_added >= 0
 
-        status_str = f'{self.get_name()}:'
-        if other_name is not None:
-            status_str += f' adding {other_name}:'
-        if num_added == 0:
-            status_str += ' nothing to add'
-        else:
-            status_str += f' adding {num_added} entries'
-
-        if num_dups != 0 or num_already_present != 0:
-            status_str += ' (omitting'
-
-            if num_dups != 0:
-                status_str += f' {num_dups} duplicate entries'
-            if num_already_present != 0:
-                if num_dups != 0:
-                    status_str += ' and'
-                status_str += f' {num_already_present} already present entries'
-
-            status_str += ')'
-
         if not silent:
+            status_str = f'{self.get_name()}:'
+            if other_name is not None:
+                status_str += f' adding {other_name}:'
+            if num_added == 0:
+                status_str += ' nothing to add'
+            else:
+                status_str += f' adding {num_added} entries'
+
+            if num_dups != 0 or num_already_present != 0:
+                status_str += ' (omitting'
+
+                if num_dups != 0:
+                    status_str += f' {num_dups} duplicate entries'
+                if num_already_present != 0:
+                    if num_dups != 0:
+                        status_str += ' and'
+                    status_str += f' {num_already_present} already present entries'
+
+                status_str += ')'
+
             print(status_str)
 
         if num_added == 0:
@@ -334,7 +334,7 @@ class Container(object):
 
         return
 
-    def remove(self, other, prompt=None) -> None:
+    def remove(self, other, prompt=None, silent=False) -> None:
         self._ensure_df()
 
         if len(self._df) == 0:
@@ -375,27 +375,28 @@ class Container(object):
         assert num_removed >= 0
         assert num_absent >= 0
 
-        status_str = f'{self.get_name()}:'
-        if other_name is not None:
-            status_str += f' removing {other.get_name()}:'
-        if num_removed == 0:
-            status_str += ' nothing to remove'
-        else:
-            status_str += f' removing {num_removed} entries'
+        if not silent:
+            status_str = f'{self.get_name()}:'
+            if other_name is not None:
+                status_str += f' removing {other.get_name()}:'
+            if num_removed == 0:
+                status_str += ' nothing to remove'
+            else:
+                status_str += f' removing {num_removed} entries'
 
-        if num_dups != 0 or num_absent != 0:
-            status_str += ' (omitting'
+            if num_dups != 0 or num_absent != 0:
+                status_str += ' (omitting'
 
-            if num_dups != 0:
-                status_str += f' {num_dups} duplicate entries'
-            if num_absent != 0:
                 if num_dups != 0:
-                    status_str += ' and'
-                status_str += f' {num_absent} absent entries'
+                    status_str += f' {num_dups} duplicate entries'
+                if num_absent != 0:
+                    if num_dups != 0:
+                        status_str += ' and'
+                    status_str += f' {num_absent} absent entries'
 
-            status_str += ')'
+                status_str += ')'
 
-        print(status_str)
+            print(status_str)
 
         if num_removed == 0:
             return

@@ -449,7 +449,7 @@ class SpotifyInterface:
             run_at_least_once=True
         )
 
-        print(f"Replaced contents of playlist '{playlist_name_or_id}' with {len(tracks)} tracks")
+        print(f"Replaced contents of Spotify playlist '{playlist_name_or_id}' with {len(tracks)} tracks")
 
         self._cache.invalidate('playlist_tracks', playlist_id)
 

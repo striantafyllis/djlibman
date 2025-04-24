@@ -474,13 +474,13 @@ def main():
 
     # clean_up_artist_tracks()
 
-    # discog_report_for_prog_a_producers()
-
     # get_progressive_a_producers()
 
     # refresh_prog_a_producers()
 
-    # populate_queue()
+    # discog_report_for_prog_a_producers()
+
+    populate_queue()
 
     return
 

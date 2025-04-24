@@ -171,14 +171,19 @@ class _SpotifyDiscography:
             not_found_artist_albums_idx = artist_albums_doc.get_df().index.difference(
                 artist_albums.index, sort=False)
 
+            # it seems this happens regularly for the more popular artists; downgrading to warning.
             if len(not_found_artist_albums_idx) > 0:
-                raise Exception(
-                    f'Artist {artist_id} {artist_name}: {len(not_found_artist_albums_idx)} '
+                print(f'WARNING: Artist {artist_id} {artist_name}: {len(not_found_artist_albums_idx)} '
                     f'out of {len(artist_albums_doc)} existing albums were not found in the '
-                    f'latest update; use force=True to replace the existing artist albums file')
+                    f'latest update')
+                # raise Exception(
+                #     f'Artist {artist_id} {artist_name}: {len(not_found_artist_albums_idx)} '
+                #     f'out of {len(artist_albums_doc)} existing albums were not found in the '
+                #     f'latest update; use force=True to replace the existing artist albums file')
 
             print(f' {len(artist_albums)} fetched, {len(new_artist_albums)} new, '
-                  f'{len(artist_albums_doc) - len(new_artist_albums)} already there')
+                  f'{len(artist_albums_doc) - len(new_artist_albums)} already there, '
+                  f'{len(not_found_artist_albums_idx)} not found')
 
             artist_albums_doc.append(new_artist_albums, prompt=False)
 
@@ -230,7 +235,10 @@ class _SpotifyDiscography:
             artist_tracks_doc.truncate(prompt=False, silent=True)
             new_artist_albums = artist_albums_doc.get_df()
         else:
-            albums_in_artist_tracks = pd.Index(artist_tracks_doc.get_df().album_id).unique()
+            if len(artist_tracks_doc) > 0:
+                albums_in_artist_tracks = pd.Index(artist_tracks_doc.get_df().album_id).unique()
+            else:
+                albums_in_artist_tracks = pd.Index([])
 
             not_found_artist_albums = albums_in_artist_tracks.difference(
                 artist_albums_doc.get_df().index, sort=False)

@@ -401,7 +401,7 @@ def sample_artist_to_queue(*, artist_id=None, artist_name=None, latest=10, popul
         print('Latest tracks:')
         pretty_print_tracks(latest_tracks, indent=' '*4, enum=True, extra_attribs='release_date')
 
-        queue.append(latest_tracks)
+        queue.append(latest_tracks, prompt=False)
         queue.write()
 
     if popular > 0:
@@ -412,7 +412,7 @@ def sample_artist_to_queue(*, artist_id=None, artist_name=None, latest=10, popul
         print('Most popular tracks:')
         pretty_print_tracks(most_popular_tracks, indent=' '*4, enum=True, extra_attribs='popularity')
 
-        queue.append(most_popular_tracks)
+        queue.append(most_popular_tracks, prompt=False)
         queue.write()
 
     return

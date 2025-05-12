@@ -358,6 +358,11 @@ def playlists_maintenance(do_rekordbox=True, do_spotify=True):
     groups = classification.classify_tracks(djlib.get_df())
 
     for name, group in groups.items():
+        # reverse the order in the group; this makes the latest tracks appear first.
+        # It's more convenient.
+
+        group = group[::-1]
+
         if do_rekordbox:
             rekordbox_playlist = RekordboxPlaylist(
                 name=['managed'] + list(name),

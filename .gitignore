@@ -8,6 +8,5 @@ code_examples/grammar/*.tokens
 code_examples/grammar/*.py
 /buffer
 /djlibman.log
-/data/prog_a_artists*.csv
-/data/tracks*.txt
-/data/next_q_artists*.csv
+/data/*
+

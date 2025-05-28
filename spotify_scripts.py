@@ -6,7 +6,9 @@ from spotipy import Spotify
 import djlib_config
 import library_scripts
 import spotify_discography
+import classification
 from containers import *
+from library_scripts import add_spotify_fields_to_rekordbox
 from spotify_util import *
 
 def sanity_check_disk_queues():
@@ -370,7 +372,17 @@ def filter_spotify_playlist(playlist_name):
     return
 
 
-def sample_artist_to_queue(*, artist_id=None, artist_name=None, latest=10, popular=10):
+def sample_artist_to_queue(
+        *,
+        artist_id=None,
+        artist_name=None,
+        latest=10,
+        total=10,
+        latest_cutoff_days=365
+    ):
+    if total <= 0:
+        raise ValueError(f'Invalid total tracks {total} for artist {artist_name}')
+
     print(f'Sampling artist {artist_name} to queue...')
 
     discography = spotify_discography.get_instance()
@@ -391,10 +403,21 @@ def sample_artist_to_queue(*, artist_id=None, artist_name=None, latest=10, popul
 
     print(f'Left after removing listening history and queue: {len(artist_discography)} tracks')
 
-    if latest > 0:
-        artist_discography.sort('release_date', ascending=False)
+    if latest == -1:
+        latest = sys.maxsize
 
-        latest_tracks = artist_discography.get_df()[:latest]
+    max_latest = min(latest, total, len(artist_discography))
+
+    if max_latest != 0:
+        latest_cutoff_date = (pd.Timestamp.utcnow() -
+                              pd.Timedelta(value=latest_cutoff_days, unit='days'))
+
+        latest_tracks = artist_discography.get_filtered(
+            lambda t: t['release_date'] >= latest_cutoff_date
+        )
+
+        latest_tracks.sort_values(by='release_date', ascending=False, axis=0, inplace=True)
+        latest_tracks = latest_tracks[:max_latest]
 
         artist_discography.remove(latest_tracks, prompt=False)
 
@@ -404,12 +427,16 @@ def sample_artist_to_queue(*, artist_id=None, artist_name=None, latest=10, popul
         queue.append(latest_tracks, prompt=False)
         queue.write()
 
-    if popular > 0:
+        remaining = min(total - len(latest_tracks), len(artist_discography))
+    else:
+        remaining = min(total, len(artist_discography))
+
+    if remaining > 0:
         artist_discography.sort('popularity', ascending=False)
 
-        most_popular_tracks = artist_discography.get_df()[:popular]
+        most_popular_tracks = artist_discography.get_df()[:remaining]
 
-        print('Most popular tracks:')
+        print('Popular tracks:')
         pretty_print_tracks(most_popular_tracks, indent=' '*4, enum=True, extra_attribs='popularity')
 
         queue.append(most_popular_tracks, prompt=False)
@@ -564,4 +591,30 @@ def review_maintenance(
     review_playlist.write()
 
     return
+
+def queue_stats(start_date, end_date):
+    start_date = pd.Timestamp(start_date, tz='UTC')
+    end_date = pd.Timestamp(end_date, tz='UTC')
+
+    djlib = Doc('djlib')
+    listening_history = ListeningHistory()
+
+    ab_tracks = classification.filter_tracks(
+        djlib.get_df(),
+        classes=['A', 'B']
+    )
+
+    ab_tracks_with_spotify = add_spotify_fields_to_rekordbox(ab_tracks)
+
+    listened_tracks = listening_history.get_filtered(
+        lambda track: track['added_at'] >= start_date and track['added_at'] <= end_date
+    )
+
+    listened_ab_tracks = listened_tracks.index.intersection(ab_tracks_with_spotify.spotify_id, sort=False)
+
+    return len(listened_tracks), len(listened_ab_tracks)
+
+
+
+
 

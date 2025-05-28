@@ -14,6 +14,12 @@ def add_spotify_fields_to_rekordbox(rekordbox_tracks: pd.DataFrame, *, drop_miss
 
     rekordbox_to_spotify_df = rekordbox_to_spotify.get_df()
 
+    # avoid overlapping columns like rekordbox_id
+    rekordbox_to_spotify_columns = rekordbox_to_spotify_df.columns.difference(
+        rekordbox_tracks.columns, sort=False)
+
+    rekordbox_to_spotify_df = rekordbox_to_spotify_df[rekordbox_to_spotify_columns]
+
     if drop_missing_ids:
         rekordbox_to_spotify_df = dataframe_filter(
             rekordbox_to_spotify_df,
@@ -117,7 +123,7 @@ def djlib_sanity_checks():
         not_found_in_rekordbox = djlib.get_difference(collection)
 
         for i in range(len(not_found_in_rekordbox)):
-            sys.stderr.write(f'Track not found in Rekordbox: {format_track(not_found_in_rekordbox)}\n')
+            sys.stderr.write(f'Track not found in Rekordbox: {format_track(not_found_in_rekordbox.iloc[i])}\n')
             errors += 1
 
     if errors > 0:

@@ -242,7 +242,7 @@ class Container(object):
         self._ensure_df()
 
         bool_array = self._df.apply(filter, axis=1)
-        return self._df.loc[bool_array]
+        return pd.DataFrame(self._df.loc[bool_array])
 
     def _preprocess_before_append(self, df: pd.DataFrame):
         return df

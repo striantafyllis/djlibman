@@ -461,19 +461,11 @@ def populate_queue():
             artist_id = artist.artist_id,
             artist_name = artist.artist_name,
             latest=artist.num_latest,
-            popular=artist.num_most_popular)
+            total=artist.num_total)
 
     return
 
 def main():
-    # promote_set_tracks_to_a()
-
-    # get_progressive_a_producers()
-
-    # build_artist_albums()
-
-    # clean_up_artist_tracks()
-
     # get_progressive_a_producers()
 
     # refresh_prog_a_producers()

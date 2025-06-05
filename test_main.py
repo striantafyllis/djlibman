@@ -425,7 +425,7 @@ def refresh_prog_a_producers():
         discogs.refresh_artist(
             artist_id=artist_id,
             artist_name=artist_name,
-            refresh_days=1,
+            refresh_days=30,
             force=False)
 
         end_time = time.time()

@@ -292,7 +292,7 @@ def queue_maintenance(
 
     return
 
-def pretty_print_spotify_playlist(playlist_name, *, liked_only=False):
+def pretty_print_spotify_playlist(playlist_name, *, enum=True, liked_only=False):
     spotify_playlist = SpotifyPlaylist(playlist_name)
 
     if liked_only:
@@ -305,7 +305,7 @@ def pretty_print_spotify_playlist(playlist_name, *, liked_only=False):
         print(f"Spotify playlist '{playlist_name}': {len(spotify_playlist)} tracks")
         tracks = spotify_playlist.get_df()
 
-    pretty_print_tracks(tracks, enum=True, ids=False)
+    pretty_print_tracks(tracks, enum=enum, ids=False)
     return
 
 def shuffle_spotify_playlist(playlist_name):

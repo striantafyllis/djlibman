@@ -277,18 +277,31 @@ def queue_maintenance(
         promote_tracks_in_spotify_queue(last_track, promote_source, promote_target)
 
     shazam = SpotifyPlaylist('My Shazam Tracks', create=True)
-    if len(shazam) > 0:
-        choice = get_user_choice(f'Move {len(shazam)} tracks from My Shazam Tracks to L2 queue?')
+    shazam_staging = SpotifyPlaylist('Shazam Staging', create=True)
+
+    if len(shazam_staging) > 0:
+        choice = get_user_choice(f'Move {len(shazam_staging)} tracks from Shazam Staging to L2 queue?')
         if choice == 'yes':
             l2_queue_name = djlib_config.get_default_spotify_queue_at_level(2)
             l2_queue = SpotifyPlaylist(l2_queue_name)
-            l2_queue.append(shazam, prompt=False)
-            shazam.truncate(prompt=False)
+            l2_queue.append(shazam_staging, prompt=False)
+            shazam_staging.truncate(prompt=False)
 
             l2_queue.write()
-            shazam.write()
+            shazam_staging.write()
 
             sanity_check_spotify_queue(l2_queue_name, is_level_1=False)
+
+    if len(shazam) > 0:
+        choice = get_user_choice(f'Move {len(shazam)} tracks from My Shazam Tracks to Shazam Staging?')
+        if choice == 'yes':
+            shazam_staging.append(shazam, prompt=False)
+            shazam.truncate(prompt=False)
+
+            shazam_staging.write()
+            shazam.write()
+
+            sanity_check_spotify_queue('Shazam Staging', is_level_1=True)
 
     return
 

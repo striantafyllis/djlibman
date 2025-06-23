@@ -267,6 +267,12 @@ class ListeningHistory(Doc):
                   f'history - {filtered_through_spotify_id} by spotify ID and '
                   f'{filtered_through_track_sigs} by track signatures')
 
+            filtered_tracks = other._df.loc[
+                other._df.index.difference(other_df.index, sort=False)
+            ]
+
+            pretty_print_tracks(filtered_tracks)
+
             if other._should_prompt(prompt):
                 choice = get_user_choice('Proceed?')
                 if choice != 'yes':

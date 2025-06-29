@@ -78,7 +78,7 @@ class FileDoc:
         return
 
     def _parse(self):
-        self._last_read_time = os.path.getmtime(self._path)
+        self._last_read_time = self.getmtime()
         time1 = time.time()
         self._contents = self._raw_read()
         time2 = time.time()
@@ -134,6 +134,10 @@ class FileDoc:
     def _raw_write(self, df):
         raise Exception('Not implemented')
 
+    def _back_up(self):
+        back_up_file(self._path, self._backups)
+        return
+
     def exists(self):
         return os.path.exists(self._path)
 
@@ -147,14 +151,13 @@ class FileDoc:
         return os.path.getmtime(self._path)
 
     def read(self, force=False):
-        if force or self._last_read_time is None or os.path.getmtime(self._path) > self._last_read_time:
+        if force or self._contents is None or self._last_read_time is None or self.getmtime() > self._last_read_time:
             self._parse()
 
         return self._contents
 
     def write(self, df):
-        back_up_file(self._path, self._backups)
-
+        self._back_up()
         df2 = pd.DataFrame(df)
         for column_name, deconverter in self._deconverters.items():
             if column_name in self._contents.columns:

@@ -215,6 +215,8 @@ def create_doc(name, type='csv', **kwargs):
             doc = file_interface.ExcelSheet(path, **kwargs)
         elif type == 'csv':
             doc = file_interface.CsvFile(path, **kwargs)
+        elif type == 'google_sheet':
+            doc = google_interface.GoogleSheet(google, path, **kwargs)
         else:
             raise Exception("Unsupported doc type: '%s'" % type)
 

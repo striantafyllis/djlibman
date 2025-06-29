@@ -12,6 +12,8 @@ from googleapiclient.discovery import build
 # from googleapiclient.errors import HttpError
 from google.auth.exceptions import RefreshError
 
+from file_interface import FileDoc
+
 from general_utils import *
 
 _SCOPES = 'https://www.googleapis.com/auth/drive'
@@ -42,11 +44,12 @@ class GoogleInterface:
                 raise Exception('Unknown field in config section google: %s' % field)
 
         # the connection will be initialized when it's first used
-        self._connection = None
+        self._drive_connection = None
+        self._sheets_connection = None
         return
 
     def _init_connection(self):
-        if self._connection is not None:
+        if self._drive_connection is not None:
             return
 
         if os.path.exists(self._cached_token_file):
@@ -70,94 +73,164 @@ class GoogleInterface:
             with open(self._cached_token_file, 'w') as token:
                 token.write(creds.to_json())
 
-        self._connection = build('sheets', 'v4', credentials=creds)
+        self._drive_connection = build('drive', 'v3', credentials=creds)
+        self._sheets_connection = build('sheets', 'v4', credentials=creds)
         return
 
-    def connection(self):
+    def drive_connection(self):
         self._init_connection()
-        return self._connection
+        return self._drive_connection
 
-class GoogleSheet:
+    def sheets_connection(self):
+        self._init_connection()
+        return self._sheets_connection
+
+    def get_files(self, type=None, name=None):
+        conn = self.drive_connection()
+
+        query = None
+        if type is not None:
+            query = 'mimeType='
+            if type == 'sheet':
+                query += "'application/vnd.google-apps.spreadsheet'"
+            elif type == 'doc':
+                query += "'application/vnd.google-apps.document'"
+            else:
+                raise ValueError(f"Unknown Google file type: '{type}'")
+
+        if name is not None:
+            if query is None:
+                query = ''
+            else:
+                query += ' and '
+
+            query += f"name='{name}'"
+
+        results = conn.files().list(q=query).execute()
+
+        files = results.get('files', [])
+
+        nextPageToken = results.get('nextPageToken')
+
+        while nextPageToken is not None:
+            results = conn.files().list(pageToken=nextPageToken).execute()
+
+            files += results.get('files', [])
+            nextPageToken = results.get('nextPageToken')
+
+        return files
+
+_converters = [
+    np.int64,
+    np.float64,
+    lambda s: pd.to_datetime(s, utc=True)
+]
+
+
+def _convert_read_value(value):
+    if value is None or value == '':
+        return None
+
+    for conv in _converters:
+        try:
+            new_value = conv(value)
+            return new_value
+        except ValueError:
+            continue
+
+    return value
+
+
+class GoogleSheet(FileDoc):
     def __init__(self,
-                 interface,
-                 google_id,
+                 google_interface,
+                 path,
                  sheet,
-                 header=0,
-                 index_column='_FIRST_COLUMN',
-                 list_columns=[],
-                 boolean_columns=[],
-                 datetime_columns=[],
-                 datetime_format=None
+                 **kwargs
                  ):
-        self._interface = interface
-        self._id = google_id
-        self._page = sheet
-        self._header = header
-        self._index_column = index_column
+        super(GoogleSheet, self).__init__(path, **kwargs)
+        self._interface = google_interface
+        self._sheet = sheet
+        self._id = None
         return
+
+    def _init_id(self):
+        if self._id is not None:
+            return
+
+        files = self._interface.get_files(type='sheet', name=self._path)
+
+        if len(files) == 0:
+            self._id = '_DOESNT_EXIST'
+        elif len(files) == 1:
+            self._id = files[0]['id']
+        else:
+            raise ValueError(f"More than one Google Sheets match name '{self._path}'")
 
     def exists(self):
-        # TODO
-        return True
+        self._init_id()
+        return self._id != '_DOESNT_EXIST'
 
     def getmtime(self):
-        return time.time()
+        self._init_id()
+        if self._id == '_DOESNT_EXIST':
+            return None
 
-    def delete(self):
-        raise Exception('Deleting Google sheets not supported')
+        result = self._interface.drive_connection().files()\
+            .get(fileId=self._id, fields='modifiedTime')\
+            .execute()
 
-    def read(self, force=False):
-        spreadsheets = self._interface.connection().spreadsheets()
+        return pd.Timestamp(result['modifiedTime']).timestamp()
 
-        result = spreadsheets.values().get(spreadsheetId=self._id, range=self._page).execute()
+    def _back_up(self):
+        # no need to back up as Google keeps version history
+        return
 
-        values = result.get('values', [])
+    def delete_backups(self):
+        return
 
-        num_rows = len(values)
+    def _raw_read(self):
+        result = self._interface.sheets_connection().spreadsheets()\
+            .values().get(spreadsheetId=self._id, range=self._sheet)\
+            .execute()
+
+        values = result.get('values')
+
         num_columns = max([len(row) for row in values])
 
         if self._header is not None:
-            if num_rows < 1:
-                raise Exception("Google sheet '%s' page '%s': header expected but no rows" %
-                                (self._id, self._page))
-            column_names = values[0]
-
-            if len(column_names) != num_columns:
-                raise Exception("Google sheet '%s' page '%s': %d columns in header but %d columns in values" %
-                                (self._id, self._page, len(column_names), num_columns))
-
-
+            if len(values) < 1:
+                raise ValueError(f'Google sheet {self._path} page {self._sheet}: '
+                                 f'header specified but sheet has no rows')
+            columns = values[0]
             values = values[1:]
-            num_rows -= 1
+
+            if len(columns) < num_columns:
+                raise ValueError(
+                    f'Google sheet {self._path} page {self._sheet}: '
+                    f'header has {len(columns)} columns but data has {num_columns} columns')
         else:
-            column_names = [_col_num_to_alpha(col_num) for col_num in range(num_columns)]
+            columns = [_col_num_to_alpha(col_num) for col_num in range(num_columns)]
 
-        columns = {}
+        # Google returns everything as strings. This code tries to fix the mess.
 
-        for col_num in range(num_columns):
-            column_name = column_names[col_num]
-            column_values = [None] * num_rows
+        conv_values = [
+            [_convert_read_value(v) for v in row]
+            for row in values
+        ]
 
-            for row_num in range(num_rows):
-                row = values[row_num]
-                if col_num >= len(row):
-                    continue
+        df = pd.DataFrame(data=conv_values, columns=columns)
 
-                value = row[col_num]
-                column_values[row_num] = value if value != '' else None
+        # this is necessary because int columns will show up as floats
+        df2 = df.apply(lambda column: column.convert_dtypes(), axis=0)
 
-            columns[column_name] = infer_type(column_values)
+        return df2
 
-        df = pd.DataFrame(data=columns)
+    def _raw_write(self, df):
+        raise Exception('Not implemented')
 
-        if self._index_column is not None:
-            if self._index_column == '_FIRST_COLUMN' and len(self._contents.columns) > 0:
-                self._contents.set_index(self._contents.columns[0], drop=False, inplace=True)
-            else:
-                self._contents.set_index(self._index_column, drop=False, inplace=True)
-
-        return df
-
+    def delete(self):
+        raise Exception('Deleting Google sheets not supported')
 
     def write(self, df):
         raise Exception('Google sheet writing not supported yet')

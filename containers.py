@@ -94,16 +94,16 @@ class Container(object):
     def _check_existence(self):
         raise NotImplementedError()
 
-    def _read(self) -> pd.DataFrame:
+    def _read(self, force=False) -> pd.DataFrame:
         raise NotImplementedError()
 
     def _write_back(self, df: pd.DataFrame) -> None:
         raise NotImplementedError()
 
-    def _ensure_df(self):
-        if self._df is None:
+    def _ensure_df(self, force=False):
+        if force or self._df is None:
             if self._exists:
-                self._df = self._read()
+                self._df = self._read(force=force)
             else:
                 self._df = pd.DataFrame()
         return
@@ -119,8 +119,8 @@ class Container(object):
     def exists(self):
         return self._exists
 
-    def get_df(self) -> pd.DataFrame:
-        self._ensure_df()
+    def get_df(self, force=False) -> pd.DataFrame:
+        self._ensure_df(force=force)
         return self._df
 
     def __len__(self):
@@ -472,8 +472,8 @@ class Doc(Container):
             self._doc.delete()
         self._exists = False
 
-    def _read(self):
-        return self._doc.read()
+    def _read(self, force=False):
+        return self._doc.read(force=force)
 
     def _write_back(self, df):
         self._doc.write(df)
@@ -503,7 +503,7 @@ class SpotifyPlaylist(Container):
     def _check_existence(self):
         return djlib_config.spotify.playlist_exists(self._playlist_name)
 
-    def _read(self):
+    def _read(self, force=False):
         return djlib_config.spotify.get_playlist_tracks(self._playlist_name)
 
     def _write_back(self, df):
@@ -523,7 +523,7 @@ class SpotifyLiked(Container):
     def _check_existence(self):
         return True
 
-    def _read(self):
+    def _read(self, force=False):
         return djlib_config.spotify.get_liked_tracks()
 
     def _write_back(self, df):
@@ -560,7 +560,7 @@ class RekordboxCollection(Container):
     def _check_existence(self):
         return True
 
-    def _read(self):
+    def _read(self, force=False):
         return djlib_config.rekordbox.get_collection()
 
 
@@ -578,7 +578,7 @@ class RekordboxPlaylist(Container):
     def _check_existence(self):
         return djlib_config.rekordbox.playlist_exists(self._playlist_name)
 
-    def _read(self):
+    def _read(self, force=False):
         return djlib_config.rekordbox.get_playlist_tracks(self._playlist_name)
 
     def _write_back(self, df, write_thru=True):
@@ -616,7 +616,7 @@ class Wrapper(Container):
     def _check_existence(self):
         return True
 
-    def _read(self):
+    def _read(self, force=False):
         if isinstance(self._contents, pd.DataFrame):
             return self._contents
         elif isinstance(self._contents, Container):

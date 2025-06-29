@@ -1,6 +1,7 @@
 import os.path
 import re
 import sys
+import time
 
 import pandas as pd
 
@@ -77,14 +78,35 @@ class GoogleInterface:
         return self._connection
 
 class GoogleSheet:
-    def __init__(self, interface, config):
+    def __init__(self,
+                 interface,
+                 google_id,
+                 sheet,
+                 header=0,
+                 index_column='_FIRST_COLUMN',
+                 list_columns=[],
+                 boolean_columns=[],
+                 datetime_columns=[],
+                 datetime_format=None
+                 ):
         self._interface = interface
-        self._id = config["id"]
-        self._page = config["page"]
-        self._has_header = config.getboolean('header')
+        self._id = google_id
+        self._page = sheet
+        self._header = header
+        self._index_column = index_column
         return
 
-    def read(self):
+    def exists(self):
+        # TODO
+        return True
+
+    def getmtime(self):
+        return time.time()
+
+    def delete(self):
+        raise Exception('Deleting Google sheets not supported')
+
+    def read(self, force=False):
         spreadsheets = self._interface.connection().spreadsheets()
 
         result = spreadsheets.values().get(spreadsheetId=self._id, range=self._page).execute()
@@ -94,7 +116,7 @@ class GoogleSheet:
         num_rows = len(values)
         num_columns = max([len(row) for row in values])
 
-        if self._has_header:
+        if self._header is not None:
             if num_rows < 1:
                 raise Exception("Google sheet '%s' page '%s': header expected but no rows" %
                                 (self._id, self._page))
@@ -127,6 +149,12 @@ class GoogleSheet:
             columns[column_name] = infer_type(column_values)
 
         df = pd.DataFrame(data=columns)
+
+        if self._index_column is not None:
+            if self._index_column == '_FIRST_COLUMN' and len(self._contents.columns) > 0:
+                self._contents.set_index(self._contents.columns[0], drop=False, inplace=True)
+            else:
+                self._contents.set_index(self._index_column, drop=False, inplace=True)
 
         return df
 

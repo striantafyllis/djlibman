@@ -152,14 +152,37 @@ def init(config_file=None):
             for field in section.keys():
                 if field in ['type']:
                     continue
-                if field in ['path', 'index_column', 'sheet', 'datetime_format']:
+
+                if field in ['index_column', 'sheet']:
                     kwargs[field] = section[field]
-                elif field in ['header', 'backups']:
+                    continue
+
+                if field == 'header':
                     kwargs[field] = section.getint(field)
-                elif field in ['list_columns', 'boolean_columns', 'datetime_columns']:
+                    continue
+
+                if field in ['list_columns', 'boolean_columns']:
                     kwargs[field] = ast.literal_eval(section[field])
+                    continue
+
+                if type == 'google_sheet':
+                    if field == 'google_id':
+                        kwargs[field] = section[field]
+                        continue
                 else:
-                    raise Exception("Unknown field in config section %s: %s" % (section_name, field))
+                    if field in ['path', 'datetime_format']:
+                        kwargs[field] = section[field]
+                        continue
+
+                    if field == 'backups':
+                        kwargs[field] = section.getint(field)
+                        continue
+
+                    if field == 'datetime_columns':
+                        kwargs[field] = ast.literal_eval(section[field])
+                        continue
+
+                raise Exception("Unknown field in config section %s: %s" % (section_name, field))
 
             _add_doc(name, type, **kwargs)
 

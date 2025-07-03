@@ -190,6 +190,8 @@ class GoogleSheet(FileDoc):
         return
 
     def _raw_read(self):
+        self._init_id()
+
         result = self._interface.sheets_connection().spreadsheets()\
             .values().get(spreadsheetId=self._id, range=self._sheet)\
             .execute()
@@ -227,11 +229,34 @@ class GoogleSheet(FileDoc):
         return df2
 
     def _raw_write(self, df):
-        raise Exception('Not implemented')
+        self._init_id()
+
+        values = df.values.tolist()
+
+        values = [
+            [
+                '' if val is None or pd.isna(val) else val
+                for val in row
+            ]
+            for row in values
+        ]
+
+        values = [df.columns.tolist()] + values
+
+        self._interface.sheets_connection().spreadsheets().values().update(
+            spreadsheetId=self._id, range=self._sheet,
+            valueInputOption='USER_ENTERED',
+            includeValuesInResponse=False,
+            body={
+                'range': self._sheet,
+                'values': values,
+                'majorDimension': 'ROWS'
+            }
+        ).execute()
+
+        return
+
+
 
     def delete(self):
         raise Exception('Deleting Google sheets not supported')
-
-    def write(self, df):
-        raise Exception('Google sheet writing not supported yet')
-

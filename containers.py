@@ -291,7 +291,8 @@ class Container(object):
 
             genuinely_new_entries = self._preprocess_before_append(genuinely_new_entries)
 
-            new_df = pd.concat([self._df, genuinely_new_entries])
+            if len(genuinely_new_entries) > 0:
+                new_df = pd.concat([self._df, genuinely_new_entries])
 
         assert num_already_present >= 0
         assert num_added >= 0

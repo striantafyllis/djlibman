@@ -411,8 +411,8 @@ def sample_artist_to_queue(
     listening_history = ListeningHistory()
     queue = Queue()
 
-    listening_history.filter(artist_discography, prompt=False)
-    artist_discography.remove(queue, prompt=False)
+    listening_history.filter(artist_discography, prompt=False, silent=True)
+    artist_discography.remove(queue, prompt=False, silent=True)
 
     print(f'Left after removing listening history and queue: {len(artist_discography)} tracks')
 

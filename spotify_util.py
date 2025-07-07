@@ -210,8 +210,10 @@ class ListeningHistory(Doc):
         self._track_signatures = None
         return
 
-    def remove(self, other, prompt=None):
-        raise ValueError('Why remove from listening history?')
+    def remove(self, other, prompt=None, force=False):
+        if not force:
+            raise ValueError('Why remove from listening history?')
+        super(ListeningHistory, self).remove(other, prompt)
 
     def _ensure_track_signatures(self):
         self._ensure_df()
@@ -225,13 +227,16 @@ class ListeningHistory(Doc):
 
         return
 
-    def filter(self, other: Container, prompt=None):
+    def filter(self, other: Container, prompt=None, silent=False):
         self._ensure_track_signatures()
 
         if not isinstance(other, Container):
             raise ValueError("'other' argument must be a container")
 
         other_df = other.get_df()
+
+        if len(other_df) == 0:
+            return
 
         if other_df.index.name != 'spotify_id':
             raise ValueError('Only Spotify tracks indexed by spotify_id can be filtered '
@@ -263,15 +268,16 @@ class ListeningHistory(Doc):
         filtered = filtered_through_spotify_id + filtered_through_track_sigs
 
         if filtered != 0:
-            print(f'{other.get_name()}: removing {filtered} tracks from listening '
-                  f'history - {filtered_through_spotify_id} by spotify ID and '
-                  f'{filtered_through_track_sigs} by track signatures')
+            if not silent:
+                filtered_tracks = other._df.loc[
+                    other._df.index.difference(other_df.index, sort=False)
+                ]
 
-            filtered_tracks = other._df.loc[
-                other._df.index.difference(other_df.index, sort=False)
-            ]
+                print(f'{other.get_name()}: removing {filtered} tracks from listening '
+                      f'history - {filtered_through_spotify_id} by spotify ID and '
+                      f'{filtered_through_track_sigs} by track signatures')
 
-            pretty_print_tracks(filtered_tracks)
+                pretty_print_tracks(filtered_tracks)
 
             if other._should_prompt(prompt):
                 choice = get_user_choice('Proceed?')
@@ -282,7 +288,8 @@ class ListeningHistory(Doc):
             # check and the ID reconciliation
             other._df = other_df
             other._changed = True
-        else:
+
+        elif not silent:
             print(f'{other.get_name()}: no tracks in listening history')
 
         return

@@ -433,6 +433,25 @@ def refresh_prog_a_producers():
         print(f'** Refreshed artist {artist_id} {artist_name}: {end_time-start_time:.1f} seconds')
 
 
+def debug_discography():
+    discogs = spotify_discography.get_instance()
+
+    artist_id = '4QvopvfkScQMzOUiXRjMDJ'
+    artist_name = 'Forty Cats'
+    print(f'** Refreshing artist {artist_id} {artist_name}... ')
+
+    start_time = time.time()
+    discogs.refresh_artist(
+        artist_id=artist_id,
+        artist_name=artist_name,
+        refresh_days=30,
+        force=False)
+
+    end_time = time.time()
+
+    print(f'** Refreshed artist {artist_id} {artist_name}: {end_time - start_time:.1f} seconds')
+
+
 def old_main():
     # get_progressive_a_producers()
 
@@ -454,8 +473,8 @@ def populate_queue():
     for artist in next_q_artists.get_df().itertuples(index=False):
         i += 1
 
-        # if i <= 5:
-        #     continue
+        # if i > 1:
+        #     break
 
         sample_artist_to_queue(
             artist_id = artist.artist_id,
@@ -468,11 +487,13 @@ def populate_queue():
 def main():
     # get_progressive_a_producers()
 
-    # refresh_prog_a_producers()
+    refresh_prog_a_producers()
 
     # discog_report_for_prog_a_producers()
 
-    populate_queue()
+    # populate_queue()
+
+    # debug_discography()
 
     return
 

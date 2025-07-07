@@ -15,6 +15,8 @@ flavor_groupings = {
 
 class_groupings = {
     '': ['A', 'B'],
+    'A': ['A'],
+    'B': ['B'],
     'C': ['C'],
     'X': ['X'],
     'Pending': ['?'],
@@ -190,9 +192,9 @@ def classify_by_danceability(name, tracks):
     ambient_tracks = filter_tracks(tracks, ambient=True)
 
     return {
-        _join_names(name, ''): danceable_tracks,
+        _join_names(name, 'Danceable'): danceable_tracks,
         _join_names(name, 'Ambient'): ambient_tracks,
-        _join_names(name, 'Danceable|Ambient'): tracks
+        _join_names(name, ''): tracks
     }
 
 def classify_by_tempo(name, tracks):

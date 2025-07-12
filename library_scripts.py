@@ -358,51 +358,47 @@ def form_progressive_not_used(do_rekordbox=True, do_spotify=True, write_thru=Tru
     return
 
 
+
 def playlists_maintenance(do_rekordbox=True, do_spotify=True):
     djlib = Doc('djlib')
 
-    groups = classification.classify_tracks(djlib.get_df())
+    playlists = classification.classify_tracks(djlib.get_df())
 
-    for name, group in groups.items():
+    for playlist in playlists:
         # reverse the order in the group; this makes the latest tracks appear first.
         # It's more convenient.
 
-        group = group[::-1]
+        playlist['tracks'] = playlist['tracks'][::-1]
 
-        if do_rekordbox:
+        if do_rekordbox and playlist.get('rekordbox_name') is not None:
+            rekordbox_name = ['managed'] + playlist['rekordbox_name']
             rekordbox_playlist = RekordboxPlaylist(
-                name=['managed'] + list(name),
+                name=rekordbox_name,
                 create=True,
                 overwrite=True
             )
-            rekordbox_playlist.set_df(group)
+            rekordbox_playlist.set_df(playlist['tracks'])
 
-            print(f'Creating Rekordbox playlist {name}: {len(rekordbox_playlist)} tracks')
+            print(f'Creating Rekordbox playlist {rekordbox_name}: {len(rekordbox_playlist)} tracks')
             # write the rekordbox playlist in the XML in memory, but don't dump the
             # XML file to disk; that will be done at the end.
             rekordbox_playlist.write(write_thru=False)
 
-        if do_spotify and name[0] == 'Danceable|Ambient':
+        if do_spotify and playlist.get('spotify_name') is not None:
+            spotify_name = 'DJ ' + playlist['spotify_name']
             spotify_playlist = SpotifyPlaylist(
-                name=' '.join(['DJ'] + list(name[1:])),
+                name=spotify_name,
                 create=True,
                 overwrite=True
             )
-            spotify_playlist.set_df(group)
+            spotify_playlist.set_df(playlist['tracks'])
 
-            print(f'Creating Spotify playlist {name}: {len(spotify_playlist)} tracks')
+            print(f'Creating Spotify playlist {spotify_name}: {len(spotify_playlist)} tracks')
             spotify_playlist.write()
 
     if do_rekordbox:
         # do this right before form_progressive_not_used, because it uses the Progressive playlist
         # which was updated above
-        djlib_config.rekordbox.write()
-
-    # special-case code - will be generalized later
-    form_progressive_not_used(do_rekordbox, do_spotify, write_thru=False)
-
-    if do_rekordbox:
-        # do this only once at the end; it's a lot faster
         djlib_config.rekordbox.write()
 
     return

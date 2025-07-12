@@ -4,25 +4,6 @@ import numpy as np
 
 _DOWNTEMPO_CUTOFF = 112
 
-flavor_groupings = {
-    'Progressive': ['Progressive'],
-    'Progressive-Adjacent': ['Progressive-Adjacent'],
-    'Afro/Latin/Funky': ['Afro', 'Latin', 'Funky'],
-    'Organic/Afro/Latin/Funky': ['Organic', 'Afro', 'Latin', 'Funky'],
-    'Organic': ['Organic'],
-    'Other': None
-}
-
-class_groupings = {
-    '': ['A', 'B'],
-    'A': ['A'],
-    'B': ['B'],
-    'C': ['C'],
-    'X': ['X'],
-    'Pending': ['?'],
-    'D': ['D'],
-}
-
 def track_is(
         track,
         *,
@@ -135,100 +116,89 @@ def filter_tracks(
         )
     ]
 
-def _join_names(name1, name2):
-    if not isinstance(name1, tuple):
-        if name1 == '':
-            name1 = ()
-        else:
-            name1 = (name1,)
-
-    if not isinstance(name2, tuple):
-        if name2 == '':
-            name2 = ()
-        else:
-            name2 = (name2,)
-
-    return name1 + name2
-
-def classify_by_flavor(name, tracks):
-    groups = {}
-
-    for flavor_name, flavor_group in flavor_groupings.items():
-        if flavor_group is None:
-            other_flavors = []
-            for other_flavor_group in flavor_groupings.values():
-                if other_flavor_group is not None:
-                    other_flavors += other_flavor_group
-
-            flavor_tracks = filter_tracks(tracks, not_flavors=other_flavors)
-        else:
-            flavor_tracks = filter_tracks(tracks, flavors=flavor_group)
-
-        groups[_join_names(name, flavor_name)] = flavor_tracks
-
-    return groups
-
-
-def classify_by_class(name, tracks):
-    groups = {}
-
-    for class_name, class_group in class_groupings.items():
-        if class_group is None:
-            other_classes = []
-            for other_class_group in class_groupings.values():
-                if other_class_group is not None:
-                    other_classes += other_class_group
-
-            class_tracks = filter_tracks(tracks, not_classes=other_classes)
-        else:
-            class_tracks = filter_tracks(tracks, classes=class_group)
-
-        groups[_join_names(name, class_name)] = class_tracks
-
-    return groups
-
-def classify_by_danceability(name, tracks):
-    danceable_tracks = filter_tracks(tracks, danceable=True)
-    ambient_tracks = filter_tracks(tracks, ambient=True)
-
-    return {
-        _join_names(name, 'Danceable'): danceable_tracks,
-        _join_names(name, 'Ambient'): ambient_tracks,
-        _join_names(name, ''): tracks
-    }
-
-def classify_by_tempo(name, tracks):
-    uptempo_tracks = filter_tracks(tracks, uptempo=True)
-    downtempo_tracks = filter_tracks(tracks, uptempo=False)
-
-    return {
-        _join_names(name, ''): uptempo_tracks,
-        _join_names(name, 'Downtempo'): downtempo_tracks
-    }
-
-
 def classify_tracks(tracks):
-    groups1 = classify_by_class((), tracks)
-
-    groups2 = {}
-    for name, group in groups1.items():
-        groups2.update(classify_by_danceability(name, group))
-
-    groups3 = {}
-    for name, group in groups2.items():
-        groups3.update(classify_by_tempo(name, group))
-
-    groups4 = {}
-    for name, group in groups3.items():
-        groups4.update(classify_by_flavor(name, group))
-
-    groups = groups4
-
-    # filter out empty groups
-    nonempty_groups = {
-        name: group
-        for name, group in groups.items()
-        if len(group) > 0
+    flavor_groupings = {
+        'Progressive': ['Progressive'],
+        'Organic': ['Organic'],
+        'Afro/Latin/Funky': ['Afro', 'Latin', 'Funky'],
+        'Organic/Afro/Latin/Funky': ['Organic', 'Afro', 'Latin', 'Funky'],
     }
 
-    return nonempty_groups
+    covered_flavors = set([
+        flavor for flavors in flavor_groupings.values() for flavor in flavors
+    ])
+
+    prime_class_groupings = {
+        'A': ['A'],
+        'B': ['B'],
+        'AB': ['A', 'B'],
+        'C': ['C']
+    }
+
+    other_class_groupings = {
+        'D': ['D'],
+        'X': ['X'],
+        'Pending': ['?']
+    }
+
+    playlists = []
+
+    for uptempo in [True, False]:
+        rb_prefix = ['Downtempo'] if not uptempo else []
+
+        for flavor_name, flavors in flavor_groupings.items():
+            for class_name, classes in prime_class_groupings.items():
+                playlists.append({
+                    'rekordbox_name': rb_prefix + [f'{flavor_name} {class_name}'],
+                    'spotify_name': f'{flavor_name} {class_name}'
+                        if uptempo and class_name in ['A', 'B', 'AB'] else None,
+                    'kwargs': {
+                        'uptempo': uptempo,
+                        'flavors': flavors,
+                        'classes': classes
+                    }
+                })
+
+        for class_name, classes in prime_class_groupings.items():
+            playlists.append({
+                'rekordbox_name': rb_prefix + [f'Other {class_name}'],
+                'kwargs': {
+                    'uptempo': uptempo,
+                    'not_flavors': covered_flavors,
+                    'classes': classes
+                }
+            })
+
+        for class_name, classes in other_class_groupings.items():
+            for flavor_name, flavors in flavor_groupings.items():
+                playlists.append({
+                    'rekordbox_name': rb_prefix + [class_name, flavor_name],
+                    'kwargs': {
+                        'uptempo': uptempo,
+                        'flavors': flavors,
+                        'classes': classes
+                    }
+                })
+
+            playlists.append({
+                'rekordbox_name': rb_prefix + [class_name, 'Other'],
+                'kwargs': {
+                    'uptempo': uptempo,
+                    'not_flavors': covered_flavors,
+                    'classes': classes
+                }
+            })
+
+    for playlist in playlists:
+        playlist['tracks'] = filter_tracks(tracks, **(playlist['kwargs']))
+
+    nonempty_playlists = [
+        playlist for playlist in playlists if len(playlist['tracks']) > 0
+    ]
+
+    return nonempty_playlists
+
+
+
+
+

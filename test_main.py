@@ -208,6 +208,10 @@ def library_reorg_add_question_mark():
     return
 
 def promote_set_tracks_to_a():
+    progressive_ab = RekordboxPlaylist(['managed', 'Progressive AB'])
+
+    reclassify_tracks_as(progressive_ab, 'B')
+
     rb_playlists = djlib_config.rekordbox.get_playlist_names()
 
     set_names = [['Sets', name] for name in rb_playlists['Sets']]
@@ -487,13 +491,17 @@ def populate_queue():
 def main():
     # get_progressive_a_producers()
 
-    refresh_prog_a_producers()
+    # refresh_prog_a_producers()
 
     # discog_report_for_prog_a_producers()
 
     # populate_queue()
 
     # debug_discography()
+
+    # playlists_maintenance(do_spotify=False)
+
+    # promote_set_tracks_to_a()
 
     return
 

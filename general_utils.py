@@ -149,7 +149,7 @@ def dataframe_filter(df, filter):
 
 def get_attrib_or_fail(series, attrib_possible_names):
     for attrib in attrib_possible_names:
-        if attrib in series:
+        if attrib in series and not pd.isna(series[attrib]):
             return series[attrib]
     raise Exception('None of the attributes %s are present in series %s' % (attrib_possible_names, series))
 

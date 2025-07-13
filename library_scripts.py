@@ -38,6 +38,34 @@ def add_spotify_fields_to_rekordbox(rekordbox_tracks: pd.DataFrame, *, drop_miss
 
     return rekordbox_tracks_with_spotify_fields
 
+def add_rekordbox_fields_to_spotify(spotify_tracks: pd.DataFrame, *, drop_missing_ids=False):
+    rekordbox_to_spotify = Doc('rekordbox_to_spotify')
+
+    rekordbox_to_spotify_df = rekordbox_to_spotify.get_df()
+
+    if drop_missing_ids:
+        rekordbox_to_spotify_df = dataframe_filter(
+            rekordbox_to_spotify_df,
+            lambda track: not pd.isna(track['spotify_id'])
+        )
+
+    # avoid overlapping columns like rekordbox_id
+    rekordbox_to_spotify_columns = rekordbox_to_spotify_df.columns.difference(
+        spotify_tracks.columns, sort=False)
+
+    rekordbox_to_spotify_df = rekordbox_to_spotify_df[rekordbox_to_spotify_columns]
+
+    if spotify_tracks.index.name != 'spotify_id':
+        raise ValueError('Argument is not indexed by spotify_id')
+
+    spotify_tracks_with_rekordbox_fields = spotify_tracks.merge(
+        right=rekordbox_to_spotify_df,
+        left_index=True,
+        right_on='spotify_id',
+        how=('inner' if drop_missing_ids else 'left')
+    )
+
+    return spotify_tracks_with_rekordbox_fields
 
 def rekordbox_sanity_checks():
     top_level_playlist_names = ['Main Library', 'back catalog', 'non-DJ']

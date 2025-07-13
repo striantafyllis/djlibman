@@ -123,6 +123,66 @@ class Container(object):
         self._ensure_df(force=force)
         return self._df
 
+    def slice(self,
+              from_index=None,
+              to_index=None,
+              index_column=None,
+              ignore_case=False,
+              use_prefix=False,
+              unambiguous_prefix=False):
+        """
+        Returns a slice of the underlying dataframe. CAUTION: both from_index and to_index are inclusive.
+        from_index and to_index can be specified either as integers or as strings. If they are
+        specified as strings, the strings will be looked up in the index_column.
+        If ignore_case is set to true and from_index or to_index is a string, the search in the
+        index column will be case-insensitive.
+        If use_prefix is set to true and from_index or to_index is a string, we'll search the
+        index_column for an entry that starts with from_index or to_index respectively. If there
+        are more than one such entries, then:
+        - if unambiguous_prefix is true, an error will be issued.
+        - otherwise, the first such entry will be used.
+
+        If either from_index or to_index are strings and index_column is not specified, an error is issued.
+        """
+        self._ensure_df()
+
+        if from_index is None:
+            from_index = 0
+        if to_index is None:
+            to_index = len(self._df) - 1
+
+        if isinstance(from_index, int):
+            pass
+        elif isinstance(from_index, str):
+            if index_column is None:
+                raise ValueError('from_index is a string but no index_column specified')
+            col = self._df[index_column]
+
+            from_index = first_index_of(col, from_index,
+                                        ignore_case=ignore_case,
+                                        use_prefix=use_prefix,
+                                        unambiguous_prefix=unambiguous_prefix)
+
+            if from_index == -1:
+                raise ValueError(f'from_index {from_index} not found')
+
+        if isinstance(to_index, int):
+            pass
+        elif isinstance(to_index, str):
+            if index_column is None:
+                raise ValueError('from_index is a string but no index_column specified')
+            col = self._df[index_column]
+
+            to_index = first_index_of(col, to_index,
+                                      ignore_case=ignore_case,
+                                      use_prefix=use_prefix,
+                                      unambiguous_prefix=unambiguous_prefix)
+
+            if to_index == -1:
+                raise ValueError(f'to_index {to_index} not found')
+
+        return self._df.iloc[from_index:to_index+1]
+
     def __len__(self):
         return len(self.get_df())
 

@@ -39,63 +39,76 @@ def sanity_check_disk_queues():
 
     return
 
+def separate_chosen_tracks(
+        tracks,
+        method='Liked',
+        reference_tracks=None
+):
+    """
+    Separates the "chosen" from the "non-chosen" tracks in a playlist.
+    The case-insensitive method argument specifies the way:
+    - "liked": Tracks that are liked are chosen; the rest are not chosen.
+    - "ref": Tracks in the reference tracks are chosen; the rest are not chosen.
+    - "liked+ref": Tracks that are both liked and in the reference tracks are chosen;
+            the rest are not chosen.
 
-def get_playlist_listened_tracks(
-        playlist: SpotifyPlaylist,
-        last_listened_track) -> pd.DataFrame:
+    Returns a pair of values: (chosen tracks, not chosen tracks)
+    """
+    method = method.lower()
 
-    playlist_tracks = playlist.get_df()
+    if isinstance(tracks, Container):
+        tracks = tracks.get_df()
 
-    if isinstance(last_listened_track, int):
-        if last_listened_track > len(playlist_tracks):
-            raise Exception(
-                f'Playlist last listened track is {last_listened_track}; '
-                f'playlist has only {len(playlist_tracks)} tracks')
+    if reference_tracks is not None and isinstance(reference_tracks, Container):
+        # TODO translate IDs
+        reference_tracks = reference_tracks.get_df()
 
-        return playlist_tracks.iloc[:last_listened_track]
+    if method == 'liked':
+        refs = [SpotifyLiked().get_df()]
+    elif method == 'ref':
+        if reference_tracks is None:
+            raise ValueError('Reference tracks not provided')
+        refs = [reference_tracks]
+    elif method == 'liked+ref':
+        if reference_tracks is None:
+            raise ValueError('Reference tracks not provided')
+        refs = [SpotifyLiked().get_df(), reference_tracks]
+    else:
+        raise ValueError(f"Unrecognizable method '{method}'")
 
-    if isinstance(last_listened_track, str):
-        if last_listened_track.upper() == 'ALL':
-            return playlist_tracks
+    chosen_idx = tracks.index
 
-        last_listened_track_idx = None
+    for ref in refs:
+        chosen_idx = chosen_idx.intersection(ref.index, sort=False)
 
-        for i in range(len(playlist_tracks)):
-            if playlist_tracks.iloc[i]['name'].upper() == last_listened_track.upper():
-                last_listened_track_idx = i
-                break
+    not_chosen_idx = tracks.index.difference(chosen_idx, sort=False)
 
-        if last_listened_track_idx is None:
-            # Try to find it as a prefix
-            candidate_tracks = []
-            for i in range(len(playlist_tracks)):
-                if playlist_tracks.iloc[i]['name'].upper().startswith(last_listened_track.upper()):
-                    candidate_tracks.append(i)
-                    break
-            if len(candidate_tracks) > 1:
-                raise Exception(f"Last listened track {last_listened_track} is ambiguous; "
-                                f"{len(candidate_tracks)} matches")
-            elif len(candidate_tracks) == 0:
-                raise Exception(f"Track '{last_listened_track}' not found in playlist")
-            else:
-                last_listened_track_idx = candidate_tracks[0]
+    return tracks.loc[chosen_idx], tracks.loc[not_chosen_idx]
 
-        return playlist_tracks.iloc[:(last_listened_track_idx+1)]
 
-    raise Exception(f"Invalid type for last_listened_track: {type(last_listened_track)}")
 
 
 def promote_tracks_in_spotify_queue(
         last_track,
         promote_source_name,
-        promote_target_name):
+        promote_target_name,
+        method,
+        ref_playlist
+):
 
     promote_queue_level = djlib_config.get_spotify_queue_level(promote_source_name)
 
     promote_source = SpotifyPlaylist(promote_source_name)
     promote_target = SpotifyPlaylist(promote_target_name)
 
-    listened_tracks = get_playlist_listened_tracks(promote_source, last_track)
+    listened_tracks = promote_source.slice(
+        from_index=0,
+        to_index=last_track,
+        index_column='name',
+        ignore_case=True,
+        use_prefix=True,
+        unambiguous_prefix=True
+    )
 
     print(f'{promote_source_name}: {len(listened_tracks)} listened tracks')
     pretty_print_tracks(listened_tracks, indent=' ' * 4, enum=True)
@@ -107,24 +120,27 @@ def promote_tracks_in_spotify_queue(
         return
 
     # find how many of the listened tracks are liked
-    liked = SpotifyLiked()
+    listened_chosen_tracks, listened_not_chosen_tracks = separate_chosen_tracks(
+        listened_tracks,
+        method=method,
+        reference_tracks=SpotifyPlaylist(ref_playlist) if ref_playlist is not None else None
+    )
 
-    listened_liked_tracks_idx = listened_tracks.index.intersection(liked.get_df().index, sort=False)
-    listened_liked_tracks = listened_tracks.loc[listened_liked_tracks_idx]
-
-    print(f'{promote_source_name}: {len(listened_liked_tracks)} of the '
-          f'{len(listened_tracks)} listened tracks are liked')
-    pretty_print_tracks(listened_liked_tracks, indent=' ' * 4, enum=True)
+    print(f'{promote_source_name}: {len(listened_chosen_tracks)} of the '
+          f'{len(listened_tracks)} listened tracks are chosen')
+    pretty_print_tracks(listened_chosen_tracks, indent=' ' * 4, enum=True)
     choice = get_user_choice('Is this correct?')
     if choice != 'yes':
         return
     print()
 
-    if len(listened_liked_tracks) > 0:
-        promote_target.append(listened_liked_tracks, prompt=False)
+    if len(listened_chosen_tracks) > 0:
+        promote_target.append(listened_chosen_tracks, prompt=False)
         promote_target.write()
 
-        liked.remove(listened_liked_tracks, prompt=False)
+        liked = SpotifyLiked()
+
+        liked.remove(listened_chosen_tracks, prompt=False)
         liked.write()
 
     promote_source.remove(listened_tracks, prompt=False)
@@ -232,7 +248,9 @@ def sanity_check_spotify_queue(spotify_queue_name, *, is_level_1=False, is_promo
 def queue_maintenance(
         last_track=None,
         promote_source=None,
-        promote_target=None
+        promote_target=None,
+        method='Liked',
+        ref_playlist=None
 ):
     if last_track is None:
         if promote_source is not None or promote_target is not None:
@@ -274,7 +292,13 @@ def queue_maintenance(
     sys.stdout.flush()
 
     if last_track is not None:
-        promote_tracks_in_spotify_queue(last_track, promote_source, promote_target)
+        promote_tracks_in_spotify_queue(
+            last_track,
+            promote_source,
+            promote_target,
+            method=method,
+            ref_playlist=ref_playlist
+        )
 
     shazam = SpotifyPlaylist('My Shazam Tracks', create=True)
     shazam_staging = SpotifyPlaylist('Shazam Staging', create=True)
@@ -626,6 +650,71 @@ def queue_stats(start_date, end_date):
     listened_ab_tracks = listened_tracks.index.intersection(ab_tracks_with_spotify.spotify_id, sort=False)
 
     return len(listened_tracks), len(listened_ab_tracks)
+
+
+def review_maintenance(
+        playlist,
+        ref_playlist=None,
+        first_track=None,
+        last_track=None,
+        method=None
+):
+    playlist_tracks = SpotifyPlaylist(playlist)
+    ref_playlist_tracks = SpotifyPlaylist(ref_playlist) if ref_playlist is not None else None
+
+    listened_tracks = playlist_tracks.slice(
+        from_index=first_track,
+        to_index=last_track,
+        index_column='name',
+        ignore_case=True,
+        use_prefix=True,
+        unambiguous_prefix=True
+    )
+
+    print(f'{playlist}: {len(listened_tracks)} listened tracks')
+    pretty_print_tracks(listened_tracks, indent=' ' * 4, enum=True)
+    choice = get_user_choice('Is this correct?')
+    if choice != 'yes':
+        return
+    print()
+
+    if len(listened_tracks) == 0:
+        return
+
+    chosen_tracks, not_chosen_tracks = separate_chosen_tracks(
+        listened_tracks,
+        method=method,
+        reference_tracks=ref_playlist_tracks
+    )
+
+    print(f'{playlist}: {len(not_chosen_tracks)} were not chosen')
+    pretty_print_tracks(not_chosen_tracks, indent=' ' * 4, enum=True)
+    choice = get_user_choice('Is this correct?')
+    if choice != 'yes':
+        return
+
+    playlist_tracks.remove(listened_tracks, prompt=False)
+    playlist_tracks.write()
+
+    choice = get_user_choice('What to do?',
+                             options=['Nothing', 'C class', 'D class'])
+    if choice == 'Nothing':
+        return
+    elif choice == 'C class':
+        new_class = 'C'
+    elif choice == 'D class':
+        new_class = 'D'
+
+    not_chosen_tracks_rb = library_scripts.add_rekordbox_fields_to_spotify(
+        not_chosen_tracks, drop_missing_ids=True)
+
+    not_chosen_tracks_rb.set_index('rekordbox_id', inplace=True)
+
+    library_scripts.reclassify_tracks_as(not_chosen_tracks_rb, new_class)
+
+    return
+
+
 
 
 

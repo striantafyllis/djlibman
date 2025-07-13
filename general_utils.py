@@ -539,3 +539,42 @@ def series_to_dataframe(series):
         columns=series.index,
         index=pd.Index(data=[series.iloc[0]],
                        name=series.index[0]))
+
+def first_index_of(collection, value, ignore_case=False, use_prefix=False, unambiguous_prefix=False):
+    if (ignore_case or use_prefix) and not isinstance(value, str):
+        raise ValueError('ignore_case and use_prefix can only be used on string values')
+
+    if ignore_case:
+        value = value.upper()
+
+    if use_prefix and unambiguous_prefix:
+        candidates = []
+
+    for i in range(len(collection)):
+        if isinstance(collection, pd.Series):
+            col_value = collection.iloc[i]
+        else:
+            col_value = collection[i]
+
+        if ignore_case:
+            col_value = col_value.upper()
+
+        if use_prefix:
+            if col_value.startswith(value):
+                if unambiguous_prefix:
+                    candidates.append(i)
+                else:
+                    return i
+        else:
+            if col_value == value:
+                return i
+
+    if unambiguous_prefix:
+        if len(candidates) == 1:
+            return candidates[0]
+        if len(candidates) == 0:
+            return -1
+        if len(candidates) > 0:
+            raise ValueError(f'Ambiguous prefix {value}; matches {len(candidates)} entries')
+    else:
+        return -1

@@ -503,6 +503,11 @@ def main():
 
     # promote_set_tracks_to_a()
 
+    review_maintenance('DJ Progressive A Review',
+                       ref_playlist='DJ Progressive A Review Ref',
+                       method='liked+ref',
+                       last_track='Disposition')
+
     return
 
 

@@ -98,6 +98,8 @@ def _postprocess_albums(results):
 class SpotifyInterface:
     def __init__(self, config):
         self._client_id = config['client_id']
+        if self._client_id.startswith('$'):
+            self._client_id = os.environ[self._client_id[1:]]
 
         client_secret_loc = config['client_secret']
 

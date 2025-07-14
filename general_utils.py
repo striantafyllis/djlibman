@@ -9,6 +9,8 @@ import os.path
 import shutil
 import sys
 import difflib
+import string
+import random
 
 import numpy as np
 import pandas as pd
@@ -578,3 +580,11 @@ def first_index_of(collection, value, ignore_case=False, use_prefix=False, unamb
             raise ValueError(f'Ambiguous prefix {value}; matches {len(candidates)} entries')
     else:
         return -1
+
+def random_string(length):
+    random.seed()
+    s = ''
+    for i in range(length):
+        s += random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits)
+
+    return s

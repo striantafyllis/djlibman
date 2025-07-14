@@ -49,6 +49,8 @@ def add_rekordbox_fields_to_spotify(spotify_tracks: pd.DataFrame, *, drop_missin
             lambda track: not pd.isna(track['spotify_id'])
         )
 
+    rekordbox_to_spotify_df.set_index('spotify_id', inplace=True, drop=True)
+
     # avoid overlapping columns like rekordbox_id
     rekordbox_to_spotify_columns = rekordbox_to_spotify_df.columns.difference(
         spotify_tracks.columns, sort=False)
@@ -61,7 +63,7 @@ def add_rekordbox_fields_to_spotify(spotify_tracks: pd.DataFrame, *, drop_missin
     spotify_tracks_with_rekordbox_fields = spotify_tracks.merge(
         right=rekordbox_to_spotify_df,
         left_index=True,
-        right_on='spotify_id',
+        right_index=True,
         how=('inner' if drop_missing_ids else 'left')
     )
 

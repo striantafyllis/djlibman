@@ -10,3 +10,4 @@ code_examples/grammar/*.py
 /djlibman.log
 /data/*
 
+/soundcloud_cached_token.json

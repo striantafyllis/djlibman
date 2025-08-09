@@ -5,6 +5,7 @@ from spotipy.oauth2 import SpotifyOAuth
 
 import pandas as pd
 import numpy as np
+import requests
 
 import cache
 from general_utils import *
@@ -112,6 +113,13 @@ class SpotifyInterface:
         self._redirect_uri = config['redirect_uri']
         self._cached_token_file = config['cached_token_file']
 
+        self._cache = cache.Cache()
+
+        self._init_connection()
+
+        return
+
+    def _init_connection(self):
         # this just creates the wrapper object; the actual network connection
         # will be initialized when we first try to use it
         logger.debug('Initializing Spotify connection with scope %s', _SCOPES)
@@ -121,13 +129,14 @@ class SpotifyInterface:
                                                             client_secret=self._client_secret,
                                                             redirect_uri=self._redirect_uri))
 
-        self._cache = cache.Cache()
-
-        return
-
     def _wrap_request(self, request_name, **kwargs):
         start_time = time.time()
-        result = getattr(self._connection, request_name)(**kwargs)
+        try:
+            result = getattr(self._connection, request_name)(**kwargs)
+        except requests.exceptions.ConnectionError as e:
+            self._init_connection()
+            result = getattr(self._connection, request_name)(**kwargs)
+
         end_time = time.time()
         logger.debug('Spotify request %s(%s): %.3f s',
                      request_name, kwargs, end_time - start_time)
@@ -138,7 +147,11 @@ class SpotifyInterface:
                       **kwargs):
         start_time = time.time()
 
-        result = getattr(self._connection, request_name)(**kwargs)
+        try:
+            result = getattr(self._connection, request_name)(**kwargs)
+        except requests.exceptions.ConnectionError as e:
+            self._init_connection()
+            result = getattr(self._connection, request_name)(**kwargs)
 
         items = result['items']
 
@@ -191,7 +204,12 @@ class SpotifyInterface:
 
         if len(items) == 0 and run_at_least_once:
             num_batches += 1
-            result = getattr(self._connection, first_request_name)(**kwargs)
+            try:
+                result = getattr(self._connection, first_request_name)(**kwargs)
+            except requests.exceptions.ConnectionError as e:
+                self._init_connection()
+                result = getattr(self._connection, first_request_name)(**kwargs)
+
             if result_field is not None:
                 results = result[result_field]
 
@@ -204,9 +222,18 @@ class SpotifyInterface:
             batch = list(items[start:end])
             kwargs[list_kwarg] = batch
             if is_first:
-                result = getattr(self._connection, first_request_name)(**kwargs)
+                try:
+                    result = getattr(self._connection, first_request_name)(**kwargs)
+                except requests.exceptions.ConnectionError as e:
+                    self._init_connection()
+                    result = getattr(self._connection, first_request_name)(**kwargs)
             else:
-                result = getattr(self._connection, subsequent_request_name)(**kwargs)
+                try:
+                    result = getattr(self._connection, subsequent_request_name)(**kwargs)
+                except requests.exceptions.ConnectionError as e:
+                    self._init_connection()
+                    result = getattr(self._connection, subsequent_request_name)(**kwargs)
+
             is_first = False
 
             if result_field is not None:
@@ -230,6 +257,7 @@ class SpotifyInterface:
         time.time()
         return self._wrap_request('current_user')['id']
         logger.debug('Spotify request: current_user()')
+        self._connection.current_user()
 
     def get_playlists(self):
         def body():

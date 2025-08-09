@@ -10,6 +10,7 @@ import pandas as pd
 
 import rekordbox_interface
 import spotify_interface
+import soundcloud_interface
 import google_interface
 import file_interface
 
@@ -18,6 +19,7 @@ default_dir = None
 rekordbox = None
 google = None
 spotify = None
+soundcloud = None
 docs = {}
 _backups = 0
 spotify_queues = []
@@ -35,6 +37,7 @@ def init(config_file=None):
     global default_dir
     global rekordbox
     global google
+    global soundcloud
     global spotify
     global spotify_queues
     global discography_cache_dir
@@ -98,6 +101,9 @@ def init(config_file=None):
 
         elif section.name == 'google':
             google = google_interface.GoogleInterface(section)
+
+        elif section.name == 'soundcloud':
+            soundcloud = soundcloud_interface.SoundcloudInterface(section)
 
         elif section.name == 'spotify':
             spotify = spotify_interface.SpotifyInterface(section)

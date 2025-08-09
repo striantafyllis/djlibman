@@ -154,32 +154,34 @@ class Container(object):
         if isinstance(from_index, int):
             pass
         elif isinstance(from_index, str):
+            from_index_str = from_index
             if index_column is None:
                 raise ValueError('from_index is a string but no index_column specified')
             col = self._df[index_column]
 
-            from_index = first_index_of(col, from_index,
+            from_index = first_index_of(col, from_index_str,
                                         ignore_case=ignore_case,
                                         use_prefix=use_prefix,
                                         unambiguous_prefix=unambiguous_prefix)
 
             if from_index == -1:
-                raise ValueError(f'from_index {from_index} not found')
+                raise ValueError(f'from_index {from_index_str} not found')
 
         if isinstance(to_index, int):
             pass
         elif isinstance(to_index, str):
+            to_index_str = to_index
             if index_column is None:
                 raise ValueError('from_index is a string but no index_column specified')
             col = self._df[index_column]
 
-            to_index = first_index_of(col, to_index,
+            to_index = first_index_of(col, to_index_str,
                                       ignore_case=ignore_case,
                                       use_prefix=use_prefix,
                                       unambiguous_prefix=unambiguous_prefix)
 
             if to_index == -1:
-                raise ValueError(f'to_index {to_index} not found')
+                raise ValueError(f'to_index {to_index_str} not found')
 
         return self._df.iloc[from_index:to_index+1]
 

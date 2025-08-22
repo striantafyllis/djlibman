@@ -101,6 +101,10 @@ def promote_tracks_in_spotify_queue(
     promote_source = SpotifyPlaylist(promote_source_name)
     promote_target = SpotifyPlaylist(promote_target_name)
 
+    if isinstance(last_track, int):
+        # because this comes from a human, it's probably 1-based, whereas we want 0-based
+        last_track -= 1
+
     listened_tracks = promote_source.slice(
         from_index=0,
         to_index=last_track,

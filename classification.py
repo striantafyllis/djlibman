@@ -132,10 +132,10 @@ def classify_tracks(tracks):
         'A': ['A'],
         'B': ['B'],
         'AB': ['A', 'B'],
-        'C': ['C']
     }
 
     other_class_groupings = {
+        'C': ['C'],
         'D': ['D'],
         'X': ['X'],
         'Pending': ['?']
@@ -147,11 +147,18 @@ def classify_tracks(tracks):
         rb_prefix = ['Downtempo'] if not uptempo else []
 
         for flavor_name, flavors in flavor_groupings.items():
-            for class_name, classes in prime_class_groupings.items():
+            for class_name, classes in (prime_class_groupings | other_class_groupings).items():
+                rekordbox_names = [['managed'] + rb_prefix + [f'{flavor_name} {class_name}']]
+
+                if uptempo and class_name in prime_class_groupings:
+                    rekordbox_names += [['managed AB'] + rb_prefix + [f'{flavor_name} {class_name}']]
+                    spotify_name = f'DJ {flavor_name} {class_name}'
+                else:
+                    spotify_name = None
+
                 playlists.append({
-                    'rekordbox_name': rb_prefix + [f'{flavor_name} {class_name}'],
-                    'spotify_name': f'{flavor_name} {class_name}'
-                        if uptempo and class_name in ['A', 'B', 'AB'] else None,
+                    'rekordbox_names': rekordbox_names,
+                    'spotify_name': spotify_name,
                     'kwargs': {
                         'uptempo': uptempo,
                         'flavors': flavors,
@@ -161,27 +168,7 @@ def classify_tracks(tracks):
 
         for class_name, classes in prime_class_groupings.items():
             playlists.append({
-                'rekordbox_name': rb_prefix + [f'Other {class_name}'],
-                'kwargs': {
-                    'uptempo': uptempo,
-                    'not_flavors': covered_flavors,
-                    'classes': classes
-                }
-            })
-
-        for class_name, classes in other_class_groupings.items():
-            for flavor_name, flavors in flavor_groupings.items():
-                playlists.append({
-                    'rekordbox_name': rb_prefix + [class_name, flavor_name],
-                    'kwargs': {
-                        'uptempo': uptempo,
-                        'flavors': flavors,
-                        'classes': classes
-                    }
-                })
-
-            playlists.append({
-                'rekordbox_name': rb_prefix + [class_name, 'Other'],
+                'rekordbox_names': [['managed'] + rb_prefix + [f'{flavor_name} {class_name}']],
                 'kwargs': {
                     'uptempo': uptempo,
                     'not_flavors': covered_flavors,

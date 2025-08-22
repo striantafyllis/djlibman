@@ -400,30 +400,29 @@ def playlists_maintenance(do_rekordbox=True, do_spotify=True):
 
         playlist['tracks'] = playlist['tracks'][::-1]
 
-        if do_rekordbox and playlist.get('rekordbox_name') is not None:
-            rekordbox_name = ['managed'] + playlist['rekordbox_name']
-            rekordbox_playlist = RekordboxPlaylist(
-                name=rekordbox_name,
-                create=True,
-                overwrite=True
-            )
-            rekordbox_playlist.set_df(playlist['tracks'])
+        if do_rekordbox:
+            for rekordbox_name in playlist['rekordbox_names']:
+                rekordbox_playlist = RekordboxPlaylist(
+                    name=rekordbox_name,
+                    create=True,
+                    overwrite=True
+                )
+                rekordbox_playlist.set_df(playlist['tracks'])
 
-            print(f'Creating Rekordbox playlist {rekordbox_name}: {len(rekordbox_playlist)} tracks')
-            # write the rekordbox playlist in the XML in memory, but don't dump the
-            # XML file to disk; that will be done at the end.
-            rekordbox_playlist.write(write_thru=False)
+                print(f'Creating Rekordbox playlist {rekordbox_name}: {len(rekordbox_playlist)} tracks')
+                # write the rekordbox playlist in the XML in memory, but don't dump the
+                # XML file to disk; that will be done at the end.
+                rekordbox_playlist.write(write_thru=False)
 
         if do_spotify and playlist.get('spotify_name') is not None:
-            spotify_name = 'DJ ' + playlist['spotify_name']
             spotify_playlist = SpotifyPlaylist(
-                name=spotify_name,
+                name=playlist['spotify_name'],
                 create=True,
                 overwrite=True
             )
             spotify_playlist.set_df(playlist['tracks'])
 
-            print(f'Creating Spotify playlist {spotify_name}: {len(spotify_playlist)} tracks')
+            print(f'Creating Spotify playlist {playlist['spotify_name']}: {len(spotify_playlist)} tracks')
             spotify_playlist.write()
 
     if do_rekordbox:

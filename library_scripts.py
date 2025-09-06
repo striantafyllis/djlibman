@@ -296,9 +296,12 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library'):
                         print(f'Option {i+1}: {format_track(spotify_track)}')
                         choice = get_user_choice('Accept?', options=['yes', 'next','give up'])
                         if choice == 'yes':
-                            new_mappings.loc[rekordbox_id] = {'rekordbox_id': rekordbox_id}
-                            new_mappings.loc[rekordbox_id][new_mappings.columns[1:]] = \
-                                spotify_track[new_mappings.columns[1:]]
+                            new_mappings.loc[rekordbox_id] = (
+                                spotify_track[new_mappings.columns[1:]].to_dict() |
+                                {
+                                    'rekordbox_id': rekordbox_id,
+                                    'added_at': pd.Timestamp.utcnow()
+                            })
 
                             done = True
                             break
@@ -358,36 +361,6 @@ def djlib_spotify_likes_maintenance():
     return
 
 
-def form_progressive_not_used(do_rekordbox=True, do_spotify=True, write_thru=True):
-    """Special case code to form the Progressive - Not Used playlist. This will be generalized later."""
-
-    rb_playlists = djlib_config.rekordbox.get_playlist_names()
-
-    sets = [['Sets', name] for name in rb_playlists['Sets']]
-
-    prog_tracks = RekordboxPlaylist(['managed', 'Progressive'])
-
-    prog_not_used_tracks = RekordboxPlaylist(['managed', 'Progressive Not Used'],
-                                             create=True, overwrite=True)
-    prog_not_used_tracks.set_df(prog_tracks.get_df())
-
-    for prog_set in sets:
-        set_tracks = RekordboxPlaylist(prog_set)
-        prog_not_used_tracks.remove(set_tracks, prompt=False, silent=True)
-
-    if do_rekordbox:
-        print(f'Creating Rekordbox playlist Progressive Not Used: {len(prog_not_used_tracks)} tracks')
-        prog_not_used_tracks.write(write_thru=write_thru)
-
-    if do_spotify:
-        prog_not_used_spotify = SpotifyPlaylist('DJ Progressive Not Used', create=True, overwrite=True)
-        prog_not_used_spotify.truncate(prompt=False, silent=True)
-        prog_not_used_spotify.append(prog_not_used_tracks, prompt=False, silent=True)
-        prog_not_used_spotify.write()
-
-    return
-
-
 
 def playlists_maintenance(do_rekordbox=True, do_spotify=True):
     djlib = Doc('djlib')
@@ -432,6 +405,68 @@ def playlists_maintenance(do_rekordbox=True, do_spotify=True):
 
     return
 
+def filter_sets():
+    print('Creating Filtered Sets...')
+    djlib = Doc('djlib').get_df()
+
+    rb_playlist_names = djlib_config.rekordbox.get_playlist_names()
+
+    rb_set_names = rb_playlist_names['Sets']
+
+    for rb_set_name in rb_set_names:
+        rb_set = RekordboxPlaylist(['Sets', rb_set_name])
+
+        rb_filtered_set = RekordboxPlaylist(['Filtered Sets', rb_set_name],
+                                            create=True, overwrite=True)
+
+        rb_set_tracks = rb_set.get_df()
+
+        rb_set_tracks = rb_set_tracks.merge(
+            right=djlib,
+            how='inner',
+            left_index=True,
+            right_index=True,
+            suffixes=('', '_y')
+        )
+
+        rb_set_filtered_tracks = classification.filter_tracks(rb_set_tracks, classes=['A'])
+
+        rb_filtered_set.set_df(rb_set_filtered_tracks)
+
+        rb_filtered_set.write(write_thru=False)
+
+    djlib_config.rekordbox.write()
+
+    return
+
+def check_minisets():
+    print('Checking Minisets...')
+    djlib = Doc('djlib').get_df()
+
+    rb_playlist_names = djlib_config.rekordbox.get_playlist_names()
+
+    rb_miniset_names = rb_playlist_names['Minisets']
+
+    for rb_miniset_name in rb_miniset_names:
+        rb_miniset = RekordboxPlaylist(['Minisets', rb_miniset_name])
+
+        rb_miniset_tracks = rb_miniset.get_df()
+
+        rb_miniset_tracks = rb_miniset_tracks.merge(
+            right=djlib,
+            how='inner',
+            left_index=True,
+            right_index=True,
+            suffixes=('', '_y')
+        )
+
+        not_A_tracks = classification.filter_tracks(rb_miniset_tracks, not_classes=['A', 'B'])
+
+        if len(not_A_tracks) != 0:
+            print(f"WARNING: Miniset '{rb_miniset_name}' contains tracks from non-playable classes:")
+            pretty_print_tracks(not_A_tracks, indent=' '*4, enum=False, ids=True)
+
+
 def library_maintenance_sanity_checks():
     if not rekordbox_sanity_checks():
         return False
@@ -463,6 +498,10 @@ def library_maintenance_after_classification():
 
     playlists_maintenance()
 
+    filter_sets()
+
+    check_minisets()
+
     return
 
 
@@ -477,6 +516,10 @@ def library_maintenance_all():
     djlib_spotify_likes_maintenance()
 
     playlists_maintenance()
+
+    filter_sets()
+
+    check_minisets()
 
     return
 

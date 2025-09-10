@@ -120,25 +120,35 @@ class GoogleInterface:
 
         return files
 
-_converters = [
-    np.int64,
-    np.float64,
-    lambda s: pd.to_datetime(s, utc=True)
-]
+    def get_file_id(self, name, type=None):
+        files = self.get_files(type=type, name=name)
+
+        if len(files) == 0:
+            return None
+        elif len(files) == 1:
+            return files[0]['id']
+        else:
+            raise ValueError(f"More than one Google docs match name '{name}'" +
+                             f' and type {type}' if type is not None else '')
+
+    def get_sheets_in_file(self, name=None, id=None):
+        if id is None:
+            if name is not None:
+                id = self.get_file_id(name=name, type='sheet')
+            else:
+                raise ValueError('At least one of name or id should be specified')
+
+        if id is None:
+            raise ValueError(f"Google Sheet '{name}' does not exist")
+
+        properties = self.sheets_connection().spreadsheets().get(
+            spreadsheetId = id,
+            fields = 'sheets.properties'
+        ).execute()
+
+        return [prop['properties']['title'] for prop in properties['sheets']]
 
 
-def _convert_read_value(value):
-    if value is None or value == '':
-        return None
-
-    for conv in _converters:
-        try:
-            new_value = conv(value)
-            return new_value
-        except ValueError:
-            continue
-
-    return value
 
 
 class GoogleSheet(FileDoc):
@@ -146,26 +156,44 @@ class GoogleSheet(FileDoc):
                  google_interface,
                  path,
                  sheet,
+                 id=None,
+                 convert_datetime=True,
                  **kwargs
                  ):
         super(GoogleSheet, self).__init__(path, **kwargs)
         self._interface = google_interface
         self._sheet = sheet
-        self._id = None
+        self._id = id
+
+        self._read_value_converters = [ np.int64, np.float64 ]
+        if convert_datetime:
+            self._read_value_converters.append(lambda s: pd.to_datetime(s, utc=True))
+
         return
+
+    def _convert_read_value(self, value):
+        if value is None or value == '':
+            return None
+
+        for conv in self._read_value_converters:
+            try:
+                new_value = conv(value)
+                return new_value
+            except ValueError:
+                continue
+
+        return value
 
     def _init_id(self):
         if self._id is not None:
             return
 
-        files = self._interface.get_files(type='sheet', name=self._path)
+        self._id = self._interface.get_file_id(type='sheet', name=self._path)
 
-        if len(files) == 0:
+        if self._id is None:
             self._id = '_DOESNT_EXIST'
-        elif len(files) == 1:
-            self._id = files[0]['id']
-        else:
-            raise ValueError(f"More than one Google Sheets match name '{self._path}'")
+
+        return
 
     def exists(self):
         self._init_id()
@@ -215,9 +243,10 @@ class GoogleSheet(FileDoc):
             columns = [_col_num_to_alpha(col_num) for col_num in range(num_columns)]
 
         # Google returns everything as strings. This code tries to fix the mess.
+        # Additionally, if columns are missing from the end, the Google row will be shorter.
 
         conv_values = [
-            [_convert_read_value(v) for v in row]
+            [self._convert_read_value(row[i]) if i < len(row) else None for i in range(len(columns))]
             for row in values
         ]
 

@@ -15,36 +15,44 @@ def issue_error(error_message, continue_on_error=False):
 
 unit_conversion_table = {
     'lb': { 'oz': 16, 'g': 453.592 },
-    'tbsp': { 'tsp': 3, 'ml': 14.7868 }
+    'floz': { 'ml': 29.5735 },
+    'tbsp': { 'tsp': 3, 'ml': 14.7868 },
+    'cups': { 'floz': 8 }
 }
 
 def _complete_unit_conversion_table():
-    for unit1, unit1_map in list(unit_conversion_table.items()):
-        for unit2, value2 in list(unit1_map.items()):
-            unit2_map = unit_conversion_table.get(unit2)
+    while True:
+        starting_unit_conversion_table = dict(unit_conversion_table)
 
-            if unit2_map is None:
-                unit2_map = {}
-                unit_conversion_table[unit2] = unit2_map
+        for unit1, unit1_map in list(unit_conversion_table.items()):
+            for unit2, value2 in list(unit1_map.items()):
+                unit2_map = unit_conversion_table.get(unit2)
 
-            if unit1 not in unit2_map:
-                unit2_map[unit1] = 1.0 / value2
+                if unit2_map is None:
+                    unit2_map = {}
+                    unit_conversion_table[unit2] = unit2_map
 
-            for unit3, value3 in unit1_map.items():
-                if unit3 == unit2:
-                    continue
+                if unit1 not in unit2_map:
+                    unit2_map[unit1] = 1.0 / value2
 
-                unit3_map = unit_conversion_table.get(unit3)
+                for unit3, value3 in unit1_map.items():
+                    if unit3 == unit2:
+                        continue
 
-                if unit3_map is None:
-                    unit3_map = {}
-                    unit_conversion_table[unit3] = unit3_map
+                    unit3_map = unit_conversion_table.get(unit3)
 
-                if unit3 not in unit2_map:
-                    unit2_map[unit3] = value3 / value2
+                    if unit3_map is None:
+                        unit3_map = {}
+                        unit_conversion_table[unit3] = unit3_map
 
-                if unit2 not in unit3_map:
-                    unit3_map[unit2] = value2 / value3
+                    if unit3 not in unit2_map:
+                        unit2_map[unit3] = value3 / value2
+
+                    if unit2 not in unit3_map:
+                        unit3_map[unit2] = value2 / value3
+
+        if unit_conversion_table == starting_unit_conversion_table:
+            break
 
     return
 
@@ -97,8 +105,8 @@ class Nutrition:
     def _process_sheet_common(
             self,
             google_sheet_name,
-            google_sheet_id,
             sheet,
+            google_sheet_id=None,
             continue_on_error=False):
         doc = google_interface.GoogleSheet(
             google_interface=self.google,
@@ -118,7 +126,7 @@ class Nutrition:
                         continue_on_error=continue_on_error)
             return None
 
-        return contents
+        return doc, contents
 
     def _process_source_sheet(
             self,
@@ -128,11 +136,11 @@ class Nutrition:
             continue_on_error=False):
         print(f'Parsing {google_sheet_name}#{sheet} ...')
 
-        contents = self._process_sheet_common(
-            google_sheet_name,
-            google_sheet_id,
-            sheet,
-            continue_on_error)
+        _, contents = self._process_sheet_common(
+            google_sheet_name=google_sheet_name,
+            google_sheet_id=google_sheet_id,
+            sheet=sheet,
+            continue_on_error=continue_on_error)
 
         if contents is None:
             return
@@ -198,11 +206,11 @@ class Nutrition:
             continue_on_error=False):
         print(f'Parsing {google_sheet_name}#{sheet} ...')
 
-        contents = self._process_sheet_common(
-            google_sheet_name,
-            google_sheet_id,
-            sheet,
-            continue_on_error)
+        _, contents = self._process_sheet_common(
+            google_sheet_name=google_sheet_name,
+            google_sheet_id=google_sheet_id,
+            sheet=sheet,
+            continue_on_error=continue_on_error)
 
         if contents is None:
             return
@@ -312,15 +320,17 @@ class Nutrition:
         if food_info_quantity is not None and quantity is None:
             raise ValueError(f"Food {food} is a measurable compound food; quantity and unit must be specified.")
 
-        if food_info_unit is None or food_info_unit == unit:
+        if food_info_unit is None:
             conversion_rate = 1.0
+        elif food_info_unit == unit:
+            conversion_rate = quantity / food_info_quantity
         else:
             unit_conversion_rates = unit_conversion_table.get(unit)
 
             if unit_conversion_rates is None or food_info_unit not in unit_conversion_rates:
                 raise ValueError(f"Food '{food}': cannot convert unit {unit} to compound food table unit {food_info_unit}")
 
-            conversion_rate = unit_conversion_rates[food_info_unit]
+            conversion_rate = unit_conversion_rates[food_info_unit] * quantity / food_info_quantity
 
         nutrition_info = {}
 
@@ -346,6 +356,43 @@ class Nutrition:
 
         return nutrition_info
 
+    def populate_sheet(
+            self,
+            google_sheet_name,
+            sheet,
+            continue_on_error=False):
+        doc, contents = self._process_sheet_common(
+            google_sheet_name=google_sheet_name,
+            sheet=sheet,
+            continue_on_error=continue_on_error)
+
+        for row_idx in range(len(contents)):
+            row = contents.iloc[row_idx]
+
+            name = row['Name']
+
+            if pd.isna(name):
+                continue
+
+            name = name.lower()
+
+            quantity = row['Quantity'] if not pd.isna(row['Quantity']) else None
+            unit = row['Unit'].lower() if not pd.isna(row['Unit']) else None
+
+            nutrition_info = self.calculate_nutrition_info(name, quantity, unit)
+
+            for key, value in nutrition_info.items():
+                if key not in contents.columns:
+                    continue
+
+                col_idx = contents.columns.get_loc(key)
+
+                contents.iloc[row_idx, col_idx] = value
+
+        doc.write(contents)
+
+        return
+
 
 source_sheets = [
     'Nutrition Info',
@@ -367,10 +414,13 @@ def main():
         continue_on_error=False
     )
 
-    info1 = nutrition.calculate_nutrition_info('olive oil', 7, 'g')
-    info2 = nutrition.calculate_nutrition_info('olive oil', 30, 'ml')
-    info3 = nutrition.calculate_nutrition_info('9/8 vegetable gumbo', 20, 'oz')
-    info4 = nutrition.calculate_nutrition_info('Tue 2025-09-09')
+    # info1 = nutrition.calculate_nutrition_info('olive oil', 7, 'g')
+    # info2 = nutrition.calculate_nutrition_info('olive oil', 30, 'ml')
+    # info3 = nutrition.calculate_nutrition_info('9/8 vegetable gumbo', 20, 'oz')
+    # info4 = nutrition.calculate_nutrition_info('Tue 2025-09-09')
+
+    nutrition.populate_sheet(google_sheet_name='Food Tracking', sheet='Platters')
+    nutrition.populate_sheet(google_sheet_name='Food Tracking', sheet='Days')
 
     return
 

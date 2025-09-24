@@ -269,7 +269,7 @@ def get_progressive_a_producers():
     prog_a_artists.sort_values(by='A', ascending=False, inplace=True)
 
     doc = Doc('prog_a_artists', create=True, overwrite=True,
-              path='/Users/spyros/python/djlibman/data/prog_a_artists.csv',
+              path='/data/prog_a_artists-2025-09-15.csv',
               backups=0,
               type='csv'
               )
@@ -281,7 +281,7 @@ def get_progressive_a_producers():
 def build_artist_albums():
     source_doc = Doc(
         'prog_a_artists',
-        path='/Users/spyros/python/djlibman/data/prog_a_artists.csv',
+        path='/data/prog_a_artists-2025-09-15.csv',
         backups=0,
         type='csv'
         )
@@ -304,7 +304,7 @@ def build_artist_albums():
 def clean_up_artist_tracks():
     source_doc = Doc(
         'prog_a_artists',
-        path='/Users/spyros/python/djlibman/data/prog_a_artists.csv',
+        path='/data/prog_a_artists-2025-09-15.csv',
         backups=0,
         type='csv'
         )
@@ -340,14 +340,14 @@ def clean_up_artist_tracks():
 def discog_report_for_prog_a_producers():
     source_doc = Doc(
         'prog_a_artists',
-        path='/Users/spyros/python/djlibman/data/prog_a_artists.csv',
+        path='/data/prog_a_artists-2025-09-15.csv',
         backups=0,
         type='csv'
         )
 
     target_doc = Doc(
         'prog_a_artists_enhanced',
-        path='/Users/spyros/python/djlibman/data/prog_a_artists_enhanced.csv',
+        path='/data/prog_a_artists_enhanced-2025-09-15.csv',
         backups=0,
         type='csv',
         create=True,
@@ -401,7 +401,7 @@ def discog_report_for_prog_a_producers():
 def refresh_prog_a_producers():
     source_doc = Doc(
         'prog_a_artists',
-        path='/Users/spyros/python/djlibman/data/prog_a_artists.csv',
+        path='/data/prog_a_artists-2025-09-15.csv',
         backups=0,
         type='csv'
         )
@@ -468,7 +468,7 @@ def old_main():
 def populate_queue():
     next_q_artists = Doc(
         'next_q_artists',
-        path='/Users/spyros/python/djlibman/data/next_q_artists.csv',
+        path='/Users/spyros/python/djlibman/data/next_q_artists-2025-09-15.csv',
         backups=0,
         type='csv'
         )
@@ -495,7 +495,7 @@ def main():
 
     # discog_report_for_prog_a_producers()
 
-    # populate_queue()
+    populate_queue()
 
     # debug_discography()
 
@@ -503,10 +503,10 @@ def main():
 
     # promote_set_tracks_to_a()
 
-    review_maintenance('DJ Progressive A Review',
-                       ref_playlist='DJ Progressive A Review Ref',
-                       method='liked+ref',
-                       last_track='Disposition')
+    # review_maintenance('DJ Progressive A Review',
+    #                    ref_playlist='DJ Progressive A Review Ref',
+    #                    method='liked+ref',
+    #                    last_track='Disposition')
 
     return
 

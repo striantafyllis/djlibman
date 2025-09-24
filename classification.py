@@ -130,8 +130,11 @@ def classify_tracks(tracks):
 
     prime_class_groupings = {
         'A': ['A'],
+        'A+': ['A+'],
+        'A-': ['A-'],
         'B': ['B'],
         'AB': ['A', 'B'],
+        'AB-': ['A-', 'B']
     }
 
     other_class_groupings = {

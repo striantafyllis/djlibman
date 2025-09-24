@@ -16,8 +16,10 @@ def issue_error(error_message, continue_on_error=False):
 unit_conversion_table = {
     'lb': { 'oz': 16, 'g': 453.592 },
     'floz': { 'ml': 29.5735 },
+    'pint': { 'floz': 19.2152, 'pints': 1 },
     'tbsp': { 'tsp': 3, 'ml': 14.7868 },
-    'cups': { 'floz': 8 }
+    'cups': { 'cup': 1, 'floz': 8 },
+    'pcs': { 'pc': 1 }
 }
 
 def _complete_unit_conversion_table():

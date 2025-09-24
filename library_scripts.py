@@ -447,7 +447,13 @@ def check_minisets():
 
     rb_miniset_names = rb_playlist_names['Minisets']
 
+    rb_miniset_not_Aplus_tracks = None
+
     for rb_miniset_name in rb_miniset_names:
+        if rb_miniset_name.endswith(' --'):
+            # in progress; ignore for now
+            continue
+
         rb_miniset = RekordboxPlaylist(['Minisets', rb_miniset_name])
 
         rb_miniset_tracks = rb_miniset.get_df()
@@ -460,11 +466,28 @@ def check_minisets():
             suffixes=('', '_y')
         )
 
-        not_A_tracks = classification.filter_tracks(rb_miniset_tracks, not_classes=['A', 'B'])
+        not_AB_tracks = classification.filter_tracks(rb_miniset_tracks, not_classes=['A', 'B'])
 
-        if len(not_A_tracks) != 0:
+        if len(not_AB_tracks) != 0:
             print(f"WARNING: Miniset '{rb_miniset_name}' contains tracks from non-playable classes:")
-            pretty_print_tracks(not_A_tracks, indent=' '*4, enum=False, ids=True)
+            pretty_print_tracks(not_AB_tracks, indent=' '*4, enum=False, ids=True)
+
+        not_Aplus_tracks = classification.filter_tracks(rb_miniset_tracks, not_classes=['A+'])
+
+        if len(not_Aplus_tracks) > 0:
+            if rb_miniset_not_Aplus_tracks is None:
+                rb_miniset_not_Aplus_tracks = Wrapper(not_Aplus_tracks, name='Miniset B tracks')
+            else:
+                rb_miniset_not_Aplus_tracks.append(not_Aplus_tracks, prompt=False, silent=False)
+
+    if rb_miniset_not_Aplus_tracks is not None and len(rb_miniset_not_Aplus_tracks) > 0:
+        print('The following tracks are in minisets but are not classified as A+.')
+        pretty_print_tracks(rb_miniset_not_Aplus_tracks, indent=' '*4, enum=False, ids=True)
+
+        choice = get_user_choice('Promote to A+?')
+
+        if choice == 'yes':
+            reclassify_tracks_as(rb_miniset_not_Aplus_tracks, 'A+', silent=True, prompt=False)
 
 
 def library_maintenance_sanity_checks():
@@ -494,13 +517,13 @@ def library_maintenance_after_classification():
     if not library_maintenance_sanity_checks():
         return
 
+    check_minisets()
+
     djlib_spotify_likes_maintenance()
 
     playlists_maintenance()
 
     filter_sets()
-
-    check_minisets()
 
     return
 
@@ -513,13 +536,13 @@ def library_maintenance_all():
 
     rekordbox_to_spotify_maintenance()
 
+    check_minisets()
+
     djlib_spotify_likes_maintenance()
 
     playlists_maintenance()
 
     filter_sets()
-
-    check_minisets()
 
     return
 
@@ -532,7 +555,7 @@ def pretty_print_rekordbox_playlist(playlist_name):
     return
 
 
-def reclassify_tracks_as(tracks, new_class):
+def reclassify_tracks_as(tracks, new_class, prompt=True, silent=False):
     if isinstance(tracks, Container):
         tracks = tracks.get_df()
 
@@ -549,24 +572,31 @@ def reclassify_tracks_as(tracks, new_class):
 
     tracks = djlib.get_df().loc[track_ids]
 
-    print(f'Tracks to reclassify as {new_class}:')
-    pretty_print_tracks(tracks, enum=True, ids=False)
-    print()
-
-    print(f'Tracks already at {new_class}:')
     tracks_already_new_class = classification.filter_tracks(tracks, classes=[new_class])
-    pretty_print_tracks(tracks_already_new_class, enum=True, ids=False)
-    print()
-
-    print(f'Tracks to be reclassified as {new_class}:')
     tracks_to_reclassify = tracks.loc[tracks.index.difference(tracks_already_new_class.index, sort=False)]
-    if len(tracks_to_reclassify) == 0:
-        print('NONE')
-    else:
-        pretty_print_tracks(tracks_to_reclassify, enum=True, ids=False)
-        choice = get_user_choice('Proceed?')
-        if choice == 'yes':
-            djlib.get_df().loc[tracks_to_reclassify.index, 'Class'] = new_class
-            djlib.write(force=True)
+
+    if not silent:
+        print(f'Tracks to reclassify as {new_class}:')
+        pretty_print_tracks(tracks, enum=True, ids=False)
+        print()
+
+        print(f'Tracks already at {new_class}:')
+        pretty_print_tracks(tracks_already_new_class, enum=True, ids=False)
+        print()
+
+        print(f'Tracks to be reclassified as {new_class}:')
+        if len(tracks_to_reclassify) == 0:
+            print('NONE')
+        else:
+            pretty_print_tracks(tracks_to_reclassify, enum=True, ids=False)
+
+    if len(tracks_to_reclassify) != 0:
+        if prompt:
+            choice = get_user_choice('Proceed?')
+            if choice != 'yes':
+                return
+
+        djlib.get_df().loc[tracks_to_reclassify.index, 'Class'] = new_class
+        djlib.write(force=True)
 
     return

@@ -482,7 +482,7 @@ def check_minisets():
 
     if rb_miniset_not_Aplus_tracks is not None and len(rb_miniset_not_Aplus_tracks) > 0:
         print('The following tracks are in minisets but are not classified as A+.')
-        pretty_print_tracks(rb_miniset_not_Aplus_tracks, indent=' '*4, enum=False, ids=True)
+        pretty_print_tracks(rb_miniset_not_Aplus_tracks, indent=' '*4, enum=True, ids=True)
 
         choice = get_user_choice('Promote to A+?')
 

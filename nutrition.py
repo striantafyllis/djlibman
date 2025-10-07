@@ -2,6 +2,8 @@
 import sys
 
 import pandas as pd
+import numpy as np
+
 from pandas import value_counts
 
 import google_interface
@@ -386,6 +388,11 @@ class Nutrition:
             for key, value in nutrition_info.items():
                 if key not in contents.columns:
                     continue
+
+                # fix an annoying problem...
+                if isinstance(value, float) and not isinstance(value, int):
+                    if not np.issubdtype(contents[key].dtype.type, np.float64):
+                        contents[key] = contents[key].astype(pd.Float64Dtype(), copy=False)
 
                 col_idx = contents.columns.get_loc(key)
 

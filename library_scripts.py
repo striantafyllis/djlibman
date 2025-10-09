@@ -170,7 +170,7 @@ def djlib_values_sanity_check():
 
     bad_class_tracks = djlib.get_filtered(
         lambda track: not pd.isna(track.Class) and
-                      not re.match(r'[?O]?[ABCDX][1-5]?', track.Class))
+                      not re.match(r'[?O]?[ABCDXN][1-5]?', track.Class))
 
     if len(bad_class_tracks) > 0:
         errors += 1
@@ -449,6 +449,10 @@ def check_minisets():
 
     rb_miniset_not_Aplus_tracks = None
 
+    Aplus_tracks = classification.filter_tracks(djlib, classes=['A+'])
+
+    Aplus_tracks_not_in_minisets_idx = Aplus_tracks.index
+
     for rb_miniset_name in rb_miniset_names:
         if rb_miniset_name.endswith(' --'):
             # in progress; ignore for now
@@ -457,6 +461,11 @@ def check_minisets():
         rb_miniset = RekordboxPlaylist(['Minisets', rb_miniset_name])
 
         rb_miniset_tracks = rb_miniset.get_df()
+
+        Aplus_tracks_not_in_minisets_idx = Aplus_tracks_not_in_minisets_idx.difference(
+            rb_miniset_tracks.index,
+            sort=False
+        )
 
         rb_miniset_tracks = rb_miniset_tracks.merge(
             right=djlib,
@@ -471,6 +480,10 @@ def check_minisets():
         if len(not_AB_tracks) != 0:
             print(f"WARNING: Miniset '{rb_miniset_name}' contains tracks from non-playable classes:")
             pretty_print_tracks(not_AB_tracks, indent=' '*4, enum=False, ids=True)
+
+            choice = get_user_choice('Continue with minisets?')
+            if choice != 'yes':
+                return
 
         not_Aplus_tracks = classification.filter_tracks(rb_miniset_tracks, not_classes=['A+'])
 
@@ -488,6 +501,18 @@ def check_minisets():
 
         if choice == 'yes':
             reclassify_tracks_as(rb_miniset_not_Aplus_tracks, 'A+', silent=True, prompt=False)
+
+    if len(Aplus_tracks_not_in_minisets_idx) > 0:
+        Aplus_tracks_not_in_minisets = djlib.loc[Aplus_tracks_not_in_minisets_idx]
+        print('The following tracks are A+ but are not in minisets.')
+        pretty_print_tracks(Aplus_tracks_not_in_minisets, indent=' '*4,
+                            enum=True, ids=True)
+
+        choice = get_user_choice('Demote to B?')
+        if choice == 'yes':
+            reclassify_tracks_as(Aplus_tracks_not_in_minisets, 'B', silent=True, prompt=False)
+
+    return
 
 
 def library_maintenance_sanity_checks():

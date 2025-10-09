@@ -138,6 +138,7 @@ def classify_tracks(tracks):
     }
 
     other_class_groupings = {
+        'N': ['N'],
         'C': ['C'],
         'D': ['D'],
         'X': ['X'],

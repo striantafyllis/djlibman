@@ -159,7 +159,7 @@ class Nutrition:
                 current_compound_food = None
                 continue
 
-            name = name.lower()
+            name = name.strip().lower()
 
             quantity = row['Quantity']
             unit = row['Unit']
@@ -170,7 +170,7 @@ class Nutrition:
                             continue_on_error=continue_on_error)
                 continue
 
-            unit = unit.lower()
+            unit = unit.strip().lower()
 
             values = {
                 key: value
@@ -229,10 +229,10 @@ class Nutrition:
                 current_compound_food = None
                 continue
 
-            name = name.lower()
+            name = name.strip().lower()
 
             quantity = row['Quantity'] if not pd.isna(row['Quantity']) else None
-            unit = row['Unit'].lower() if not pd.isna(row['Unit']) else None
+            unit = row['Unit'].strip().lower() if not pd.isna(row['Unit']) else None
 
             if quantity is not None and unit is None:
                 issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "
@@ -378,10 +378,10 @@ class Nutrition:
             if pd.isna(name):
                 continue
 
-            name = name.lower()
+            name = name.strip().lower()
 
             quantity = row['Quantity'] if not pd.isna(row['Quantity']) else None
-            unit = row['Unit'].lower() if not pd.isna(row['Unit']) else None
+            unit = row['Unit'].strip().lower() if not pd.isna(row['Unit']) else None
 
             nutrition_info = self.calculate_nutrition_info(name, quantity, unit)
 

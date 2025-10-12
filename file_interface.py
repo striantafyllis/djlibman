@@ -34,11 +34,14 @@ def from_boolean(value):
 def to_list(value):
     if _is_empty(value):
         return value
-    return [el.strip() for el in value.split(',')]
+    if isinstance(value, str):
+        return [el.strip() for el in value.split(',')]
+    else:
+        return [str(value)]
 
 def from_list(value):
     if isinstance(value, list):
-        return ', '.join(value)
+        return ', '.join([str(el) for el in value])
 
 class FileDoc:
     def __init__(self,

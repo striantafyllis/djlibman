@@ -262,13 +262,16 @@ class GoogleSheet(FileDoc):
 
         values = df.values.tolist()
 
-        values = [
-            [
-                '' if val is None or pd.isna(val) else val
-                for val in row
-            ]
-            for row in values
-        ]
+        for i in range(len(values)):
+            for j in range(len(values[i])):
+                val = values[i][j]
+                if val is None:
+                    values[i][j] = ''
+                elif isinstance(val, list):
+                    if len(val) == 0:
+                        values[i][j] = ''
+                elif pd.isna(val):
+                    values[i][j] = ''
 
         values = [df.columns.tolist()] + values
 

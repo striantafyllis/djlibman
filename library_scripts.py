@@ -514,6 +514,26 @@ def check_minisets():
 
     return
 
+def calculate_minisets_column():
+    djlib = Doc('djlib')
+
+    djlib.get_df()['Minisets'] = [ [] for _ in range(len(djlib))]
+
+    rb_playlist_names = djlib_config.rekordbox.get_playlist_names()
+
+    rb_miniset_names = rb_playlist_names['Minisets']
+
+    for i, rb_miniset_name in enumerate(rb_miniset_names):
+        rb_miniset = RekordboxPlaylist(['Minisets', rb_miniset_name])
+
+        rb_miniset_tracks = rb_miniset.get_df()
+
+        for rekordbox_id in rb_miniset_tracks.index:
+            djlib.get_df().loc[rekordbox_id, 'Minisets'].append(i+1)
+
+    djlib.write(force=True)
+    return
+
 
 def library_maintenance_sanity_checks():
     if not rekordbox_sanity_checks():
@@ -544,6 +564,8 @@ def library_maintenance_after_classification():
 
     check_minisets()
 
+    calculate_minisets_column()
+
     djlib_spotify_likes_maintenance()
 
     playlists_maintenance()
@@ -570,6 +592,35 @@ def library_maintenance_all():
     filter_sets()
 
     return
+
+def playlist_miniset_report(rb_playlist_name):
+    rb_playlist = RekordboxPlaylist(rb_playlist_name).get_df()
+    djlib = Doc('djlib').get_df()
+
+    tracks_by_miniset = {}
+
+    for track_id in rb_playlist.index:
+        minisets = djlib.loc[track_id, 'Minisets']
+        if minisets is None or len(minisets) == 0:
+            minisets = [-1]
+        else:
+            minisets = [int(el) for el in minisets]
+
+        for miniset in minisets:
+            if miniset not in tracks_by_miniset:
+                tracks_by_miniset[miniset] = []
+            tracks_by_miniset[miniset].append(track_id)
+
+    minisets = list(tracks_by_miniset.keys())
+    minisets.sort()
+
+    print(f'Analyzing Rekordbox playlist {rb_playlist_name} by miniset...')
+
+    for miniset in minisets:
+        miniset_tracks = tracks_by_miniset[miniset]
+
+        print(f'{'No miniset' if miniset == -1 else f'Miniset {miniset}'}: {len(miniset_tracks)} tracks:')
+        pretty_print_tracks(djlib.loc[miniset_tracks], indent=' '*4, enum=True, ids=False)
 
 
 def pretty_print_rekordbox_playlist(playlist_name):

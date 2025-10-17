@@ -157,7 +157,7 @@ class GoogleSheet(FileDoc):
                  path,
                  sheet,
                  id=None,
-                 convert_datetime=True,
+                 #convert_datetime=True,
                  **kwargs
                  ):
         super(GoogleSheet, self).__init__(path, **kwargs)
@@ -166,8 +166,8 @@ class GoogleSheet(FileDoc):
         self._id = id
 
         self._read_value_converters = [ np.int64, np.float64 ]
-        if convert_datetime:
-            self._read_value_converters.append(lambda s: pd.to_datetime(s, utc=True))
+        # if convert_datetime:
+        #     self._read_value_converters.append(lambda s: pd.to_datetime(s, utc=True))
 
         return
 

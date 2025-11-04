@@ -170,7 +170,7 @@ def djlib_values_sanity_check():
 
     bad_class_tracks = djlib.get_filtered(
         lambda track: not pd.isna(track.Class) and
-                      not re.match(r'[?O]?[ABCDXN][1-5]?', track.Class))
+                      not re.match(r'[?O]?[ABCDX][1-5]?', track.Class))
 
     if len(bad_class_tracks) > 0:
         errors += 1
@@ -449,9 +449,9 @@ def check_minisets():
 
     rb_miniset_not_Aplus_tracks = None
 
-    Aplus_tracks = classification.filter_tracks(djlib, classes=['A+'])
+    A_tracks = classification.filter_tracks(djlib, classes=['A'])
 
-    Aplus_tracks_not_in_minisets_idx = Aplus_tracks.index
+    A_tracks_not_in_minisets_idx = A_tracks.index
 
     for rb_miniset_name in rb_miniset_names:
         if rb_miniset_name.endswith(' --'):
@@ -462,7 +462,7 @@ def check_minisets():
 
         rb_miniset_tracks = rb_miniset.get_df()
 
-        Aplus_tracks_not_in_minisets_idx = Aplus_tracks_not_in_minisets_idx.difference(
+        A_tracks_not_in_minisets_idx = A_tracks_not_in_minisets_idx.difference(
             rb_miniset_tracks.index,
             sort=False
         )
@@ -485,32 +485,32 @@ def check_minisets():
             if choice != 'yes':
                 return
 
-        not_Aplus_tracks = classification.filter_tracks(rb_miniset_tracks, not_classes=['A+'])
+        not_A_tracks = classification.filter_tracks(rb_miniset_tracks, not_classes=['A'])
 
-        if len(not_Aplus_tracks) > 0:
+        if len(not_A_tracks) > 0:
             if rb_miniset_not_Aplus_tracks is None:
-                rb_miniset_not_Aplus_tracks = Wrapper(not_Aplus_tracks, name='Miniset B tracks')
+                rb_miniset_not_Aplus_tracks = Wrapper(not_A_tracks, name='Miniset B tracks')
             else:
-                rb_miniset_not_Aplus_tracks.append(not_Aplus_tracks, prompt=False, silent=False)
+                rb_miniset_not_Aplus_tracks.append(not_A_tracks, prompt=False, silent=False)
 
     if rb_miniset_not_Aplus_tracks is not None and len(rb_miniset_not_Aplus_tracks) > 0:
-        print('The following tracks are in minisets but are not classified as A+.')
+        print('The following tracks are in minisets but are not classified as A.')
         pretty_print_tracks(rb_miniset_not_Aplus_tracks, indent=' '*4, enum=True, ids=True)
 
-        choice = get_user_choice('Promote to A+?')
+        choice = get_user_choice('Promote to A?')
 
         if choice == 'yes':
-            reclassify_tracks_as(rb_miniset_not_Aplus_tracks, 'A+', silent=True, prompt=False)
+            reclassify_tracks_as(rb_miniset_not_Aplus_tracks, 'A', silent=True, prompt=False)
 
-    if len(Aplus_tracks_not_in_minisets_idx) > 0:
-        Aplus_tracks_not_in_minisets = djlib.loc[Aplus_tracks_not_in_minisets_idx]
-        print('The following tracks are A+ but are not in minisets.')
-        pretty_print_tracks(Aplus_tracks_not_in_minisets, indent=' '*4,
+    if len(A_tracks_not_in_minisets_idx) > 0:
+        A_tracks_not_in_minisets = djlib.loc[A_tracks_not_in_minisets_idx]
+        print('The following tracks are A but are not in minisets.')
+        pretty_print_tracks(A_tracks_not_in_minisets, indent=' '*4,
                             enum=True, ids=True)
 
-        choice = get_user_choice('Demote to B?')
+        choice = get_user_choice('Reclassify as B?')
         if choice == 'yes':
-            reclassify_tracks_as(Aplus_tracks_not_in_minisets, 'B', silent=True, prompt=False)
+            reclassify_tracks_as(A_tracks_not_in_minisets, 'B', silent=True, prompt=False)
 
     return
 
@@ -566,7 +566,7 @@ def library_maintenance_after_classification():
 
     calculate_minisets_column()
 
-    djlib_spotify_likes_maintenance()
+    # djlib_spotify_likes_maintenance()
 
     playlists_maintenance()
 
@@ -585,7 +585,7 @@ def library_maintenance_all():
 
     check_minisets()
 
-    djlib_spotify_likes_maintenance()
+    # djlib_spotify_likes_maintenance()
 
     playlists_maintenance()
 

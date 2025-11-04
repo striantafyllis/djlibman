@@ -119,7 +119,6 @@ class Nutrition:
             id=google_sheet_id,
             backups=0,
             header=0,
-            convert_datetime=False
         )
 
         contents = doc.read()

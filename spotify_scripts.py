@@ -92,12 +92,12 @@ def promote_tracks_in_spotify_queue(
         last_track,
         promote_source_name,
         promote_target_name,
-        method,
-        ref_playlist
+        method='liked',
+        ref_playlist=None,
+        remove_from_source=True,
+        remove_from_disk_queue=False,
+        add_to_listening_history=False
 ):
-
-    promote_queue_level = djlib_config.get_spotify_queue_level(promote_source_name)
-
     promote_source = SpotifyPlaylist(promote_source_name)
     promote_target = SpotifyPlaylist(promote_target_name)
 
@@ -147,19 +147,21 @@ def promote_tracks_in_spotify_queue(
         liked.remove(listened_chosen_tracks, prompt=False)
         liked.write()
 
-    promote_source.remove(listened_tracks, prompt=False)
-    promote_source.write()
+    if remove_from_source:
+        promote_source.remove(listened_tracks, prompt=False)
+        promote_source.write()
 
-    if promote_queue_level == 1:
+    if remove_from_disk_queue:
         print(f'Removing listened tracks from disk queue...')
         queue = Queue()
         queue.remove(listened_tracks, prompt=False)
         queue.write()
 
-    print(f'Adding listened tracks to listening history...')
-    listening_history = ListeningHistory()
-    listening_history.append(listened_tracks, prompt=False)
-    listening_history.write()
+    if add_to_listening_history:
+        print(f'Adding listened tracks to listening history...')
+        listening_history = ListeningHistory()
+        listening_history.append(listened_tracks, prompt=False)
+        listening_history.write()
 
     return
 
@@ -301,7 +303,10 @@ def queue_maintenance(
             promote_source,
             promote_target,
             method=method,
-            ref_playlist=ref_playlist
+            ref_playlist=ref_playlist,
+            remove_from_source=True,
+            add_to_listening_history=True,
+            remove_from_disk_queue=(promote_source_level == 1)
         )
 
     # shazam = SpotifyPlaylist('My Shazam Tracks', create=True)

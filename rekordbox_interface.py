@@ -181,7 +181,6 @@ class RekordboxInterface:
             # empty folder playlist case
             return
 
-        insert_index = None
         for i in range(len(containing_folder)):
             child = containing_folder[i]
 

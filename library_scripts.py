@@ -439,35 +439,35 @@ def filter_sets():
 
     return
 
-def check_minisets():
-    print('Checking Minisets...')
+def check_protosets():
+    print('Checking protosets...')
     djlib = Doc('djlib').get_df()
 
     rb_playlist_names = djlib_config.rekordbox.get_playlist_names()
 
-    rb_miniset_names = rb_playlist_names['Minisets']
+    rb_protoset_names = rb_playlist_names['Protosets']
 
-    rb_miniset_not_Aplus_tracks = None
+    rb_protoset_not_Aplus_tracks = None
 
     A_tracks = classification.filter_tracks(djlib, classes=['A'])
 
-    A_tracks_not_in_minisets_idx = A_tracks.index
+    A_tracks_not_in_protosets_idx = A_tracks.index
 
-    for rb_miniset_name in rb_miniset_names:
-        if rb_miniset_name.endswith(' --'):
+    for rb_protoset_name in rb_protoset_names:
+        if rb_protoset_name.endswith(' --'):
             # in progress; ignore for now
             continue
 
-        rb_miniset = RekordboxPlaylist(['Minisets', rb_miniset_name])
+        rb_protoset = RekordboxPlaylist(['Protosets', rb_protoset_name])
 
-        rb_miniset_tracks = rb_miniset.get_df()
+        rb_protoset_tracks = rb_protoset.get_df()
 
-        A_tracks_not_in_minisets_idx = A_tracks_not_in_minisets_idx.difference(
-            rb_miniset_tracks.index,
+        A_tracks_not_in_protosets_idx = A_tracks_not_in_protosets_idx.difference(
+            rb_protoset_tracks.index,
             sort=False
         )
 
-        rb_miniset_tracks = rb_miniset_tracks.merge(
+        rb_protoset_tracks = rb_protoset_tracks.merge(
             right=djlib,
             how='inner',
             left_index=True,
@@ -475,61 +475,61 @@ def check_minisets():
             suffixes=('', '_y')
         )
 
-        not_AB_tracks = classification.filter_tracks(rb_miniset_tracks, not_classes=['A', 'B'])
+        not_AB_tracks = classification.filter_tracks(rb_protoset_tracks, not_classes=['A', 'B'])
 
         if len(not_AB_tracks) != 0:
-            print(f"WARNING: Miniset '{rb_miniset_name}' contains tracks from non-playable classes:")
+            print(f"WARNING: Protoset '{rb_protoset_name}' contains tracks from non-playable classes:")
             pretty_print_tracks(not_AB_tracks, indent=' '*4, enum=False, ids=True)
 
-            choice = get_user_choice('Continue with minisets?')
+            choice = get_user_choice('Continue with protosets?')
             if choice != 'yes':
                 return
 
-        not_A_tracks = classification.filter_tracks(rb_miniset_tracks, not_classes=['A'])
+        not_A_tracks = classification.filter_tracks(rb_protoset_tracks, not_classes=['A'])
 
         if len(not_A_tracks) > 0:
-            if rb_miniset_not_Aplus_tracks is None:
-                rb_miniset_not_Aplus_tracks = Wrapper(not_A_tracks, name='Miniset B tracks')
+            if rb_protoset_not_Aplus_tracks is None:
+                rb_protoset_not_Aplus_tracks = Wrapper(not_A_tracks, name='Protoset B tracks')
             else:
-                rb_miniset_not_Aplus_tracks.append(not_A_tracks, prompt=False, silent=False)
+                rb_protoset_not_Aplus_tracks.append(not_A_tracks, prompt=False, silent=False)
 
-    if rb_miniset_not_Aplus_tracks is not None and len(rb_miniset_not_Aplus_tracks) > 0:
-        print('The following tracks are in minisets but are not classified as A.')
-        pretty_print_tracks(rb_miniset_not_Aplus_tracks, indent=' '*4, enum=True, ids=True)
+    if rb_protoset_not_Aplus_tracks is not None and len(rb_protoset_not_Aplus_tracks) > 0:
+        print('The following tracks are in protosets but are not classified as A.')
+        pretty_print_tracks(rb_protoset_not_Aplus_tracks, indent=' '*4, enum=True, ids=True)
 
         choice = get_user_choice('Promote to A?')
 
         if choice == 'yes':
-            reclassify_tracks_as(rb_miniset_not_Aplus_tracks, 'A', silent=True, prompt=False)
+            reclassify_tracks_as(rb_protoset_not_Aplus_tracks, 'A', silent=True, prompt=False)
 
-    if len(A_tracks_not_in_minisets_idx) > 0:
-        A_tracks_not_in_minisets = djlib.loc[A_tracks_not_in_minisets_idx]
-        print('The following tracks are A but are not in minisets.')
-        pretty_print_tracks(A_tracks_not_in_minisets, indent=' '*4,
+    if len(A_tracks_not_in_protosets_idx) > 0:
+        A_tracks_not_in_protosets = djlib.loc[A_tracks_not_in_protosets_idx]
+        print('The following tracks are A but are not in protosets.')
+        pretty_print_tracks(A_tracks_not_in_protosets, indent=' '*4,
                             enum=True, ids=True)
 
         choice = get_user_choice('Reclassify as B?')
         if choice == 'yes':
-            reclassify_tracks_as(A_tracks_not_in_minisets, 'B', silent=True, prompt=False)
+            reclassify_tracks_as(A_tracks_not_in_protosets, 'B', silent=True, prompt=False)
 
     return
 
-def calculate_minisets_column():
+def calculate_protosets_column():
     djlib = Doc('djlib')
 
-    djlib.get_df()['Minisets'] = [ [] for _ in range(len(djlib))]
+    djlib.get_df()['Protosets'] = [ [] for _ in range(len(djlib))]
 
     rb_playlist_names = djlib_config.rekordbox.get_playlist_names()
 
-    rb_miniset_names = rb_playlist_names['Minisets']
+    rb_protoset_names = rb_playlist_names['Protosets']
 
-    for i, rb_miniset_name in enumerate(rb_miniset_names):
-        rb_miniset = RekordboxPlaylist(['Minisets', rb_miniset_name])
+    for i, rb_protoset_name in enumerate(rb_protoset_names):
+        rb_protoset = RekordboxPlaylist(['Protosets', rb_protoset_name])
 
-        rb_miniset_tracks = rb_miniset.get_df()
+        rb_protoset_tracks = rb_protoset.get_df()
 
-        for rekordbox_id in rb_miniset_tracks.index:
-            djlib.get_df().loc[rekordbox_id, 'Minisets'].append(i+1)
+        for rekordbox_id in rb_protoset_tracks.index:
+            djlib.get_df().loc[rekordbox_id, 'Protosets'].append(i+1)
 
     djlib.write(force=True)
     return
@@ -562,9 +562,9 @@ def library_maintenance_after_classification():
     if not library_maintenance_sanity_checks():
         return
 
-    check_minisets()
+    check_protosets()
 
-    calculate_minisets_column()
+    # calculate_protosets_column()
 
     # djlib_spotify_likes_maintenance()
 
@@ -583,7 +583,7 @@ def library_maintenance_all():
 
     rekordbox_to_spotify_maintenance()
 
-    check_minisets()
+    check_protosets()
 
     # djlib_spotify_likes_maintenance()
 
@@ -593,34 +593,34 @@ def library_maintenance_all():
 
     return
 
-def playlist_miniset_report(rb_playlist_name):
+def playlist_protoset_report(rb_playlist_name):
     rb_playlist = RekordboxPlaylist(rb_playlist_name).get_df()
     djlib = Doc('djlib').get_df()
 
-    tracks_by_miniset = {}
+    tracks_by_protoset = {}
 
     for track_id in rb_playlist.index:
-        minisets = djlib.loc[track_id, 'Minisets']
-        if minisets is None or len(minisets) == 0:
-            minisets = [-1]
+        protosets = djlib.loc[track_id, 'Protosets']
+        if protosets is None or len(protosets) == 0:
+            protosets = [-1]
         else:
-            minisets = [int(el) for el in minisets]
+            protosets = [int(el) for el in protosets]
 
-        for miniset in minisets:
-            if miniset not in tracks_by_miniset:
-                tracks_by_miniset[miniset] = []
-            tracks_by_miniset[miniset].append(track_id)
+        for protoset in protosets:
+            if protoset not in tracks_by_protoset:
+                tracks_by_protoset[protoset] = []
+            tracks_by_protoset[protoset].append(track_id)
 
-    minisets = list(tracks_by_miniset.keys())
-    minisets.sort()
+    protosets = list(tracks_by_protoset.keys())
+    protosets.sort()
 
-    print(f'Analyzing Rekordbox playlist {rb_playlist_name} by miniset...')
+    print(f'Analyzing Rekordbox playlist {rb_playlist_name} by protoset...')
 
-    for miniset in minisets:
-        miniset_tracks = tracks_by_miniset[miniset]
+    for protoset in protosets:
+        protoset_tracks = tracks_by_protoset[protoset]
 
-        print(f'{'No miniset' if miniset == -1 else f'Miniset {miniset}'}: {len(miniset_tracks)} tracks:')
-        pretty_print_tracks(djlib.loc[miniset_tracks], indent=' '*4, enum=True, ids=False)
+        print(f'{'No protoset' if protoset == -1 else f'Protoset {protoset}'}: {len(protoset_tracks)} tracks:')
+        pretty_print_tracks(djlib.loc[protoset_tracks], indent=' '*4, enum=True, ids=False)
 
 
 def pretty_print_rekordbox_playlist(playlist_name):

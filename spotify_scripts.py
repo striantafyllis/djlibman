@@ -92,7 +92,9 @@ def promote_tracks_in_spotify_queue(
         last_track,
         promote_source_name,
         promote_target_name,
+        *,
         method='liked',
+        unlike=True,
         ref_playlist=None,
         remove_from_source=True,
         remove_from_disk_queue=False,
@@ -142,10 +144,11 @@ def promote_tracks_in_spotify_queue(
         promote_target.append(listened_chosen_tracks, prompt=False)
         promote_target.write()
 
-        liked = SpotifyLiked()
+        if unlike:
+            liked = SpotifyLiked()
 
-        liked.remove(listened_chosen_tracks, prompt=False)
-        liked.write()
+            liked.remove(listened_chosen_tracks, prompt=False)
+            liked.write()
 
     if remove_from_source:
         promote_source.remove(listened_tracks, prompt=False)

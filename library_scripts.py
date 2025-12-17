@@ -170,7 +170,7 @@ def djlib_values_sanity_check():
 
     bad_class_tracks = djlib.get_filtered(
         lambda track: not pd.isna(track.Class) and
-                      not re.match(r'[?O]?[ABCDX][1-5]?', track.Class))
+                      not re.match(r'[?O]?[ABCDFX][1-5]?', track.Class))
 
     if len(bad_class_tracks) > 0:
         errors += 1

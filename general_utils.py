@@ -253,6 +253,7 @@ def format_track_for_search(track):
     # Remove some things that are usually in Rekordbox but not in Spotify
     string = re.sub(r'(feat\.|featuring)', '', string, flags=re.IGNORECASE)
     string = re.sub(r'original( mix|$)', '', string, flags=re.IGNORECASE)
+    string = re.sub(r'extended mix', '', string, flags=re.IGNORECASE)
 
     if not isinstance(track, str):
         if 'artist_names' in track:
@@ -440,6 +441,11 @@ def fuzzy_one_to_one_mapping(sequences1, sequences2, cutoff_ratio=0.6,
             })
 
     all_pairs.sort(key=lambda x: x['ratio'], reverse=True)
+
+    # debugging code
+    # for pair in all_pairs:
+    #     pair['sequence1'] = sequences1[pair['index1']]
+    #     pair['sequence2'] = sequences2[pair['index2']]
 
     result = []
 

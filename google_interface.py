@@ -148,7 +148,94 @@ class GoogleInterface:
 
         return [prop['properties']['title'] for prop in properties['sheets']]
 
+class Change:
+    '''A class that represents changes of ranges of values during write.
+       top_row and left_col are zero-based integers.
+       values has to be a rectangular nonempty list of lists'''
 
+    def __init__(self, top_row, left_col, values):
+        self._top_row = top_row
+        self._left_col = left_col
+        self._values = values
+
+        if not isinstance(values, list):
+            raise ValueError('values has to be a list')
+        if len(values) == 0:
+            raise ValueError('values has to be a nonempty list')
+
+        self._num_rows = len(values)
+
+        self._num_cols = None
+        for row in values:
+            if not isinstance(row, list):
+                raise ValueError('values has to be a list of lists')
+            if len(row) == 0:
+                raise ValueError('values has to be  list of nonempty lists')
+
+            if self._num_cols is None:
+                self._num_cols = len(row)
+            elif self._num_rows != len(row):
+                raise ValueError(f'values contains rows of unequal length: {self._num_cols} vs. {len(row)}')
+
+        return
+
+    def try_to_merge(self, other):
+        '''Merges two changes if possible. If the merge is successful, this returns
+        the merged change. Otherwise returns None.'''
+
+        # Two changes can be merged if they have the same columns
+        # and are adjacent row-wise, or v.v.
+
+        if self._top_row == other._top_row and self._num_rows == other._num_rows:
+            if self._left_col < other._left_col:
+                left = self
+                right = other
+            else:
+                left = other
+                right = self
+
+            if left._left_col + left._num_cols == right._left_col:
+                new_right_col = left._left_col
+                new_top_row = left._top_row
+                new_values = [
+                    left._values[row_num] + right._values[row_num]
+                    for row_num in range(left._num_rows)
+                ]
+
+                return Change(new_top_row, new_right_col, new_values)
+            else:
+                return None
+
+        if self._left_col == other._left_col and self._num_cols == other._num_cols:
+            if self._top_row < other._top_row:
+                upper = self
+                lower = other
+            else:
+                upper = other
+                lower = self
+
+            if upper._top_row + upper._num_rows == lower._top_row:
+                new_top_row = upper._top_row
+                new_right_col = upper._left_col
+                new_values = upper._values + lower._values
+
+                return Change(new_top_row, new_right_col, new_values)
+            else:
+                return None
+
+        return None
+
+    def get_range(self):
+        bottom_row = self._top_row + self._num_rows
+        right_col = self._left_col + self._num_cols
+
+        top_left_corner = _col_num_to_alpha(self._left_col) + f'{self._top_row+1}'
+        bottom_right_corner= _col_num_to_alpha(right_col) + f'{bottom_row+1}'
+
+        return f'{top_left_corner}:{bottom_right_corner}'
+
+    def get_values(self):
+        return self._values
 
 
 class GoogleSheet(FileDoc):
@@ -157,7 +244,6 @@ class GoogleSheet(FileDoc):
                  path,
                  sheet,
                  id=None,
-                 #convert_datetime=True,
                  **kwargs
                  ):
         super(GoogleSheet, self).__init__(path, **kwargs)
@@ -217,7 +303,7 @@ class GoogleSheet(FileDoc):
     def delete_backups(self):
         return
 
-    def _raw_read(self):
+    def _read_as_list(self):
         self._init_id()
 
         result = self._interface.sheets_connection().spreadsheets()\
@@ -250,6 +336,12 @@ class GoogleSheet(FileDoc):
             for row in values
         ]
 
+        return columns, conv_values
+
+
+    def _raw_read(self):
+        columns, conv_values = self._read_as_list()
+
         df = pd.DataFrame(data=conv_values, columns=columns)
 
         # this is necessary because int columns will show up as floats
@@ -257,34 +349,114 @@ class GoogleSheet(FileDoc):
 
         return df2
 
+    @classmethod
+    def _get_for_write(self, two_dim_array, row, col):
+        '''
+        Gets a value from a two-dimensional list of lists that is either values read or
+        values about to be written to a Google Sheet. All the following values:
+        - values out of boundaries
+        - None
+        - Pandas NA
+        - Empty lists
+        are converted to the empty string (''). This is just what we need for writing
+        to a Google Sheet.
+
+        Indices i and j are zero-based.
+        '''
+
+        if row >= len(two_dim_array):
+            return ''
+
+        rowvals = two_dim_array[row]
+
+        if col >= len(rowvals):
+            return ''
+
+        val = rowvals[col]
+
+        if val is None:
+            return ''
+        if isinstance(val, list):
+            if len(val) == 0:
+                return ''
+        elif pd.isna(val):
+            return ''
+
+        return val
+
+
     def _raw_write(self, df):
         self._init_id()
 
-        values = df.values.tolist()
+        new_values = [df.columns.tolist()] + df.values.tolist()
 
-        for i in range(len(values)):
-            for j in range(len(values[i])):
-                val = values[i][j]
-                if val is None:
-                    values[i][j] = ''
-                elif isinstance(val, list):
-                    if len(val) == 0:
-                        values[i][j] = ''
-                elif pd.isna(val):
-                    values[i][j] = ''
+        # see what's already there
+        old_cols, old_vals = self._read_as_list()
+        old_values = [old_cols] + old_vals
 
-        values = [df.columns.tolist()] + values
+        # see what's changed
 
-        self._interface.sheets_connection().spreadsheets().values().update(
-            spreadsheetId=self._id, range=self._sheet,
-            valueInputOption='USER_ENTERED',
-            includeValuesInResponse=False,
-            body={
-                'range': self._sheet,
-                'values': values,
-                'majorDimension': 'ROWS'
-            }
+        changes = []
+
+        for row in max(len(old_values), len(new_values)):
+            for col in max(len(old_values[row]), len(new_values[row])):
+                old_val = self._get_for_write(old_values, row, col)
+                new_val = self._get_for_write(new_values, row, col)
+
+                if old_val != new_val:
+                    changes.append(Change(row, col, [[new_val]]))
+
+        # try to merge changes. This algorithm tries to merge changes vertically
+        # as much as possible and then horizontally as much as possible.
+        # It is not guaranteed to come up with the minimum number of changes,
+        # but it should do well enough most of the time.
+
+        for direction in ['horizontal', 'vertical']:
+            if direction == 'horizontal':
+                changes.sort(lambda c: c._left_col)
+            else:
+                changes.sort(lambda c: c._top_row)
+
+            idx = 0
+            while idx < len(changes)-1:
+                merged_change = changes[idx].try_to_merge(changes[idx+1])
+                if merged_change is not None:
+                    changes = changes[:idx] + [merged_change] + changes[idx+2:]
+                else:
+                    idx += 1
+
+
+        data = []
+
+        for change in changes:
+            data.append({
+                'range': change.get_range(),
+                'majorDimension': 'ROWS',
+                'values': change.get_values()
+            })
+
+        body = {
+            'valueInputOption': 'USER_ENTERED',
+            'includeValuesInResponse': False,
+            'data': data
+        }
+
+        self._interface.sheets_connection().spreadsheets().values().batchUpdate(
+            spreadsheetId=self._id,
+            body = body
         ).execute()
+
+        # self._interface.sheets_connection().spreadsheets().values().update(
+        #     spreadsheetId=self._id, range=self._sheet,
+        #     valueInputOption='USER_ENTERED',
+        #     includeValuesInResponse=False,
+        #     body={
+        #         'range': self._sheet,
+        #         'values': new_values,
+        #         'majorDimension': 'ROWS'
+        #     }
+        # ).execute()
+
 
         return
 

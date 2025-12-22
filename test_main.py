@@ -495,7 +495,7 @@ def main():
 
     # discog_report_for_prog_a_producers()
 
-    populate_queue()
+    # populate_queue()
 
     # debug_discography()
 
@@ -511,6 +511,20 @@ def main():
     return
 
 
+def test_google_sheets_code():
+    djlib = Doc('djlib')
+
+    df = djlib.get_df()
+
+    df.iloc[-4:, 7] = True
+    df.iloc[-4:, 8] = False
+
+    djlib.write(force=True)
+
+    return
+
+
 if __name__ == '__main__':
-    main()
+    # main()
+    test_google_sheets_code()
     sys.exit(0)

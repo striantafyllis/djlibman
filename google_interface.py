@@ -174,10 +174,13 @@ class Change:
 
             if self._num_cols is None:
                 self._num_cols = len(row)
-            elif self._num_rows != len(row):
+            elif self._num_cols != len(row):
                 raise ValueError(f'values contains rows of unequal length: {self._num_cols} vs. {len(row)}')
 
         return
+
+    def __str__(self):
+        return f'({self._top_row}, {self._left_col}): {self._values}'
 
     def try_to_merge(self, other):
         '''Merges two changes if possible. If the merge is successful, this returns
@@ -226,8 +229,9 @@ class Change:
         return None
 
     def get_range(self):
-        bottom_row = self._top_row + self._num_rows
-        right_col = self._left_col + self._num_cols
+        # why -1: Python upper bounds are exclusive; Excel / Google Sheets upper bounds are inclusive.
+        bottom_row = self._top_row + self._num_rows - 1
+        right_col = self._left_col + self._num_cols - 1
 
         top_left_corner = _col_num_to_alpha(self._left_col) + f'{self._top_row+1}'
         bottom_right_corner= _col_num_to_alpha(right_col) + f'{bottom_row+1}'
@@ -398,8 +402,8 @@ class GoogleSheet(FileDoc):
 
         changes = []
 
-        for row in max(len(old_values), len(new_values)):
-            for col in max(len(old_values[row]), len(new_values[row])):
+        for row in range(max(len(old_values), len(new_values))):
+            for col in range(max(len(old_values[row]), len(new_values[row]))):
                 old_val = self._get_for_write(old_values, row, col)
                 new_val = self._get_for_write(new_values, row, col)
 
@@ -413,9 +417,9 @@ class GoogleSheet(FileDoc):
 
         for direction in ['horizontal', 'vertical']:
             if direction == 'horizontal':
-                changes.sort(lambda c: c._left_col)
+                changes.sort(key=lambda c: (c._left_col, c._top_row))
             else:
-                changes.sort(lambda c: c._top_row)
+                changes.sort(key=lambda c: (c._top_row, c._left_col))
 
             idx = 0
             while idx < len(changes)-1:

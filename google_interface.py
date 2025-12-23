@@ -403,7 +403,8 @@ class GoogleSheet(FileDoc):
         changes = []
 
         for row in range(max(len(old_values), len(new_values))):
-            for col in range(max(len(old_values[row]), len(new_values[row]))):
+            for col in range(max(len(old_values[row]) if row < len(old_values) else 0,
+                                 len(new_values[row]) if row < len(new_values) else 0)):
                 old_val = self._get_for_write(old_values, row, col)
                 new_val = self._get_for_write(new_values, row, col)
 

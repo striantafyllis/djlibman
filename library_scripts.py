@@ -184,24 +184,35 @@ def djlib_maintenance():
     djlib = Doc('djlib')
     main_library = RekordboxPlaylist('Main Library')
 
-    missing_from_djlib = main_library.get_difference(djlib)
-    # filter out local edits
-    missing_from_djlib = dataframe_filter(missing_from_djlib,
-                                          lambda track: not track['Title'].endswith(' - EDIT'))
-
     djlib_auto_columns = djlib.get_df().columns.intersection(
         main_library.get_df().columns, sort=False)
 
-    if len(missing_from_djlib) == 0:
+    assert djlib.get_df().index.name in djlib_auto_columns
+
+    rb_tracks_in_djlib = main_library.get_df().index.intersection(djlib.get_df().index, sort=False)
+
+    rb_tracks_missing_from_djlib = main_library.get_df().index.difference(djlib.get_df().index, sort=False)
+
+    # reconcile fields of existing tracks between Rekordbox and the Google sheet. Rekordbox is the source of truth.
+    djlib.get_df().loc[rb_tracks_in_djlib, djlib_auto_columns] = (
+        main_library.get_df().loc[rb_tracks_in_djlib, djlib_auto_columns])
+
+    if len(rb_tracks_missing_from_djlib) == 0:
         print('All Rekordbox Main Library tracks are in djlib')
     else:
-        assert djlib.get_df().index.name in djlib_auto_columns
+        missing_from_djlib = main_library.get_df().loc[rb_tracks_missing_from_djlib, djlib_auto_columns]
+
+        # filter out local edits
+        missing_from_djlib = dataframe_filter(missing_from_djlib,
+                                              lambda track: not track['Title'].endswith(' - EDIT'))
 
         print(f'{len(missing_from_djlib)} Rekordbox Main Library tracks are missing from djlib')
         pretty_print_tracks(missing_from_djlib, indent=' '*4, enum=True)
 
         djlib.append(missing_from_djlib[djlib_auto_columns])
-        djlib.write()
+
+    # force=True is needed because field reconciliation won't appear as a change to the Container
+    djlib.write(force=True)
 
     return
 
@@ -564,7 +575,7 @@ def library_maintenance_after_classification():
 
     check_protosets()
 
-    # calculate_protosets_column()
+    calculate_protosets_column()
 
     # djlib_spotify_likes_maintenance()
 

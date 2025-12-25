@@ -440,7 +440,7 @@ def filter_sets():
             suffixes=('', '_y')
         )
 
-        rb_set_filtered_tracks = classification.filter_tracks(rb_set_tracks, classes=['A'])
+        rb_set_filtered_tracks = classification.filter_tracks(rb_set_tracks, classes=['A', 'B'])
 
         rb_filtered_set.set_df(rb_set_filtered_tracks)
 

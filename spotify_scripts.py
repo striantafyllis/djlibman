@@ -166,7 +166,7 @@ def promote_tracks_in_spotify_queue(
         listening_history.append(listened_tracks, prompt=False)
         listening_history.write()
 
-    return
+    return listened_tracks
 
 def replenish_spotify_queue(
         queue_name='L1 queue',
@@ -674,6 +674,29 @@ def review_maintenance(
 
     return
 
+
+def listening_maintenance(
+        last_track,
+        *,
+        temp_playlist='number ones pt2',
+        main_playlist='number ones',
+        next_level_playlist='number ones L2'
+):
+    listened_tracks = promote_tracks_in_spotify_queue(
+        last_track,
+        promote_source_name=temp_playlist,
+        promote_target_name=next_level_playlist,
+        unlike=False,
+        remove_from_source=True,
+        remove_from_disk_queue=False,
+        add_to_listening_history=True
+    )
+
+    main_playlist_cont = SpotifyPlaylist(main_playlist)
+    main_playlist_cont.append(listened_tracks, prompt=False)
+    main_playlist_cont.write()
+
+    return
 
 
 

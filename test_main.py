@@ -526,5 +526,6 @@ def test_google_sheets_code():
 
 if __name__ == '__main__':
     # main()
-    test_google_sheets_code()
+    # test_google_sheets_code()
+    queue_maintenance_salsa(last_track='Llegamos')
     sys.exit(0)

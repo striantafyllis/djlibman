@@ -121,7 +121,6 @@ def classify_tracks(tracks):
         'Progressive': ['Progressive'],
         'Organic': ['Organic'],
         'Afro/Latin/Funky': ['Afro', 'Latin', 'Funky'],
-        'Organic/Afro/Latin/Funky': ['Organic', 'Afro', 'Latin', 'Funky'],
     }
 
     covered_flavors = set([

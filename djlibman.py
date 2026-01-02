@@ -12,6 +12,7 @@ import numpy as np
 
 from library_scripts import *
 from spotify_scripts import *
+from common_tasks import *
 
 logger = logging.getLogger(__name__)
 

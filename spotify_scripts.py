@@ -11,9 +11,9 @@ from containers import *
 from library_scripts import add_spotify_fields_to_rekordbox
 from spotify_util import *
 
-def sanity_check_disk_queues():
-    queue = Queue()
-    print(f'Queue: {len(queue)} tracks')
+def sanity_check_disk_queue(disk_queue_name):
+    queue = Queue(disk_queue_name)
+    print(f'Queue {disk_queue_name}: {len(queue)} tracks')
 
     listening_history = ListeningHistory()
     print(f'Listening history: {len(listening_history)} tracks')
@@ -169,14 +169,15 @@ def promote_tracks_in_spotify_queue(
     return listened_tracks
 
 def replenish_spotify_queue(
-        queue_name='L1 queue',
+        playlist_name='L1 queue',
+        queue_name='queue',
         target_size=100):
-    spotify_queue = SpotifyPlaylist(queue_name)
-    disk_queue = Queue()
+    spotify_queue = SpotifyPlaylist(playlist_name)
+    disk_queue = Queue(name=queue_name)
 
     tracks_wanted = target_size - len(spotify_queue)
     if tracks_wanted <= 0:
-        print(f'Spotify playlist {queue_name} already has {len(spotify_queue)} tracks; no replenishment needed.')
+        print(f'Spotify playlist {playlist_name} already has {len(spotify_queue)} tracks; no replenishment needed.')
         return
 
     candidate_tracks_idx = disk_queue.get_df().index.difference(spotify_queue.get_df().index)
@@ -187,7 +188,7 @@ def replenish_spotify_queue(
 
     num_tracks_to_add = min(tracks_wanted, len(candidate_tracks_idx))
 
-    choice = get_user_choice(f'Add {tracks_wanted} new tracks to {queue_name}?')
+    choice = get_user_choice(f'Add {tracks_wanted} new tracks to {playlist_name}?')
     if choice == 'yes':
         if num_tracks_to_add < len(candidate_tracks_idx):
             tracks_to_add_idx = random.sample(candidate_tracks_idx.to_list(), k=num_tracks_to_add)
@@ -195,7 +196,7 @@ def replenish_spotify_queue(
         else:
             tracks_to_add = disk_queue.get_df().loc[candidate_tracks_idx]
 
-        print(f'Adding {num_tracks_to_add} tracks to {queue_name}')
+        print(f'Adding {num_tracks_to_add} tracks to {playlist_name}')
         pretty_print_tracks(tracks_to_add, indent=' '*4, enum=True)
 
         spotify_queue.append(tracks_to_add, prompt=False)
@@ -256,43 +257,77 @@ def sanity_check_spotify_queue(spotify_queue_name, *, is_level_1=False, is_promo
 
 def queue_maintenance(
         last_track=None,
+        *,
+        disk_queue=None,
+        spotify_queues=[],
         promote_source=None,
         promote_target=None,
         method='Liked',
         ref_playlist=None
 ):
+    # sanity check the spotify_queues argument
+    if spotify_queues is not None:
+        if spotify_queues is not None and not isinstance(spotify_queues, list):
+            raise ValueError('spotify_queues must be a list')
+        for i in range(len(spotify_queues)):
+            queue = spotify_queues[i]
+
+            if isinstance(queue, list):
+                if len(queue) == 0:
+                    raise ValueError(f'Spotify queue at level {i+1} is an empty list')
+                else:
+                    for queue2 in queue:
+                        if not isinstance(queue2, str):
+                            raise ValueError(f'Spotify queue at level {i+1} contains non-string element {queue2}')
+            elif isinstance(queue, str):
+                spotify_queues[i] = [queue]
+            else:
+                raise ValueError(f'Spotify queue at level {i+1} must be a string or a list')
+
     if last_track is None:
         if promote_source is not None or promote_target is not None:
             raise ValueError('promote_source or promote_target is specified without last_track')
     else:
-        if promote_source is not None and promote_target is not None:
-            promote_source_level = djlib_config.get_spotify_queue_level(promote_source)
-            promote_target_level = djlib_config.get_spotify_queue_level(promote_target)
-
-            if promote_source_level is not None and promote_target_level is not None:
-                if promote_target_level != promote_source_level + 1:
-                    raise ValueError(f"Promote queue '{promote_source}' is at level {promote_source_level} "
-                                     f"but promote target '{promote_target}' is at level {promote_target_level}")
-
+        if promote_source is None:
+            if spotify_queues is None or len(spotify_queues) == 0:
+                raise ValueError('promote_source is None and no spotify_queues were specified')
+            promote_source = spotify_queues[0][0]
+            promote_source_level = 1
         else:
-            if promote_source is None:
-                promote_source = djlib_config.get_default_spotify_queue_at_level(1)
-            if promote_target is None:
-                promote_source_level = djlib_config.get_spotify_queue_level(promote_source)
-                if promote_source_level is None:
-                    choice = get_user_choice(f"Unknown source queue {promote_source}; assume it's level 1?")
-                    if choice == 'yes':
-                        promote_source_level = 1
-                    else:
-                        print(f"Cannot determine the level of promote source {promote_source}; quitting.")
-                        return
+            promote_source_level = None
 
-                promote_target = djlib_config.get_default_spotify_queue_at_level(promote_source_level+1)
+            for i, queue in enumerate(spotify_queues):
+                if promote_source == queue:
+                    promote_source_level = i+1
+                    break
+
+        if promote_target is None:
+            if promote_source_level is None:
+                raise ValueError('promote_target is None but promote_source level cannot be determined')
+
+            if spotify_queues is None or len(spotify_queues) < promote_source_level:
+                raise ValueError(f'promote_target is None and there are no spotify_queues at level {promote_source_level+1}')
+
+            promote_target = spotify_queues[promote_source_level][0]
+            promote_target_level = promote_source_level+1
+        else:
+            promote_target_level = None
+
+            for i, queue in enumerate(spotify_queues):
+                if promote_target in queue:
+                    promote_target_level = i + 1
+                    break
+
+        if promote_source_level is not None and promote_target_level is not None:
+            if promote_target_level != promote_source_level + 1:
+                raise ValueError(f"Promote queue '{promote_source}' is at level {promote_source_level} "
+                                 f"but promote target '{promote_target}' is at level {promote_target_level}")
 
     # Sanity check! Queue and listening history must be disjoint
-    sanity_check_disk_queues()
+    if disk_queue is not None:
+        sanity_check_disk_queue(disk_queue)
 
-    for i, level in enumerate(djlib_config.spotify_queues):
+    for i, level in enumerate(spotify_queues):
         for spotify_queue in level:
             sanity_check_spotify_queue(spotify_queue,
                                        is_level_1=(i==0),
@@ -311,33 +346,6 @@ def queue_maintenance(
             add_to_listening_history=True,
             remove_from_disk_queue=(promote_source_level == 1)
         )
-
-    # shazam = SpotifyPlaylist('My Shazam Tracks', create=True)
-    # shazam_staging = SpotifyPlaylist('Shazam Staging', create=True)
-    #
-    # if len(shazam_staging) > 0:
-    #     choice = get_user_choice(f'Move {len(shazam_staging)} tracks from Shazam Staging to L2 queue?')
-    #     if choice == 'yes':
-    #         l2_queue_name = djlib_config.get_default_spotify_queue_at_level(2)
-    #         l2_queue = SpotifyPlaylist(l2_queue_name)
-    #         l2_queue.append(shazam_staging, prompt=False)
-    #         shazam_staging.truncate(prompt=False)
-    #
-    #         l2_queue.write()
-    #         shazam_staging.write()
-    #
-    #         sanity_check_spotify_queue(l2_queue_name, is_level_1=False)
-    #
-    # if len(shazam) > 0:
-    #     choice = get_user_choice(f'Move {len(shazam)} tracks from My Shazam Tracks to Shazam Staging?')
-    #     if choice == 'yes':
-    #         shazam_staging.append(shazam, prompt=False)
-    #         shazam.truncate(prompt=False)
-    #
-    #         shazam_staging.write()
-    #         shazam.write()
-    #
-    #         sanity_check_spotify_queue('Shazam Staging', is_level_1=True)
 
     return
 
@@ -673,31 +681,6 @@ def review_maintenance(
         playlist_tracks.write()
 
     return
-
-
-def listening_maintenance(
-        last_track,
-        *,
-        temp_playlist='number ones pt2',
-        main_playlist='number ones',
-        next_level_playlist='number ones L2'
-):
-    listened_tracks = promote_tracks_in_spotify_queue(
-        last_track,
-        promote_source_name=temp_playlist,
-        promote_target_name=next_level_playlist,
-        unlike=False,
-        remove_from_source=True,
-        remove_from_disk_queue=False,
-        add_to_listening_history=True
-    )
-
-    main_playlist_cont = SpotifyPlaylist(main_playlist)
-    main_playlist_cont.append(listened_tracks, prompt=False)
-    main_playlist_cont.write()
-
-    return
-
 
 
 

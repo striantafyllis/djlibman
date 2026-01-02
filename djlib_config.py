@@ -22,7 +22,6 @@ spotify = None
 soundcloud = None
 docs = {}
 _backups = 0
-spotify_queues = []
 discography_cache_dir = None
 artist_albums_ttl_days = 30
 
@@ -39,7 +38,6 @@ def init(config_file=None):
     global google
     global soundcloud
     global spotify
-    global spotify_queues
     global discography_cache_dir
     global artist_albums_ttl_days
     global discography_verbose
@@ -107,33 +105,6 @@ def init(config_file=None):
 
         elif section.name == 'spotify':
             spotify = spotify_interface.SpotifyInterface(section)
-
-        elif section.name == 'spotify_queues':
-            for field in section.keys():
-                m = re.match(r'level([1-9][0-9]*)', field)
-                if m is None:
-                    raise ValueError(f"Config section [spotify_queues]: bad field name '{field}'")
-
-                level = int(m.group(1))
-
-                if len(spotify_queues) + 1 != level:
-                    raise ValueError(f"Config section [spotify_queues]: level "
-                                     f"{level} encountered after level {len(spotify_queues)}")
-
-                value = section.get(field)
-
-                if value.startswith('[') or value.startswith("'"):
-                    value = ast.literal_eval(value)
-
-                if not isinstance(value, list):
-                    value = [value]
-
-                for v in value:
-                    if not isinstance(v, str):
-                        raise ValueError(f"Config section [spotify_queues]: invalid value type "
-                                         f"{type(v)}")
-
-                spotify_queues.append(value)
 
         elif section_name == 'spotify_discography':
             for field in section.keys():
@@ -237,25 +208,3 @@ def delete_backups():
         if isinstance(doc, file_interface.FileDoc):
             doc.delete_backups()
     return
-
-def all_spotify_queues():
-    all_queues = []
-    for level in spotify_queues:
-        all_queues += level
-
-    return all_queues
-
-def get_spotify_queue_level(queue_name):
-    for i, level in enumerate(spotify_queues):
-        if queue_name in level:
-            return i+1
-
-    return None
-
-def get_default_spotify_queue_at_level(level):
-    if level <= 0:
-        raise ValueError(f'Invalid Spotify queue level {level}')
-    if level > len(spotify_queues):
-        raise ValueError(f"Spotify queue level {level} does not exist")
-
-    return spotify_queues[level-1][0]

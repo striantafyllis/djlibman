@@ -163,14 +163,16 @@ class Queue(Doc):
             modify=True,
             create=True,
             overwrite=True,
-            index_name='spotify_id',
             **kwargs):
         super(Queue, self).__init__(
             name=name,
+            type='csv',
             modify=modify,
             create=create,
             overwrite=overwrite,
-            index_name=index_name,
+            index_name='spotify_id',
+            header=0,
+            datetime_columns=['release_date', 'added_at'],
             **kwargs
         )
 

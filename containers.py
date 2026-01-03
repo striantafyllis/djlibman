@@ -247,18 +247,36 @@ class Container(object):
 
         return other_df
 
-    def deduplicate(self, prompt=None) -> None:
+    def deduplicate(self, function=None, prompt=None) -> None:
         self._ensure_df()
 
         this_df = self._df
 
-        dup_bool_array = this_df.index.duplicated()
+        if function is None:
+            index = this_df.index
+        else:
+            index = pd.Index(
+                self._df.apply(
+                    function,
+                    axis=1
+                )
+            )
+
+        dup_bool_array = index.duplicated()
         num_dups = dup_bool_array.sum()
 
         if num_dups > 0:
-            print(f'{self.get_name()}: removing {num_dups} duplicate entries')
+            print(f'{self.get_name()}: removing {num_dups} duplicate entries' +
+                  (f' by function {function.__name__}' if function is not None else ''))
             if self._should_prompt(prompt):
-                choice = get_user_choice('Remove?')
+                choice = get_user_choice('Remove?', options=['yes', 'no', 'show'])
+                if choice == 'show':
+                    ## TODO pretty_print_tracks should be a configurable parameter
+                    pretty_print_tracks(this_df.loc[dup_bool_array], enum=True)
+                    print()
+
+                    choice = get_user_choice('Remove?')
+
                 if choice != 'yes':
                     return
 

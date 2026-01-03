@@ -23,6 +23,7 @@ def sanity_check_disk_queue(disk_queue_name):
 
     # entries in the queue should be unique
     queue.deduplicate()
+    queue.deduplicate(function=get_track_signature)
 
     # entries in listening history should be unique
     listening_history.deduplicate()

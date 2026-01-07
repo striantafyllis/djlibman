@@ -94,11 +94,11 @@ def promote_tracks_in_spotify_queue(
         promote_source_name,
         promote_target_name,
         *,
+        disk_queue=None,
         method='liked',
         unlike=True,
         ref_playlist=None,
         remove_from_source=True,
-        remove_from_disk_queue=False,
         add_to_listening_history=False
 ):
     promote_source = SpotifyPlaylist(promote_source_name)
@@ -155,9 +155,9 @@ def promote_tracks_in_spotify_queue(
         promote_source.remove(listened_tracks, prompt=False)
         promote_source.write()
 
-    if remove_from_disk_queue:
-        print(f'Removing listened tracks from disk queue...')
-        queue = Queue()
+    if disk_queue is not None:
+        print(f'Removing listened tracks from disk queue {disk_queue}...')
+        queue = Queue(disk_queue)
         queue.remove(listened_tracks, prompt=False)
         queue.write()
 
@@ -341,11 +341,11 @@ def queue_maintenance(
             last_track,
             promote_source,
             promote_target,
+            disk_queue=disk_queue if promote_source_level==1 else None,
             method=method,
             ref_playlist=ref_playlist,
             remove_from_source=True,
-            add_to_listening_history=True,
-            remove_from_disk_queue=(promote_source_level == 1)
+            add_to_listening_history=True
         )
 
     return

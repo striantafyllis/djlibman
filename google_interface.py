@@ -46,6 +46,7 @@ class GoogleInterface:
         # the connection will be initialized when it's first used
         self._drive_connection = None
         self._sheets_connection = None
+        self._docs_connection = None
         return
 
     def _init_connection(self):
@@ -75,6 +76,7 @@ class GoogleInterface:
 
         self._drive_connection = build('drive', 'v3', credentials=creds)
         self._sheets_connection = build('sheets', 'v4', credentials=creds)
+        self._docs_connection = build('docs', 'v1', credentials=creds)
         return
 
     def drive_connection(self):
@@ -84,6 +86,10 @@ class GoogleInterface:
     def sheets_connection(self):
         self._init_connection()
         return self._sheets_connection
+
+    def docs_connection(self):
+        self._init_connection()
+        return self._docs_connection
 
     def get_files(self, type=None, name=None):
         conn = self.drive_connection()
@@ -130,6 +136,17 @@ class GoogleInterface:
         else:
             raise ValueError(f"More than one Google docs match name '{name}'" +
                              f' and type {type}' if type is not None else '')
+
+
+    def get_doc(self, name):
+        doc_id = self.get_file_id(type='doc', name=name)
+
+        if doc_id is None:
+            return None
+
+        document = self.docs_connection().documents().get(documentId=doc_id).execute()
+
+        return document
 
     def get_sheets_in_file(self, name=None, id=None):
         if id is None:

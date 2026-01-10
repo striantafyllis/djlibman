@@ -7,8 +7,8 @@ import pandas as pd
 import numpy as np
 import requests
 
-import cache
-from general_utils import *
+from spyroslib import cache
+from local_util import *
 
 logger = logging.getLogger(__name__)
 

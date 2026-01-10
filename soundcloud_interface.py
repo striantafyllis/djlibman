@@ -12,8 +12,8 @@ import json
 import pandas as pd
 import numpy as np
 
-from general_utils import *
-import cache
+from local_util import *
+from spyroslib import cache
 
 logger = logging.getLogger(__name__)
 

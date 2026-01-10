@@ -11,8 +11,9 @@ import pandas as pd
 import rekordbox_interface
 import spotify_interface
 import soundcloud_interface
-import google_interface
-import file_interface
+
+from spyroslib import google_interface
+from spyroslib import containers as ct
 
 default_dir = None
 
@@ -145,66 +146,27 @@ def init(config_file=None):
 
 def _add_doc(name, type, **kwargs):
     global google
+    global default_dir
     global docs
     global _backups
 
-    if name in docs:
-        raise Exception("Duplicate doc name: '%s'" % name)
+    if 'backups' not in kwargs:
+        kwargs['backups'] = _backups
 
-    doc = create_doc(name, type, **kwargs)
-
-    docs[name] = doc
-    if name not in globals():
-        globals()[name] = doc
+    ct.Doc(
+        name=name,
+        type=type,
+        google_intf=google,
+        default_dir=default_dir,
+        is_global_doc=True,
+        **kwargs)
 
     return
-
-def create_doc(name, type='csv', **kwargs):
-    if type == 'google_sheet':
-        if google is None:
-            raise Exception("Cannot add Google sheet '%s'; no Google connection specified" % name)
-
-        doc = google_interface.GoogleSheet(google, **kwargs)
-    else:
-        if default_dir is None:
-            raise Exception(f'Doc {name}: no default dir and no path specified')
-
-        if 'path' not in kwargs:
-            if type == 'csv':
-                extension = '.csv'
-            elif type == 'excel':
-                extension = '.xlsx'
-            else:
-                raise Exception("Unsupported doc type: '%s'" % type)
-
-            path = os.path.join(default_dir, name)
-            if not name.endswith(extension):
-                path += extension
-
-        else:
-            path = kwargs['path']
-            del kwargs['path']
-
-        if 'backups' not in kwargs:
-            kwargs['backups'] = _backups
-
-        if type == 'excel':
-            doc = file_interface.ExcelSheet(path, **kwargs)
-        elif type == 'csv':
-            doc = file_interface.CsvFile(path, **kwargs)
-        elif type == 'google_sheet':
-            doc = google_interface.GoogleSheet(google, path, **kwargs)
-        else:
-            raise Exception("Unsupported doc type: '%s'" % type)
-
-    return doc
-
 
 
 def delete_backups():
     global docs
 
-    for doc in docs.values():
-        if isinstance(doc, file_interface.FileDoc):
-            doc.delete_backups()
+    for doc in ct.get_global_docs():
+        doc.delete_backups()
     return

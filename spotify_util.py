@@ -1,5 +1,8 @@
+from typing import Union
 
 import djlib_config
+
+from local_util import *
 from containers import *
 
 def format_track_for_search(track):
@@ -56,30 +59,6 @@ def format_track_for_search(track):
 
     return string
 
-
-def pretty_print_tracks(tracks, indent='', enum=False, ids=True, extra_attribs=[]):
-    num_tracks = len(tracks)
-    if num_tracks == 0:
-        return
-
-    if hasattr(tracks, 'get_df'):
-        tracks = tracks.get_df()
-
-    if isinstance(tracks, pd.DataFrame):
-        if tracks.empty:
-            return
-        tracks = tracks.iloc
-
-    for i in range(num_tracks):
-        sys.stdout.write(indent)
-        if enum:
-            sys.stdout.write(f'{i+1}. ')
-
-        sys.stdout.write(format_track(tracks[i], id=ids, extra_attribs=extra_attribs) + '\n')
-
-    sys.stdout.flush()
-
-    return
 
 def artist_name_condition(name_condition, mode='or'):
     if mode not in ['and', 'or']:
@@ -271,148 +250,6 @@ def add_artist_track_counts(artists: pd.DataFrame, tracks: pd.DataFrame, track_c
     #     print(f'{len(not_found_artists)} artists not found in artist dataframe')
 
     return
-
-
-class Queue(Doc):
-    """A special doc for the Spotify queue; it sets added_at to now() when adding tracks."""
-    def __init__(
-            self,
-            name: str = 'queue', *,
-            modify=True,
-            create=True,
-            overwrite=True,
-            **kwargs):
-        super(Queue, self).__init__(
-            name=name,
-            type='csv',
-            modify=modify,
-            create=create,
-            overwrite=overwrite,
-            index_name='spotify_id',
-            header=0,
-            datetime_columns=['release_date', 'added_at'],
-            **kwargs
-        )
-
-    def _preprocess_before_append(self, df: pd.DataFrame):
-        df = df.assign(added_at=pd.Timestamp.utcnow())
-        return df
-
-
-class ListeningHistory(Doc):
-    """A special doc for the listening history. It supports filtering by signature along with ID,
-       plus it prohibits some operations that don't make sense."""
-
-    def __init__(
-            self,
-            name: str = 'listening_history'):
-        super(ListeningHistory, self).__init__(
-            name=name,
-            modify=True,
-            create=False,
-            overwrite=False,
-            index_name='spotify_id'
-        )
-
-        self._track_signatures = None
-
-    def _rvalue_check(self, operation):
-        raise ValueError(
-            'ListeningHistory should not be added to or removed from other containers')
-
-    def _preprocess_before_append(self, df: pd.DataFrame):
-        df = df.assign(added_at=pd.Timestamp.utcnow())
-        return df
-
-    def append(self, other, prompt=None):
-        super(ListeningHistory, self).append(other, prompt)
-
-        self._track_signatures = None
-        return
-
-    def remove(self, other, prompt=None, force=False):
-        if not force:
-            raise ValueError('Why remove from listening history?')
-        super(ListeningHistory, self).remove(other, prompt)
-
-    def _ensure_track_signatures(self):
-        self._ensure_df()
-
-        self._track_signatures = pd.Index(
-            self._df.apply(
-                get_track_signature,
-                axis=1
-            )
-        )
-
-        return
-
-    def filter(self, other: Container, prompt=None, silent=False):
-        self._ensure_track_signatures()
-
-        if not isinstance(other, Container):
-            raise ValueError("'other' argument must be a container")
-
-        other_df = other.get_df()
-
-        if len(other_df) == 0:
-            return
-
-        if other_df.index.name != 'spotify_id':
-            raise ValueError('Only Spotify tracks indexed by spotify_id can be filtered '
-                             'through listening history')
-
-        other_not_listened_index = other_df.index.difference(self._df.index, sort=False)
-        filtered_through_spotify_id = len(other_df.index) - len(other_not_listened_index)
-
-        if filtered_through_spotify_id != 0:
-            other_df = other_df.loc[other_not_listened_index]
-
-        # for some reason Pandas.apply doesn't work correctly if the dataframe is empty;
-        # it returns an empty dataframe instead of a boolean array
-        if len(other_df) > 0:
-            other_not_listened_sigs = other_df.apply(
-                lambda track: get_track_signature(track) not in self._track_signatures,
-                axis=1
-            )
-
-            other_df_not_listened_sigs = other_df.loc[other_not_listened_sigs]
-
-            filtered_through_track_sigs = len(other_df) - len(other_df_not_listened_sigs)
-
-            if filtered_through_track_sigs != 0:
-                other_df = other_df_not_listened_sigs
-        else:
-            filtered_through_track_sigs = 0
-
-        filtered = filtered_through_spotify_id + filtered_through_track_sigs
-
-        if filtered != 0:
-            if not silent:
-                filtered_tracks = other._df.loc[
-                    other._df.index.difference(other_df.index, sort=False)
-                ]
-
-                print(f'{other.get_name()}: removing {filtered} tracks from listening '
-                      f'history - {filtered_through_spotify_id} by spotify ID and '
-                      f'{filtered_through_track_sigs} by track signatures')
-
-                pretty_print_tracks(filtered_tracks)
-
-            if other._should_prompt(prompt):
-                choice = get_user_choice('Proceed?')
-                if choice != 'yes':
-                    return
-
-            # not calling set_df() here because we don't want the overwrite
-            # check and the ID reconciliation
-            other._df = other_df
-            other._changed = True
-
-        elif not silent:
-            print(f'{other.get_name()}: no tracks in listening history')
-
-        return
 
 
 def find_spotify_artist(artist_name):

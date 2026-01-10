@@ -34,7 +34,7 @@ def queue_maintenance_salsa(last_track=None):
     return queue_maintenance(
         last_track=last_track,
         disk_queue='salsa_queue',
-        spotify_queues=['salsa L1', 'salsa L2', 'salsa L3', 'salsa L4', 'salsa non playable', 'salsa deferred']
+        spotify_queues=['salsa L1', 'salsa L2', 'salsa L3', 'salsa L4', 'salsa non playable']
     )
 
 def replenish_spotify_queue_prog():
@@ -42,3 +42,6 @@ def replenish_spotify_queue_prog():
 
 def replenish_spotify_queue_salsa():
     return replenish_spotify_queue(playlist_name='salsa L1', queue_name='salsa_queue')
+
+def salsa_playlist():
+    spotify_playlist_from_rekordbox_playlist('Salsa DJ Library', ['managed', 'Salsa AB'])

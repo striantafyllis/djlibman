@@ -373,7 +373,7 @@ def djlib_spotify_likes_maintenance():
 
 
 
-def playlists_maintenance(do_rekordbox=True, do_spotify=True):
+def playlists_maintenance(do_rekordbox=True, do_spotify=False):
     djlib = Doc('djlib')
 
     playlists = classification.classify_tracks(djlib.get_df())
@@ -579,7 +579,7 @@ def library_maintenance_after_classification():
 
     # djlib_spotify_likes_maintenance()
 
-    playlists_maintenance()
+    playlists_maintenance(do_rekordbox=True, do_spotify=False)
 
     filter_sets()
 
@@ -598,7 +598,7 @@ def library_maintenance_all():
 
     # djlib_spotify_likes_maintenance()
 
-    playlists_maintenance()
+    playlists_maintenance(do_rekordbox=True, do_spotify=False)
 
     filter_sets()
 

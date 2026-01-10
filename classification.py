@@ -121,6 +121,7 @@ def classify_tracks(tracks):
         'Progressive': ['Progressive'],
         'Organic': ['Organic'],
         'Afro/Latin/Funky': ['Afro', 'Latin', 'Funky'],
+        'Salsa': ['Salsa'],
     }
 
     covered_flavors = set([
@@ -142,14 +143,20 @@ def classify_tracks(tracks):
 
     playlists = []
 
-    for uptempo in [True, False]:
-        rb_prefix = ['Downtempo'] if not uptempo else []
+    for flavor_name, flavors in flavor_groupings.items():
+        for uptempo in [True, False]:
+            uptempo_relevant = flavor_name in ['Progressive', 'Organic', 'Afro', 'Latin', 'Funky']
 
-        for flavor_name, flavors in flavor_groupings.items():
+            if not uptempo_relevant and not uptempo:
+                # we've already handled everything in True...
+                continue
+
+            rb_prefix = ['Downtempo'] if (uptempo_relevant and not uptempo) else []
+
             for class_name, classes in (prime_class_groupings | other_class_groupings).items():
                 rekordbox_names = [['managed'] + rb_prefix + [f'{flavor_name} {class_name}']]
 
-                if uptempo and class_name in prime_class_groupings:
+                if (uptempo or not uptempo_relevant) and class_name in prime_class_groupings:
                     rekordbox_names += [['managed AB'] + rb_prefix + [f'{flavor_name} {class_name}']]
                     spotify_name = f'DJ {flavor_name} {class_name}'
                 else:
@@ -159,21 +166,20 @@ def classify_tracks(tracks):
                     'rekordbox_names': rekordbox_names,
                     'spotify_name': spotify_name,
                     'kwargs': {
-                        'uptempo': uptempo,
+                        'uptempo': uptempo if uptempo_relevant else None,
                         'flavors': flavors,
                         'classes': classes
                     }
                 })
 
-        for class_name, classes in prime_class_groupings.items():
-            playlists.append({
-                'rekordbox_names': [['managed'] + rb_prefix + [f'{flavor_name} {class_name}']],
-                'kwargs': {
-                    'uptempo': uptempo,
-                    'not_flavors': covered_flavors,
-                    'classes': classes
-                }
-            })
+    for class_name, classes in prime_class_groupings.items():
+        playlists.append({
+            'rekordbox_names': [['managed'] + rb_prefix + [f'Other {class_name}']],
+            'kwargs': {
+                'not_flavors': covered_flavors,
+                'classes': classes
+            }
+        })
 
     for playlist in playlists:
         playlist['tracks'] = filter_tracks(tracks, **(playlist['kwargs']))

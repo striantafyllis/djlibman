@@ -3,12 +3,10 @@
 import pandas as pd
 import numpy as np
 
-from spyroslib import containers as ct
-from spyroslib.containers import Container, Doc, Wrapper
-
+from spyroslib.containers import Container, Wrapper
+import spyroslib.containers as ct
 import djlib_config
 
-from local_util import *
 from spotify_util import *
 
 def translate_spotify_id_to_rekordbox(spotify_df: pd.DataFrame) -> pd.DataFrame:
@@ -18,7 +16,7 @@ def translate_spotify_id_to_rekordbox(spotify_df: pd.DataFrame) -> pd.DataFrame:
     if spotify_df.index.name != 'spotify_id':
         raise ValueError('Expected a DF indexed by spotify_id')
 
-    rekordbox_to_spotify_mapping = djlib_config.docs['rekordbox_to_spotify'].read()
+    rekordbox_to_spotify_mapping = Doc('rekordbox_to_spotify').get_df()
 
     # remove empty mappings
     rekordbox_to_spotify_mapping = rekordbox_to_spotify_mapping.loc[
@@ -40,7 +38,7 @@ def translate_rekordbox_id_to_spotify(rekordbox_df: pd.DataFrame) -> pd.DataFram
     if rekordbox_df.index.name != 'rekordbox_id':
         raise ValueError('Expected a DF indexed by rekordbox_id')
 
-    rekordbox_to_spotify_mapping = djlib_config.docs['rekordbox_to_spotify'].read()
+    rekordbox_to_spotify_mapping = Doc('rekordbox_to_spotify').get_df()
 
     # remove empty mappings
     rekordbox_to_spotify_mapping = rekordbox_to_spotify_mapping.loc[
@@ -78,6 +76,17 @@ ct.set_default_id_translator_func(djlibman_id_translator_func)
 
 ct.set_default_printer_func(lambda df: pretty_print_tracks(df, enum=True))
 
+
+class Doc(ct.Doc):
+    def __init__(self,
+                 name,
+                 **kwargs):
+        if 'google_intf' not in kwargs:
+            kwargs['google_intf'] = djlib_config.google
+        if 'default_dir' not in kwargs:
+            kwargs['default_dir'] = djlib_config.default_dir
+        super(Doc, self).__init__(name, **kwargs)
+        return
 
 class SpotifyPlaylist(Container):
     def __init__(self, name: str, modify=True, create=False, overwrite=False):
@@ -176,6 +185,8 @@ class RekordboxPlaylist(Container):
         if write_thru:
             djlib_config.rekordbox.write()
         return
+
+
 
 class Queue(Doc):
     """A special doc for the Spotify queue; it sets added_at to now() when adding tracks."""

@@ -2,6 +2,124 @@
 import djlib_config
 from containers import *
 
+def format_track_for_search(track):
+    """Creates a search string that's more likely to generate matches out of a
+    track's artists and title."""
+
+    if isinstance(track, str):
+        string = track.lower()
+    else:
+        string = get_attrib_or_fail(track, ['Title', 'name'])
+        string = string.lower()
+
+    # Remove some things that are usually in Rekordbox but not in Spotify
+    string = re.sub(r'(feat\.|featuring)', '', string, flags=re.IGNORECASE)
+    string = re.sub(r'original( mix|$)', '', string, flags=re.IGNORECASE)
+    string = re.sub(r'extended mix', '', string, flags=re.IGNORECASE)
+
+    if not isinstance(track, str):
+        if 'artist_names' in track:
+            artists_list = [artist.lower() for artist in track['artist_names'].split('|')]
+
+            # Work around a big difference between Spotify and everyone else:
+            # In Spotify, remix artists are in the artists' list; in other services they aren't
+            filtered_artists_list = [artist for artist in artists_list if artist not in string]
+
+            artists = ' '.join(filtered_artists_list)
+        elif 'Artists' in track:
+            artists = track['Artists'].replace(',', ' ').lower()
+        else:
+            raise Exception("None of the attributes %s are present in series %s" % (
+                ['artists', 'Artists'],
+                track
+            ))
+
+        # sort the words in the artist string; this is necessary because Spotify and Rekordbox
+        # often list artists in different order.
+        # This will also mix up first and last names of the same artist; I don't see a way to avoid this
+        artist_words = artists.split()
+        artist_words.sort()
+
+        string = ' '.join(artist_words) + ' ' + string
+
+    # replace sequences of non-word characters with a single space
+    # EXCEPT: Special-case the hyphen because some names contain it (e.g. Kay-D)
+    # Then take care of hyphens that are not in names
+    string = re.sub(r'[^-\w]+', ' ', string)
+    string = re.sub(r'\B-\B', ' ', string)
+
+    # replace multiple spaces with single space
+    string = ' '.join(string.split())
+
+    # get rid of capitalization problems
+    string = string.lower()
+
+    return string
+
+
+def pretty_print_tracks(tracks, indent='', enum=False, ids=True, extra_attribs=[]):
+    num_tracks = len(tracks)
+    if num_tracks == 0:
+        return
+
+    if hasattr(tracks, 'get_df'):
+        tracks = tracks.get_df()
+
+    if isinstance(tracks, pd.DataFrame):
+        if tracks.empty:
+            return
+        tracks = tracks.iloc
+
+    for i in range(num_tracks):
+        sys.stdout.write(indent)
+        if enum:
+            sys.stdout.write(f'{i+1}. ')
+
+        sys.stdout.write(format_track(tracks[i], id=ids, extra_attribs=extra_attribs) + '\n')
+
+    sys.stdout.flush()
+
+    return
+
+def artist_name_condition(name_condition, mode='or'):
+    if mode not in ['and', 'or']:
+        raise Exception("Invalid mode '%s'" % mode)
+
+    return lambda row: list_condition(lambda el: name_condition(el['name']))(row.artists)
+
+
+def artist_stats(tracks, count_cutoff=10):
+    artists_to_counts = {}
+
+    def _handle_artists(artists):
+        for artist in artists:
+            artists_to_counts[artist['name']] = artists_to_counts.get(artist['name'], 0) + 1
+
+    tracks.artists.apply(_handle_artists)
+
+    artist_names = list(artists_to_counts)
+    artist_names.sort(key=lambda x: artists_to_counts[x], reverse=True)
+
+    for artist_name in artist_names:
+        count = artists_to_counts[artist_name]
+        if count < count_cutoff:
+            break
+        print('%s: %d' % (artist_name, count))
+
+    return
+
+
+def pretty_print_albums(albums, indent='', enum=False):
+    for i, album in enumerate(albums):
+        sys.stdout.write(indent)
+        if enum:
+            sys.stdout.write(f'{i+1}: ')
+        sys.stdout.write(f'{album['id']}: {album['name']} ({album['total_tracks']} tracks)\n')
+
+    sys.stdout.flush()
+
+    return
+
 def get_track_signature(track):
     """Returns a value that should uniquely identify the track in most contexts;
        the value is a tuple contains the artist names and the track title"""

@@ -420,7 +420,7 @@ def filter_sets():
     print('Creating Filtered Sets...')
     djlib = Doc('djlib').get_df()
 
-    rb_playlist_names = djlib_config.rekordbox.get_playlist_names()
+    rb_playlist_names = djlib_config.rekordbox.get_playlists_as_map()
 
     rb_set_names = rb_playlist_names['Sets']
 
@@ -454,9 +454,13 @@ def check_protosets():
     print('Checking protosets...')
     djlib = Doc('djlib').get_df()
 
-    rb_playlist_names = djlib_config.rekordbox.get_playlist_names()
+    rb_playlist_names = djlib_config.rekordbox.get_playlists()
 
-    rb_protoset_names = rb_playlist_names['Protosets']
+    rb_protoset_names = [
+        playlist
+        for playlist in rb_playlist_names
+        if playlist[0] == 'Protosets'
+    ]
 
     rb_protoset_not_Aplus_tracks = None
 
@@ -465,11 +469,11 @@ def check_protosets():
     A_tracks_not_in_protosets_idx = A_tracks.index
 
     for rb_protoset_name in rb_protoset_names:
-        if rb_protoset_name.endswith(' --'):
+        if rb_protoset_name[-1].endswith(' --'):
             # in progress; ignore for now
             continue
 
-        rb_protoset = RekordboxPlaylist(['Protosets', rb_protoset_name])
+        rb_protoset = RekordboxPlaylist(rb_protoset_name)
 
         rb_protoset_tracks = rb_protoset.get_df()
 
@@ -530,12 +534,16 @@ def calculate_protosets_column():
 
     djlib.get_df()['Protosets'] = [ [] for _ in range(len(djlib))]
 
-    rb_playlist_names = djlib_config.rekordbox.get_playlist_names()
+    rb_playlist_names = djlib_config.rekordbox.get_playlists()
 
-    rb_protoset_names = rb_playlist_names['Protosets']
+    rb_protoset_names = [
+        playlist
+        for playlist in rb_playlist_names
+        if playlist[0] == 'Protosets'
+    ]
 
     for i, rb_protoset_name in enumerate(rb_protoset_names):
-        rb_protoset = RekordboxPlaylist(['Protosets', rb_protoset_name])
+        rb_protoset = RekordboxPlaylist(rb_protoset_name)
 
         rb_protoset_tracks = rb_protoset.get_df()
 

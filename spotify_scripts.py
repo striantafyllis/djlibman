@@ -8,6 +8,7 @@ import library_scripts
 import spotify_discography
 import classification
 from containers import *
+from djlib_config import rekordbox
 from library_scripts import add_spotify_fields_to_rekordbox
 from spotify_util import *
 
@@ -573,16 +574,29 @@ def remove_artist_from_queue(artist_name):
     queue.write(force=True)
     return
 
-def spotify_playlist_from_rekordbox_playlist(spotify_playlist_name, rekordbox_playlist_name):
+def spotify_playlist_from_rekordbox_playlist(spotify_playlist_name, rekordbox_playlist_name, append=False):
     spotify_playlist = SpotifyPlaylist(spotify_playlist_name, create=True, overwrite=True)
 
     rekordbox_playlist = RekordboxPlaylist(rekordbox_playlist_name)
 
-    if spotify_playlist.exists():
+    if spotify_playlist.exists() and not append:
         spotify_playlist.truncate()
 
     spotify_playlist.append(rekordbox_playlist)
     spotify_playlist.write()
+
+    return
+
+def rekordbox_playlist_from_spotify_playlist(rekordbox_playlist_name, spotify_playlist_name, append=False):
+    rekordbox_playlist = RekordboxPlaylist(rekordbox_playlist_name, create=True, overwrite=True)
+
+    spotify_playlist = SpotifyPlaylist(spotify_playlist_name)
+
+    if rekordbox_playlist.exists() and not append:
+        rekordbox_playlist.truncate()
+
+    rekordbox_playlist.append(spotify_playlist)
+    rekordbox_playlist.write()
 
     return
 

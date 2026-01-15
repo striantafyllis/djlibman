@@ -212,7 +212,7 @@ def promote_set_tracks_to_a():
 
     reclassify_tracks_as(progressive_ab, 'B')
 
-    rb_playlists = djlib_config.rekordbox.get_playlist_names()
+    rb_playlists = djlib_config.rekordbox.get_playlists_as_map()
 
     set_names = [['Sets', name] for name in rb_playlists['Sets']]
 

@@ -23,6 +23,17 @@ def number_ones_maintenance(
 
     return
 
+def rebuild_number_ones_l2():
+    number_ones_l2 = SpotifyPlaylist('number ones L2', overwrite=True)
+    number_ones = SpotifyPlaylist('number ones')
+    liked = SpotifyLiked()
+    number_ones_liked = number_ones.get_df().loc[
+        number_ones.get_df().index.intersection(
+            liked.get_df().index, sort=False)]
+    number_ones_l2.set_df(number_ones_liked)
+    number_ones_l2.write()
+    return
+
 def queue_maintenance_prog(last_track=None):
     queue_maintenance(
         last_track=last_track,

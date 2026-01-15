@@ -153,12 +153,11 @@ def _add_doc(name, type, **kwargs):
     if 'backups' not in kwargs:
         kwargs['backups'] = _backups
 
-    ct.Doc(
+    ct.Doc.add_global_doc(
         name=name,
         type=type,
         google_intf=google,
         default_dir=default_dir,
-        is_global_doc=True,
         **kwargs)
 
     return

@@ -78,13 +78,29 @@ class RekordboxInterface:
             return len(playlist)
         if isinstance(playlist, dict):
             return { key: cls._reduce_playlist(value) for key, value in playlist.items() }
+        assert False
 
-    def get_playlist_names(self):
+    @classmethod
+    def _get_playlists(cls, playlist_container, parent_playlist):
+        if isinstance(playlist_container, pd.Index):
+            return [parent_playlist]
+        if isinstance(playlist_container, dict):
+            playlists = []
+            for key, value in playlist_container.items():
+                playlists += cls._get_playlists(value, parent_playlist + [key])
+            return playlists
+        assert False
+
+    def get_playlists(self):
+        self._refresh()
+        return RekordboxInterface._get_playlists(self._playlists, [])
+
+    def get_playlists_as_map(self):
         self._refresh()
         return RekordboxInterface._reduce_playlist(self._playlists)
 
-    def pretty_print_playlist_names(self):
-        pretty_print(self.get_playlist_names())
+    def pretty_print_playlists(self):
+        pretty_print(self.get_playlists_as_map())
 
     def get_playlist_track_ids(self, playlist_name):
         self._refresh()

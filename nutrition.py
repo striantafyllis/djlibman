@@ -4,9 +4,7 @@ import sys
 import pandas as pd
 import numpy as np
 
-from pandas import value_counts
-
-import google_interface
+from spyroslib import google_interface
 
 def issue_error(error_message, continue_on_error=False):
     if continue_on_error:
@@ -68,11 +66,10 @@ class Nutrition:
     def __init__(self,
                  google_credentials,
                  google_cached_token_file,
-                 source_sheets,
-                 destination_sheets,
                  continue_on_error=False):
         self.nutrition_table = {}
         self.compound_foods = {}
+        self.continue_on_error = continue_on_error
 
         self.google = google_interface.GoogleInterface(
             {
@@ -81,30 +78,38 @@ class Nutrition:
             }
         )
 
-        for google_sheet_name in source_sheets + destination_sheets:
-            google_sheet_id = self.google.get_file_id(name=google_sheet_name, type='sheet')
+    def ingest_google_sheet(self, google_sheet_name):
+        google_sheet_id = self.google.get_file_id(name=google_sheet_name, type='sheet')
 
-            if google_sheet_id is None:
-                issue_error(f"Google sheet '{google_sheet_name}' does not exist", continue_on_error=continue_on_error)
-                continue
+        if google_sheet_id is None:
+            issue_error(f"Google sheet '{google_sheet_name}' does not exist",
+                        continue_on_error=self.continue_on_error)
 
-            sheets = self.google.get_sheets_in_file(id=google_sheet_id)
+        sheets = self.google.get_sheets_in_file(id=google_sheet_id)
 
-            for sheet in sheets:
-                if google_sheet_name in source_sheets:
-                    self._process_source_sheet(
-                        google_sheet_name,
-                        google_sheet_id,
-                        sheet,
-                        continue_on_error=continue_on_error)
-                else:
-                    self._process_destination_sheet(
-                        google_sheet_name,
-                        google_sheet_id,
-                        sheet,
-                        continue_on_error=continue_on_error)
+        for sheet in sheets:
+            self._ingest_sheet(
+                google_sheet_name,
+                google_sheet_id,
+                sheet,
+                continue_on_error=self.continue_on_error)
 
-        return
+    def fill_in_google_sheet(self, google_sheet_name):
+        google_sheet_id = self.google.get_file_id(name=google_sheet_name, type='sheet')
+
+        if google_sheet_id is None:
+            issue_error(f"Google sheet '{google_sheet_name}' does not exist",
+                        continue_on_error=self.continue_on_error)
+
+        sheets = self.google.get_sheets_in_file(id=google_sheet_id)
+
+        for sheet in sheets:
+            if not sheet.endswith('*'):
+                self._fill_in_sheet(google_sheet_name,
+                                    sheet,
+                                    google_sheet_id,
+                                    continue_on_error=self.continue_on_error)
+
 
     def _process_sheet_common(
             self,
@@ -131,7 +136,7 @@ class Nutrition:
 
         return doc, contents
 
-    def _process_source_sheet(
+    def _ingest_sheet(
             self,
             google_sheet_name,
             google_sheet_id,
@@ -148,6 +153,10 @@ class Nutrition:
         if contents is None:
             return
 
+        is_source_sheet = sheet.strip().endswith('*')
+
+        current_compound_food = None
+
         for i in range(len(contents)):
             row = contents.iloc[i]
 
@@ -160,16 +169,26 @@ class Nutrition:
 
             name = name.strip().lower()
 
-            quantity = row['Quantity']
-            unit = row['Unit']
+            is_source_entry = is_source_sheet or name.endswith('*')
 
-            if pd.isna(quantity) or pd.isna(unit):
-                issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "
-                            f"entry '{name}' is missing quantity or unit",
-                            continue_on_error=continue_on_error)
-                continue
+            quantity = row['Quantity'] if not pd.isna(row['Quantity']) else None
+            unit = row['Unit'].strip().lower() if not pd.isna(row['Unit']) else None
 
-            unit = unit.strip().lower()
+            if quantity is None or unit is None:
+                if is_source_entry:
+                    # in source rows, both quantity and unit must be present
+                    issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "
+                                f"source entry '{name}' is missing quantity or unit",
+                                continue_on_error=continue_on_error)
+                    continue
+                else:
+                    # for destination rows, some compound entries - e.g. days -
+                    # have neither unit nor quantity. But: they have to both be missing.
+                    if quantity is not None or unit is not None:
+                        issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "
+                                    f"destination entry '{name}' has a quantity but no unit "
+                                    f"or a unit with no quantity",
+                                    continue_on_error=continue_on_error)
 
             values = {
                 key: value
@@ -177,91 +196,60 @@ class Nutrition:
                 if not pd.isna(value)
             }
 
-            values['Quantity'] = quantity
-
-            if len(values) == 0:
-                issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "
-                            f"empty entry '{name}' unit '{unit}'",
-                            continue_on_error=continue_on_error)
-                continue
-
-            unit_table = self.nutrition_table.get(name)
-
-            if unit_table is None:
-                unit_table = {}
-                self.nutrition_table[name] = unit_table
-
-            if unit in self.nutrition_table:
-                issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "
-                            f"duplicate entry '{name}' unit '{unit}'",
-                            continue_on_error=continue_on_error)
-                continue
-
-            unit_table[unit] = values
-
-        return
-
-    def _process_destination_sheet(
-            self,
-            google_sheet_name,
-            google_sheet_id,
-            sheet,
-            continue_on_error=False):
-        print(f'Parsing {google_sheet_name}#{sheet} ...')
-
-        _, contents = self._process_sheet_common(
-            google_sheet_name=google_sheet_name,
-            google_sheet_id=google_sheet_id,
-            sheet=sheet,
-            continue_on_error=continue_on_error)
-
-        if contents is None:
-            return
-
-        for i in range(len(contents)):
-            row = contents.iloc[i]
-
-            name = row['Name']
-
-            if pd.isna(name):
-                # compound food ingredients end with an empty line
-                current_compound_food = None
-                continue
-
-            name = name.strip().lower()
-
-            quantity = row['Quantity'] if not pd.isna(row['Quantity']) else None
-            unit = row['Unit'].strip().lower() if not pd.isna(row['Unit']) else None
-
-            if quantity is not None and unit is None:
-                issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "
-                            f"entry '{name}' has a quantity but no unit",
-                            continue_on_error=continue_on_error)
-                continue
-
-            if current_compound_food is None:
-                if name in self.compound_foods:
+            if is_source_entry:
+                if len(values) == 0:
                     issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "
-                                f"duplicate compound entry '{name}'",
+                                f"empty source entry '{name}' unit '{unit}'",
+                                continue_on_error=continue_on_error)
+
+                values['Quantity'] = quantity
+
+                unit_table = self.nutrition_table.get(name)
+
+                if unit_table is None:
+                    unit_table = {}
+                    self.nutrition_table[name] = unit_table
+
+                if unit in self.nutrition_table:
+                    issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "
+                                f"duplicate source entry '{name}' unit '{unit}'",
                                 continue_on_error=continue_on_error)
                     continue
 
-                current_compound_food = {'Name': name}
-                if not pd.isna(quantity):
-                    current_compound_food['Quantity'] = quantity
-                    current_compound_food['Unit'] = unit
+                unit_table[unit] = values
 
-                self.compound_foods[name] = current_compound_food
+                if not is_source_sheet and current_compound_food is not None:
+                    current_compound_food['Ingredients'].append({
+                        'Name': name,
+                        'Quantity': quantity,
+                        'Unit': unit
+                    })
 
-                current_compound_food['Ingredients'] = []
+                continue
             else:
-                current_compound_food['Ingredients'].append({
-                    'Name': name,
-                    'Quantity': quantity,
-                    'Unit': unit
-                })
+                if current_compound_food is None:
+                    if name in self.compound_foods:
+                        issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "
+                                    f"duplicate compound entry '{name}'",
+                                    continue_on_error=continue_on_error)
+                        continue
 
+                    current_compound_food = {'Name': name}
+                    if not pd.isna(quantity):
+                        current_compound_food['Quantity'] = quantity
+                        current_compound_food['Unit'] = unit
+
+                    self.compound_foods[name] = current_compound_food
+
+                    current_compound_food['Ingredients'] = []
+                else:
+                    current_compound_food['Ingredients'].append({
+                        'Name': name,
+                        'Quantity': quantity,
+                        'Unit': unit
+                    })
         return
+
 
     def calculate_nutrition_info(self, food, quantity=None, unit=None, convert_units=True):
         if quantity is not None and unit is None:
@@ -359,14 +347,20 @@ class Nutrition:
 
         return nutrition_info
 
-    def populate_sheet(
+    def _fill_in_sheet(
             self,
             google_sheet_name,
             sheet,
+            google_sheet_id,
             continue_on_error=False):
+        if sheet.endswith('*'):
+            # source sheet; nothing to fill in
+            return
+
         doc, contents = self._process_sheet_common(
             google_sheet_name=google_sheet_name,
             sheet=sheet,
+            google_sheet_id=google_sheet_id,
             continue_on_error=continue_on_error)
 
         for row_idx in range(len(contents)):
@@ -378,6 +372,10 @@ class Nutrition:
                 continue
 
             name = name.strip().lower()
+
+            if name.endswith('*'):
+                # source row; nothing to fill in
+                continue
 
             quantity = row['Quantity'] if not pd.isna(row['Quantity']) else None
             unit = row['Unit'].strip().lower() if not pd.isna(row['Unit']) else None
@@ -402,12 +400,11 @@ class Nutrition:
         return
 
 
-source_sheets = [
+google_sheets_to_read = [
     'Nutrition Info',
 ]
-
-destination_sheets = [
-    'Food Tracking',
+google_sheets_to_fill_in = [
+    'Food Tracking 2026-01',
 ]
 
 google_credentials =  '/Users/spyros/google_credentials_music_library_management.json'
@@ -417,18 +414,14 @@ def main():
     nutrition = Nutrition(
         google_credentials,
         google_cached_token_file,
-        source_sheets,
-        destination_sheets,
         continue_on_error=False
     )
 
-    # info1 = nutrition.calculate_nutrition_info('olive oil', 7, 'g')
-    # info2 = nutrition.calculate_nutrition_info('olive oil', 30, 'ml')
-    # info3 = nutrition.calculate_nutrition_info('9/8 vegetable gumbo', 20, 'oz')
-    # info4 = nutrition.calculate_nutrition_info('Tue 2025-09-09')
+    for google_sheet in google_sheets_to_read + google_sheets_to_fill_in:
+        nutrition.ingest_google_sheet(google_sheet)
 
-    nutrition.populate_sheet(google_sheet_name='Food Tracking', sheet='Platters')
-    nutrition.populate_sheet(google_sheet_name='Food Tracking', sheet='Days')
+    for google_sheet in google_sheets_to_fill_in:
+        nutrition.fill_in_google_sheet(google_sheet)
 
     return
 

@@ -169,7 +169,12 @@ class Nutrition:
 
             name = name.strip().lower()
 
-            is_source_entry = is_source_sheet or name.endswith('*')
+            is_source_entry = is_source_sheet
+
+            if name.endswith('*'):
+                is_source_entry = True
+                name = name[:-1]
+
 
             quantity = row['Quantity'] if not pd.isna(row['Quantity']) else None
             unit = row['Unit'].strip().lower() if not pd.isna(row['Unit']) else None
@@ -356,6 +361,8 @@ class Nutrition:
         if sheet.endswith('*'):
             # source sheet; nothing to fill in
             return
+
+        print(f'Filling in {google_sheet_name}#{sheet} ...')
 
         doc, contents = self._process_sheet_common(
             google_sheet_name=google_sheet_name,

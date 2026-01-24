@@ -157,6 +157,8 @@ class Nutrition:
 
         current_compound_food = None
 
+        prev_starred_name = None
+        prev_starred_unit = None
         for i in range(len(contents)):
             row = contents.iloc[i]
 
@@ -165,35 +167,55 @@ class Nutrition:
             if pd.isna(name):
                 # compound food ingredients end with an empty line
                 current_compound_food = None
+                prev_starred_name = None
+                prev_starred_unit = None
                 continue
 
             name = name.strip().lower()
 
             is_source_entry = is_source_sheet
 
+            is_continuation = False
             if name.endswith('*'):
                 is_source_entry = True
                 name = name[:-1]
-
+                if name == '':
+                    if prev_starred_name is None:
+                        issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "
+                                    f"source entry continuation without previous source entry",
+                                    continue_on_error=continue_on_error)
+                        continue
+                    is_continuation = True
+                    name = prev_starred_name
+                else:
+                    prev_starred_name = name
+            else:
+                prev_starred_name = None
 
             quantity = row['Quantity'] if not pd.isna(row['Quantity']) else None
             unit = row['Unit'].strip().lower() if not pd.isna(row['Unit']) else None
 
-            if quantity is None or unit is None:
-                if is_source_entry:
-                    # in source rows, both quantity and unit must be present
-                    issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "
-                                f"source entry '{name}' is missing quantity or unit",
-                                continue_on_error=continue_on_error)
-                    continue
-                else:
-                    # for destination rows, some compound entries - e.g. days -
-                    # have neither unit nor quantity. But: they have to both be missing.
+            # the rather complicated check on whether quantity and/or unit can be empty
+            if is_source_entry:
+                if is_continuation:
                     if quantity is not None or unit is not None:
                         issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "
-                                    f"destination entry '{name}' has a quantity but no unit "
-                                    f"or a unit with no quantity",
+                                    f"continuation for source entry '{name}' should not specify "
+                                    f"quantity or unit",
                                     continue_on_error=continue_on_error)
+                        continue
+                else: # is_continuation
+                    if quantity is None or unit is None:
+                        issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "
+                                    f"source entry '{name}' is missing quantity or unit",
+                                    continue_on_error=continue_on_error)
+                        continue
+            else: # is_source_entry
+                if (quantity is None) != (unit is None):
+                    issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "
+                                f"destination entry '{name}' has a quantity but no unit "
+                                f"or a unit with no quantity",
+                                continue_on_error=continue_on_error)
 
             values = {
                 key: value
@@ -215,15 +237,28 @@ class Nutrition:
                     unit_table = {}
                     self.nutrition_table[name] = unit_table
 
-                if unit in self.nutrition_table:
-                    issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "
-                                f"duplicate source entry '{name}' unit '{unit}'",
-                                continue_on_error=continue_on_error)
-                    continue
+                if is_continuation:
+                    if prev_starred_unit is None or prev_starred_unit not in unit_table:
+                        # this should never happen if the code doesn't have a bug
+                        assert False
 
-                unit_table[unit] = values
+                    prev_starred_entry = unit_table[prev_starred_unit]
 
-                if not is_source_sheet and current_compound_food is not None:
+                    for key, value in values.items():
+                        if value is None:
+                            continue
+                        prev_starred_entry[key] += value
+                else: # is_continuation
+                    if unit in unit_table:
+                        issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "
+                                    f"duplicate source entry '{name}' unit '{unit}'",
+                                    continue_on_error=continue_on_error)
+                        continue
+
+                    unit_table[unit] = values
+                    prev_starred_unit = unit
+
+                if not is_source_sheet and not is_continuation and current_compound_food is not None:
                     current_compound_food['Ingredients'].append({
                         'Name': name,
                         'Quantity': quantity,
@@ -231,7 +266,7 @@ class Nutrition:
                     })
 
                 continue
-            else:
+            else: # is_source_entry
                 if current_compound_food is None:
                     if name in self.compound_foods:
                         issue_error(f"Google Sheet '{google_sheet_name}'!'{sheet}: "

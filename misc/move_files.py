@@ -5,8 +5,8 @@ import sys
 import re
 
 source_dir = '/Users/spyros/Downloads/qobuz'
-dest_dir = '/Users/spyros/Music/DJ Library/salsa 2026-01'
-file_regex = re.compile('^.*\.aiff?', re.IGNORECASE)
+dest_dir = '/Users/spyros/Music/DJ Library/salsa 2026-02'
+file_regex = re.compile(r'^.*\.aiff?', re.IGNORECASE)
 
 def descend(dir):
     assert os.path.isdir(dir)

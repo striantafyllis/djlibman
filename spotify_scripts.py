@@ -95,6 +95,7 @@ def promote_tracks_in_spotify_queue(
         promote_source_name,
         promote_target_name,
         *,
+        unambiguous_prefix=True,
         disk_queue=None,
         method='liked',
         unlike=True,
@@ -112,10 +113,10 @@ def promote_tracks_in_spotify_queue(
     listened_tracks = promote_source.slice(
         from_index=0,
         to_index=last_track,
+        unambiguous_prefix=unambiguous_prefix,
         index_column='name',
         ignore_case=True,
         use_prefix=True,
-        unambiguous_prefix=True
     )
 
     print(f'{promote_source_name}: {len(listened_tracks)} listened tracks')
@@ -260,6 +261,7 @@ def sanity_check_spotify_queue(spotify_queue_name, *, is_level_1=False, is_promo
 def queue_maintenance(
         last_track=None,
         *,
+        unambiguous_prefix=True,
         disk_queue=None,
         spotify_queues=[],
         promote_source=None,
@@ -342,6 +344,7 @@ def queue_maintenance(
             last_track,
             promote_source,
             promote_target,
+            unambiguous_prefix=unambiguous_prefix,
             disk_queue=disk_queue if promote_source_level==1 else None,
             method=method,
             ref_playlist=ref_playlist,

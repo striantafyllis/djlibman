@@ -50,7 +50,7 @@ def queue_maintenance_salsa(last_track=None, **kwargs):
         **kwargs
     )
 
-def replenish_spotify_queue_prog(target_size=100):
+def replenish_spotify_queue_prog(target_size=200):
     return replenish_spotify_queue(playlist_name='prog L1', queue_name='prog_queue',
                                    target_size=target_size)
 

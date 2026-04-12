@@ -163,6 +163,8 @@ def promote_tracks_in_spotify_queue(
         queue.remove(listened_tracks, prompt=False)
         queue.write()
 
+        print(f'Disk queue {disk_queue} now has {len(queue)} tracks')
+
     if add_to_listening_history:
         print(f'Adding listened tracks to listening history...')
         listening_history = ListeningHistory()
@@ -300,8 +302,8 @@ def queue_maintenance(
         else:
             promote_source_level = None
 
-            for i, queue in enumerate(spotify_queues):
-                if promote_source == queue:
+            for i, queues in enumerate(spotify_queues):
+                if promote_source in queues:
                     promote_source_level = i+1
                     break
 
@@ -436,6 +438,7 @@ def filter_spotify_playlist(playlist_name):
 
 def sample_artist_to_queue(
         *,
+        queue_name='prog_queue',
         artist_id=None,
         artist_name=None,
         latest=10,
@@ -458,7 +461,7 @@ def sample_artist_to_queue(
     print(f'Found {len(artist_discography)} tracks')
 
     listening_history = ListeningHistory()
-    queue = Queue()
+    queue = Queue(queue_name)
 
     listening_history.filter(artist_discography, prompt=False, silent=True)
     artist_discography.remove(queue, prompt=False, silent=True)
@@ -577,7 +580,7 @@ def remove_artist_from_queue(artist_name):
     queue.write(force=True)
     return
 
-def spotify_playlist_from_rekordbox_playlist(spotify_playlist_name, rekordbox_playlist_name, append=False):
+def create_spotify_playlist_from_rekordbox_playlist(spotify_playlist_name, rekordbox_playlist_name, append=False):
     spotify_playlist = SpotifyPlaylist(spotify_playlist_name, create=True, overwrite=True)
 
     rekordbox_playlist = RekordboxPlaylist(rekordbox_playlist_name)
@@ -590,7 +593,7 @@ def spotify_playlist_from_rekordbox_playlist(spotify_playlist_name, rekordbox_pl
 
     return
 
-def rekordbox_playlist_from_spotify_playlist(rekordbox_playlist_name, spotify_playlist_name, append=False):
+def create_rekordbox_playlist_from_spotify_playlist(rekordbox_playlist_name, spotify_playlist_name, append=False):
     rekordbox_playlist = RekordboxPlaylist(rekordbox_playlist_name, create=True, overwrite=True)
 
     spotify_playlist = SpotifyPlaylist(spotify_playlist_name)

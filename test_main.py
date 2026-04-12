@@ -269,7 +269,7 @@ def get_progressive_a_producers():
     prog_a_artists.sort_values(by='A', ascending=False, inplace=True)
 
     doc = Doc('prog_a_artists', create=True, overwrite=True,
-              path='data/prog_a_artists-2025-10-31.csv',
+              path='data/prog_a_artists-2026-03-01.csv',
               backups=0,
               type='csv'
               )
@@ -281,7 +281,7 @@ def get_progressive_a_producers():
 def build_artist_albums():
     source_doc = Doc(
         'prog_a_artists',
-        path='data/prog_a_artists-2025-10-31.csv',
+        path='data/prog_a_artists-2026-03-01.csv',
         backups=0,
         type='csv'
         )
@@ -340,14 +340,14 @@ def clean_up_artist_tracks():
 def discog_report_for_prog_a_producers():
     source_doc = Doc(
         'prog_a_artists',
-        path='data/prog_a_artists_reduced-2025-10-31.csv',
+        path='data/prog_a_artists_reduced-2026-03-01.csv',
         backups=0,
         type='csv'
         )
 
     target_doc = Doc(
         'prog_a_artists_enhanced',
-        path='data/prog_a_artists_enhanced-2025-10-31.csv',
+        path='data/prog_a_artists_enhanced-2026-03-01.csv',
         backups=0,
         type='csv',
         create=True,
@@ -401,7 +401,7 @@ def discog_report_for_prog_a_producers():
 def refresh_prog_a_producers():
     source_doc = Doc(
         'prog_a_artists',
-        path='data/prog_a_artists_reduced-2025-10-31.csv',
+        path='data/prog_a_artists_reduced-2026-03-01.csv',
         backups=0,
         type='csv'
         )
@@ -468,7 +468,7 @@ def old_main():
 def populate_queue():
     next_q_artists = Doc(
         'next_q_artists',
-        path='data/next_q_artists-2025-10-31.csv',
+        path='data/next_q_artists-2026-03-01.csv',
         backups=0,
         type='csv'
         )
@@ -495,7 +495,7 @@ def main():
 
     # discog_report_for_prog_a_producers()
 
-    # populate_queue()
+    populate_queue()
 
     # debug_discography()
 
@@ -525,7 +525,7 @@ def test_google_sheets_code():
 
 
 if __name__ == '__main__':
-    # main()
+    main()
     # test_google_sheets_code()
-    queue_maintenance_salsa(last_track='Llegamos')
+    # queue_maintenance_salsa(last_track='Llegamos')
     sys.exit(0)

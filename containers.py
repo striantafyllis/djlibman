@@ -196,6 +196,7 @@ class Queue(Doc):
             modify=True,
             create=True,
             overwrite=True,
+            backups=5,
             **kwargs):
         super(Queue, self).__init__(
             name=name,
@@ -206,6 +207,7 @@ class Queue(Doc):
             index_name='spotify_id',
             header=0,
             datetime_columns=['release_date', 'added_at'],
+            backups=backups,
             **kwargs
         )
 

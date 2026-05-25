@@ -269,7 +269,9 @@ def queue_maintenance(
         promote_source=None,
         promote_target=None,
         method='Liked',
-        ref_playlist=None
+        ref_playlist=None,
+        remove_from_source=True,
+        add_to_listening_history=True
 ):
     # sanity check the spotify_queues argument
     if spotify_queues is not None:
@@ -350,8 +352,8 @@ def queue_maintenance(
             disk_queue=disk_queue if promote_source_level==1 else None,
             method=method,
             ref_playlist=ref_playlist,
-            remove_from_source=True,
-            add_to_listening_history=True
+            remove_from_source=remove_from_source,
+            add_to_listening_history=add_to_listening_history
         )
 
     return
@@ -445,9 +447,6 @@ def sample_artist_to_queue(
         total=10,
         latest_cutoff_days=365
     ):
-    if total <= 0:
-        raise ValueError(f'Invalid total tracks {total} for artist {artist_name}')
-
     print(f'Sampling artist {artist_name} to queue...')
 
     discography = spotify_discography.get_instance()
@@ -458,7 +457,7 @@ def sample_artist_to_queue(
                                                     deduplicate_tracks=True),
         name=f'discography for {artist_name}')
 
-    print(f'Found {len(artist_discography)} tracks')
+    print(f'Artist {artist_name}: Found {len(artist_discography)} tracks')
 
     listening_history = ListeningHistory()
     queue = Queue(queue_name)
@@ -468,12 +467,18 @@ def sample_artist_to_queue(
 
     print(f'Left after removing listening history and queue: {len(artist_discography)} tracks')
 
+    if total == -1:
+        total = sys.maxsize
     if latest == -1:
         latest = sys.maxsize
 
-    max_latest = min(latest, total, len(artist_discography))
+    if len(artist_discography) < total:
+        print(f'Artist {artist_name}: adding all {len(artist_discography)} tracks to queue')
+        queue.append(artist_discography, prompt=False)
+        queue.write()
+        return
 
-    if max_latest != 0:
+    if latest > 0:
         latest_cutoff_date = (pd.Timestamp.utcnow() -
                               pd.Timedelta(value=latest_cutoff_days, unit='days'))
 
@@ -481,26 +486,31 @@ def sample_artist_to_queue(
             lambda t: t['release_date'] >= latest_cutoff_date
         )
 
-        latest_tracks.sort_values(by='release_date', ascending=False, axis=0, inplace=True)
-        latest_tracks = latest_tracks[:max_latest]
+        if len(latest_tracks) > latest:
+            latest_tracks.sort_values(by='release_date', ascending=False, axis=0, inplace=True)
+            latest_tracks = latest_tracks[:latest]
 
         artist_discography.remove(latest_tracks, prompt=False)
 
-        print('Latest tracks:')
-        pretty_print_tracks(latest_tracks, indent=' '*4, enum=True, extra_attribs='release_date')
+        print(f'Artist {artist_name}: Adding {len(latest_tracks)} latest tracks to queue')
+        # pretty_print_tracks(latest_tracks, indent=' '*4, enum=True, extra_attribs='release_date')
 
         queue.append(latest_tracks, prompt=False)
         queue.write()
 
-        remaining = min(total - len(latest_tracks), len(artist_discography))
+        remaining = total - len(latest_tracks)
     else:
-        remaining = min(total, len(artist_discography))
+        remaining = total
 
     if remaining > 0:
-        artist_discography.sort('popularity', ascending=False)
+        if len(artist_discography) > remaining:
+            artist_discography.sort('popularity', ascending=False)
 
-        most_popular_tracks = artist_discography.get_df()[:remaining]
+            most_popular_tracks = artist_discography.get_df()[:remaining]
+        else:
+            most_popular_tracks = artist_discography.get_df()
 
+        print(f'Artist {artist_name}: adding {len(most_popular_tracks)} older tracks to queue')
         print('Popular tracks:')
         pretty_print_tracks(most_popular_tracks, indent=' '*4, enum=True, extra_attribs='popularity')
 

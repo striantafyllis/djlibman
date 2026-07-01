@@ -100,6 +100,8 @@ def pretty_print_albums(albums, indent='', enum=False):
     return
 
 
+
+
 def text_to_spotify_track(text):
     # Remove everything until the first letter character - e.g. numbers like 1.
     text1 = re.sub(r'^[0-9\W]+', '', text)

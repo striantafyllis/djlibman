@@ -3,11 +3,10 @@
 import pandas as pd
 import numpy as np
 
-from spyroslib.containers import Container, Wrapper
 import spyroslib.containers as ct
 import djlib_config
 
-from spotify_util import *
+from local_util import *
 
 def translate_spotify_id_to_rekordbox(spotify_df: pd.DataFrame) -> pd.DataFrame:
     """Converts a dataframe indexed by spotify_id to one indexed by rekordbox_id"""
@@ -88,7 +87,7 @@ class Doc(ct.Doc):
         super(Doc, self).__init__(name, **kwargs)
         return
 
-class SpotifyPlaylist(Container):
+class SpotifyPlaylist(ct.Container):
     def __init__(self, name: str, modify=True, create=False, overwrite=False):
         self._playlist_name = name
         super(SpotifyPlaylist, self).__init__(
@@ -111,7 +110,7 @@ class SpotifyPlaylist(Container):
         djlib_config.spotify.replace_tracks_in_playlist(self._playlist_name, df)
         return
 
-class SpotifyLiked(Container):
+class SpotifyLiked(ct.Container):
     def __init__(self):
         super(SpotifyLiked, self).__init__('Spotify Liked Tracks', modify=True, create=False, overwrite=False)
         return
@@ -142,7 +141,7 @@ class SpotifyLiked(Container):
         return
 
 
-class RekordboxCollection(Container):
+class RekordboxCollection(ct.Container):
     def __init__(self):
         super(RekordboxCollection, self).__init__(
             name='Rekordbox Collection',
@@ -163,7 +162,7 @@ class RekordboxCollection(Container):
         return djlib_config.rekordbox.get_collection()
 
 
-class RekordboxPlaylist(Container):
+class RekordboxPlaylist(ct.Container):
     def __init__(self, name: str, modify=True, create=False, overwrite=False):
         self._playlist_name = name
         super(RekordboxPlaylist, self).__init__(
@@ -264,10 +263,10 @@ class ListeningHistory(Doc):
 
         return
 
-    def filter(self, other: Container, prompt=None, silent=False):
+    def filter(self, other: ct.Container, prompt=None, silent=False):
         self._ensure_track_signatures()
 
-        if not isinstance(other, Container):
+        if not isinstance(other, ct.Container):
             raise ValueError("'other' argument must be a container")
 
         other_df = other.get_df()

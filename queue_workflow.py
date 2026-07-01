@@ -535,3 +535,61 @@ def queue_stats(start_date, end_date):
 
     return len(listened_tracks), len(listened_ab_tracks)
 
+def add_unlistened_from_regex_to_playlist(source_regex, target_playlist_name):
+    source_playlists = get_spotify_playlists_regex(source_regex)
+
+    print(f"Found {len(source_playlists)} playlists matching regex '{source_regex}'")
+
+    target_playlist = SpotifyPlaylist(target_playlist_name)
+    listening_history = ListeningHistory()
+
+    for source_playlist_name in source_playlists:
+        source_playlist = SpotifyPlaylist(source_playlist_name)
+
+        num_tracks = len(source_playlist)
+        listening_history.filter(source_playlist, prompt=False, silent=True)
+
+        num_unlistened_tracks = len(source_playlist)
+
+        source_playlist.remove(target_playlist, prompt=False, silent=True)
+
+        num_new_tracks = len(source_playlist)
+
+        print(f"Source playlist '{source_playlist_name}': {num_tracks} tracks, "
+              f"{num_unlistened_tracks} unlistened tracks, {num_new_tracks} "
+              f"new tracks -> adding to playlist '{target_playlist_name}'")
+        if num_new_tracks > 0:
+            target_playlist.append(source_playlist, prompt=False, silent=True)
+
+    target_playlist.write()
+    return
+
+
+def add_liked_from_regex_to_playlist(source_regex, target_playlist_name):
+    source_playlists = get_spotify_playlists_regex(source_regex)
+
+    print(f"Found {len(source_playlists)} playlists matching regex '{source_regex}'")
+
+    target_playlist = SpotifyPlaylist(target_playlist_name)
+    liked = SpotifyLiked()
+
+    for source_playlist_name in source_playlists:
+        source_playlist = SpotifyPlaylist(source_playlist_name)
+
+        num_tracks = len(source_playlist)
+
+        source_playlist.intersect(liked, prompt=False, silent=True)
+        num_liked_tracks = len(source_playlist)
+
+        source_playlist.remove(target_playlist, prompt=False, silent=True)
+
+        num_new_tracks = len(source_playlist)
+
+        print(f"Source playlist '{source_playlist_name}': {num_tracks} tracks, "
+              f"{num_liked_tracks} liked tracks, {num_new_tracks} "
+              f"new tracks -> adding to playlist '{target_playlist_name}'")
+        if num_new_tracks > 0:
+            target_playlist.append(source_playlist, prompt=False, silent=True)
+
+    target_playlist.write()
+    return

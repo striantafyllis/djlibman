@@ -30,6 +30,32 @@ def format_track(track, id=True, extra_attribs=[]):
 
     return s
 
+def get_track_signature(track):
+    """Returns a value that should uniquely identify the track in most contexts;
+       the value is a tuple contains the artist names and the track title"""
+    name = track['name']
+    artist_names = track['artist_names'].upper().split('|')
+
+    # get rid of parenthesized combinations of uppercase letters and numbers - these are usually label codes
+    name = re.sub(r'(\[|\()[A-Z]{3,100} ?[0-9]+(\]|\))', '', name)
+
+    name = name.upper()
+
+    # get read of "featuring ...", "feat. " etc.
+    name = re.sub(r'FEAT(\.|URING) .*', '', name)
+
+    for s in ['(', ')', '[', ']', '-', ' AND ', ' X ', 'EXTENDED', 'ORIGINAL', 'REMIX', 'MIXED', 'MIX', 'RADIO', 'EDIT']:
+        name = name.replace(s, '')
+
+    # get rid of whitespace differences
+    name = ' '.join(name.split())
+
+    artist_names.sort()
+
+    return tuple(artist_names + [name])
+
+
+
 
 def pretty_print_tracks(tracks, indent='', enum=False, ids=True, extra_attribs=[]):
     num_tracks = len(tracks)

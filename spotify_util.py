@@ -99,30 +99,6 @@ def pretty_print_albums(albums, indent='', enum=False):
 
     return
 
-def get_track_signature(track):
-    """Returns a value that should uniquely identify the track in most contexts;
-       the value is a tuple contains the artist names and the track title"""
-    name = track['name']
-    artist_names = track['artist_names'].upper().split('|')
-
-    # get rid of parenthesized combinations of uppercase letters and numbers - these are usually label codes
-    name = re.sub(r'(\[|\()[A-Z]{3,100} ?[0-9]+(\]|\))', '', name)
-
-    name = name.upper()
-
-    # get read of "featuring ...", "feat. " etc.
-    name = re.sub(r'FEAT(\.|URING) .*', '', name)
-
-    for s in ['(', ')', '[', ']', '-', ' AND ', ' X ', 'EXTENDED', 'ORIGINAL', 'REMIX', 'MIXED', 'MIX', 'RADIO', 'EDIT']:
-        name = name.replace(s, '')
-
-    # get rid of whitespace differences
-    name = ' '.join(name.split())
-
-    artist_names.sort()
-
-    return tuple(artist_names + [name])
-
 
 def text_to_spotify_track(text):
     # Remove everything until the first letter character - e.g. numbers like 1.
@@ -389,3 +365,13 @@ def like_spotify_playlist(spotify_playlist_name):
 
     return
 
+def get_spotify_playlists_regex(regex):
+    all_playlist_names = djlib_config.spotify.get_playlists()
+
+    regex_playlist_names = [
+        playlist
+        for playlist in all_playlist_names.name
+        if re.match(regex, playlist)
+    ]
+
+    return regex_playlist_names

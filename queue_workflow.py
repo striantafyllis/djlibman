@@ -1,15 +1,8 @@
 
-import random
-
-from spotipy import Spotify
-
-import djlib_config
-import library_scripts
-import spotify_discography
 import classification
-from containers import *
-from djlib_config import rekordbox
-from library_scripts import add_spotify_fields_to_rekordbox
+import spotify_discography
+from library_workflow import add_spotify_fields_to_rekordbox
+
 from spotify_util import *
 
 def sanity_check_disk_queue(disk_queue_name):
@@ -86,9 +79,6 @@ def separate_chosen_tracks(
     not_chosen_idx = tracks.index.difference(chosen_idx, sort=False)
 
     return tracks.loc[chosen_idx], tracks.loc[not_chosen_idx]
-
-
-
 
 def promote_tracks_in_spotify_queue(
         last_track,
@@ -358,36 +348,6 @@ def queue_maintenance(
 
     return
 
-def pretty_print_spotify_playlist(playlist_name, *, enum=True, liked_only=False):
-    spotify_playlist = SpotifyPlaylist(playlist_name)
-
-    if liked_only:
-        liked = SpotifyLiked()
-
-        tracks = spotify_playlist.get_intersection(liked)
-
-        print(f"Spotify playlist '{playlist_name}': {len(spotify_playlist)} tracks, {len(tracks)} liked tracks")
-    else:
-        print(f"Spotify playlist '{playlist_name}': {len(spotify_playlist)} tracks")
-        tracks = spotify_playlist.get_df()
-
-    pretty_print_tracks(tracks, enum=enum, ids=False)
-    return
-
-def shuffle_spotify_playlist(playlist_name):
-    playlist = SpotifyPlaylist(playlist_name, overwrite=True)
-
-    tracks = playlist.get_df()
-
-    new_tracks_idx = random.sample(tracks.index.to_list(), k=len(tracks))
-
-    new_tracks = tracks.loc[new_tracks_idx]
-
-    playlist.set_df(new_tracks)
-    playlist.write()
-
-    return
-
 def add_to_queue(tracks):
     """Adds tracks to the disk queue. The tracks have to be either a Container or a DataFrame or
        a string that's the name of a Spotify playlist."""
@@ -423,20 +383,21 @@ def add_to_queue(tracks):
 
     return
 
-def filter_spotify_playlist(playlist_name):
+def filter_spotify_playlist(playlist_name, queue_name=None):
     """Removes tracks in queue and listening history from a Spotify playlist"""
 
     playlist = SpotifyPlaylist(playlist_name)
 
     listening_history = ListeningHistory()
-    queue = Queue()
-
     listening_history.filter(playlist)
-    playlist.remove(queue)
+
+    if queue_name is not None:
+        queue = Queue(queue_name)
+        playlist.remove(queue)
+
     playlist.write()
 
     return
-
 
 def sample_artist_to_queue(
         *,
@@ -519,47 +480,8 @@ def sample_artist_to_queue(
 
     return
 
-def text_file_to_spotify_playlist(text_file, target_playlist_name='tmp queue'):
-    if target_playlist_name is None:
-        target_playlist = None
-    else:
-        target_playlist = SpotifyPlaylist(target_playlist_name)
-
-    lines = read_lines_from_file(text_file)
-
-    print(f'Looking for {len(lines)} lines of text in Spotify' +
-          (f'; adding to playlist {target_playlist_name}'
-           if target_playlist_name is not None else ''))
-
-    unmatched_lines = []
-    for line in lines:
-        spotify_track = text_to_spotify_track(line)
-
-        if spotify_track is None:
-            unmatched_lines.append(line)
-        elif target_playlist is not None:
-            # this avoids a Pandas warning
-            spotify_track['added_at'] = pd.Timestamp.now()
-
-            if len(target_playlist.get_df()) == 0:
-                target_playlist.set_df(series_to_dataframe(spotify_track))
-            else:
-                target_playlist.get_df().loc[spotify_track['spotify_id']] = spotify_track
-
-
-    target_playlist.write(force=True)
-
-    if len(unmatched_lines) == 0:
-        print(f'Matched all {len(lines)} lines of text in Spotify')
-    else:
-        print(f'{len(unmatched_lines)} out of {len(lines)} were left unmatched:')
-        for unmatched_line in unmatched_lines:
-            print('    ' + unmatched_line)
-
-    return
-
-def remove_artist_from_queue(artist_name):
-    queue = Queue()
+def remove_artist_from_queue(artist_name, queue_name):
+    queue = Queue(queue_name)
 
     if len(queue) == 0:
         return
@@ -590,41 +512,6 @@ def remove_artist_from_queue(artist_name):
     queue.write(force=True)
     return
 
-def create_spotify_playlist_from_rekordbox_playlist(spotify_playlist_name, rekordbox_playlist_name, append=False):
-    spotify_playlist = SpotifyPlaylist(spotify_playlist_name, create=True, overwrite=True)
-
-    rekordbox_playlist = RekordboxPlaylist(rekordbox_playlist_name)
-
-    if spotify_playlist.exists() and not append:
-        spotify_playlist.truncate()
-
-    spotify_playlist.append(rekordbox_playlist)
-    spotify_playlist.write()
-
-    return
-
-def create_rekordbox_playlist_from_spotify_playlist(rekordbox_playlist_name, spotify_playlist_name, append=False):
-    rekordbox_playlist = RekordboxPlaylist(rekordbox_playlist_name, create=True, overwrite=True)
-
-    spotify_playlist = SpotifyPlaylist(spotify_playlist_name)
-
-    if rekordbox_playlist.exists() and not append:
-        rekordbox_playlist.truncate()
-
-    rekordbox_playlist.append(spotify_playlist)
-    rekordbox_playlist.write()
-
-    return
-
-def unlike_spotify_playlist(spotify_playlist_name):
-    spotify_playlist = SpotifyPlaylist(spotify_playlist_name)
-
-    spotify_liked = SpotifyLiked()
-
-    spotify_liked.remove(spotify_playlist)
-    spotify_liked.write()
-
-    return
 
 def queue_stats(start_date, end_date):
     start_date = pd.Timestamp(start_date, tz='UTC')
@@ -647,73 +534,4 @@ def queue_stats(start_date, end_date):
     listened_ab_tracks = listened_tracks.index.intersection(ab_tracks_with_spotify.spotify_id, sort=False)
 
     return len(listened_tracks), len(listened_ab_tracks)
-
-
-def review_maintenance(
-        playlist,
-        ref_playlist=None,
-        first_track=None,
-        last_track=None,
-        method='liked'
-):
-    playlist_tracks = SpotifyPlaylist(playlist)
-    ref_playlist_tracks = SpotifyPlaylist(ref_playlist) if ref_playlist is not None else None
-
-    listened_tracks = playlist_tracks.slice(
-        from_index=first_track,
-        to_index=last_track,
-        index_column='name',
-        ignore_case=True,
-        use_prefix=True,
-        unambiguous_prefix=True
-    )
-
-    print(f'{playlist}: {len(listened_tracks)} listened tracks')
-    pretty_print_tracks(listened_tracks, indent=' ' * 4, enum=True)
-    choice = get_user_choice('Is this correct?')
-    if choice != 'yes':
-        return
-    print()
-
-    if len(listened_tracks) == 0:
-        return
-
-    chosen_tracks, not_chosen_tracks = separate_chosen_tracks(
-        listened_tracks,
-        method=method,
-        reference_tracks=ref_playlist_tracks
-    )
-
-    print(f'{playlist}: {len(not_chosen_tracks)} were not chosen')
-    pretty_print_tracks(not_chosen_tracks, indent=' ' * 4, enum=True)
-    choice = get_user_choice('Is this correct?')
-    if choice != 'yes':
-        return
-
-    choice = get_user_choice('What to do?',
-                             options=['Nothing', 'C class', 'D class'])
-    if choice == 'Nothing':
-        return
-    elif choice == 'C class':
-        new_class = 'C'
-    elif choice == 'D class':
-        new_class = 'D'
-
-    not_chosen_tracks_rb = library_scripts.add_rekordbox_fields_to_spotify(
-        not_chosen_tracks, drop_missing_ids=True)
-
-    not_chosen_tracks_rb.set_index('rekordbox_id', inplace=True)
-
-    library_scripts.reclassify_tracks_as(not_chosen_tracks_rb, new_class)
-
-    choice = get_user_choice(f"Remove listened tracks from playlist {playlist}?")
-    if choice == 'yes':
-        playlist_tracks.remove(listened_tracks, prompt=False)
-        playlist_tracks.write()
-
-    return
-
-
-
-
 

@@ -1,6 +1,6 @@
 from typing import Union
 
-import djlib_config
+from spyroslib.containers import Container
 
 from local_util import *
 from containers import *
@@ -273,4 +273,119 @@ def find_spotify_artist(artist_name):
         raise ValueError(f'Artist {artist_name} not found')
 
     return candidate_ids[0]
+
+def pretty_print_spotify_playlist(playlist_name, *, enum=True, liked_only=False):
+    spotify_playlist = SpotifyPlaylist(playlist_name)
+
+    if liked_only:
+        liked = SpotifyLiked()
+
+        tracks = spotify_playlist.get_intersection(liked)
+
+        print(f"Spotify playlist '{playlist_name}': {len(spotify_playlist)} tracks, {len(tracks)} liked tracks")
+    else:
+        print(f"Spotify playlist '{playlist_name}': {len(spotify_playlist)} tracks")
+        tracks = spotify_playlist.get_df()
+
+    pretty_print_tracks(tracks, enum=enum, ids=False)
+    return
+
+def shuffle_spotify_playlist(playlist_name):
+    playlist = SpotifyPlaylist(playlist_name, overwrite=True)
+
+    tracks = playlist.get_df()
+
+    new_tracks_idx = random.sample(tracks.index.to_list(), k=len(tracks))
+
+    new_tracks = tracks.loc[new_tracks_idx]
+
+    playlist.set_df(new_tracks)
+    playlist.write()
+
+    return
+
+def text_file_to_spotify_playlist(text_file, target_playlist_name='tmp queue'):
+    if target_playlist_name is None:
+        target_playlist = None
+    else:
+        target_playlist = SpotifyPlaylist(target_playlist_name)
+
+    lines = read_lines_from_file(text_file)
+
+    print(f'Looking for {len(lines)} lines of text in Spotify' +
+          (f'; adding to playlist {target_playlist_name}'
+           if target_playlist_name is not None else ''))
+
+    unmatched_lines = []
+    for line in lines:
+        spotify_track = text_to_spotify_track(line)
+
+        if spotify_track is None:
+            unmatched_lines.append(line)
+        elif target_playlist is not None:
+            # this avoids a Pandas warning
+            spotify_track['added_at'] = pd.Timestamp.now()
+
+            if len(target_playlist.get_df()) == 0:
+                target_playlist.set_df(series_to_dataframe(spotify_track))
+            else:
+                target_playlist.get_df().loc[spotify_track['spotify_id']] = spotify_track
+
+
+    target_playlist.write(force=True)
+
+    if len(unmatched_lines) == 0:
+        print(f'Matched all {len(lines)} lines of text in Spotify')
+    else:
+        print(f'{len(unmatched_lines)} out of {len(lines)} were left unmatched:')
+        for unmatched_line in unmatched_lines:
+            print('    ' + unmatched_line)
+
+    return
+
+def create_spotify_playlist_from_rekordbox_playlist(spotify_playlist_name, rekordbox_playlist_name, append=False):
+    spotify_playlist = SpotifyPlaylist(spotify_playlist_name, create=True, overwrite=True)
+
+    rekordbox_playlist = RekordboxPlaylist(rekordbox_playlist_name)
+
+    if spotify_playlist.exists() and not append:
+        spotify_playlist.truncate()
+
+    spotify_playlist.append(rekordbox_playlist)
+    spotify_playlist.write()
+
+    return
+
+def create_rekordbox_playlist_from_spotify_playlist(rekordbox_playlist_name, spotify_playlist_name, append=False):
+    rekordbox_playlist = RekordboxPlaylist(rekordbox_playlist_name, create=True, overwrite=True)
+
+    spotify_playlist = SpotifyPlaylist(spotify_playlist_name)
+
+    if rekordbox_playlist.exists() and not append:
+        rekordbox_playlist.truncate()
+
+    rekordbox_playlist.append(spotify_playlist)
+    rekordbox_playlist.write()
+
+    return
+
+def unlike_spotify_playlist(spotify_playlist_name):
+    spotify_playlist = SpotifyPlaylist(spotify_playlist_name)
+
+    spotify_liked = SpotifyLiked()
+
+    spotify_liked.remove(spotify_playlist)
+    spotify_liked.write()
+
+    return
+
+def like_spotify_playlist(spotify_playlist_name):
+    spotify_playlist = SpotifyPlaylist(spotify_playlist_name)
+
+    spotify_liked = SpotifyLiked()
+
+    spotify_liked.append(spotify_playlist)
+    spotify_liked.write()
+
+    return
 

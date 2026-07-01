@@ -10,8 +10,8 @@ import logging
 import pandas as pd
 import numpy as np
 
-from library_scripts import *
-from spotify_scripts import *
+from library_workflow import *
+from queue_workflow import *
 from common_tasks import *
 
 logger = logging.getLogger(__name__)

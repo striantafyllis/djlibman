@@ -4,7 +4,6 @@ import os.path
 import configparser
 import ast
 import logging
-import re
 
 import pandas as pd
 

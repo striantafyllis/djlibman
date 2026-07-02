@@ -12,7 +12,7 @@ from local_util import *
 
 logger = logging.getLogger(__name__)
 
-_MAX_ITEMS_PER_REQUEST = 50
+_MAX_ITEMS_PER_REQUEST = 20
 
 _SCOPES = [
     'user-library-read',

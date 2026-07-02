@@ -81,10 +81,11 @@ def separate_chosen_tracks(
     return tracks.loc[chosen_idx], tracks.loc[not_chosen_idx]
 
 def promote_tracks_in_spotify_queue(
-        last_track,
-        promote_source_name,
-        promote_target_name,
         *,
+        last_track=None,
+        promote_source_name=None,
+        promote_target_name=None,
+        side_playlist_name=None,
         unambiguous_prefix=True,
         disk_queue=None,
         method='liked',
@@ -93,8 +94,13 @@ def promote_tracks_in_spotify_queue(
         remove_from_source=True,
         add_to_listening_history=False
 ):
+    if side_playlist_name is not None and not remove_from_source:
+        raise ValueError("Side playlist is set but remove_from_source is false; this doesn't make sense.")
+
     promote_source = SpotifyPlaylist(promote_source_name)
     promote_target = SpotifyPlaylist(promote_target_name)
+
+    side_playlist = SpotifyPlaylist(side_playlist_name) if side_playlist_name is not None else None
 
     if isinstance(last_track, int):
         # because this comes from a human, it's probably 1-based, whereas we want 0-based
@@ -134,23 +140,29 @@ def promote_tracks_in_spotify_queue(
     print()
 
     if len(listened_chosen_tracks) > 0:
-        promote_target.append(listened_chosen_tracks, prompt=False)
+        print(f'Appending {len(listened_chosen_tracks)} tracks to playlist {promote_target_name}...')
+        promote_target.append(listened_chosen_tracks, prompt=False, silent=True)
         promote_target.write()
 
         if unlike:
             liked = SpotifyLiked()
 
-            liked.remove(listened_chosen_tracks, prompt=False)
+            liked.remove(listened_chosen_tracks, prompt=False, silent=True)
             liked.write()
 
+    if len(listened_not_chosen_tracks) > 0 and side_playlist is not None:
+        print(f'Appending remaining {len(listened_not_chosen_tracks)} tracks to side playlist {side_playlist_name}...')
+        side_playlist.append(listened_not_chosen_tracks, prompt=False, silent=True)
+        side_playlist.write()
+
     if remove_from_source:
-        promote_source.remove(listened_tracks, prompt=False)
+        promote_source.remove(listened_tracks, prompt=False, silent=True)
         promote_source.write()
 
     if disk_queue is not None:
         print(f'Removing listened tracks from disk queue {disk_queue}...')
         queue = Queue(disk_queue)
-        queue.remove(listened_tracks, prompt=False)
+        queue.remove(listened_tracks, prompt=False, silent=True)
         queue.write()
 
         print(f'Disk queue {disk_queue} now has {len(queue)} tracks')
@@ -158,7 +170,7 @@ def promote_tracks_in_spotify_queue(
     if add_to_listening_history:
         print(f'Adding listened tracks to listening history...')
         listening_history = ListeningHistory()
-        listening_history.append(listened_tracks, prompt=False)
+        listening_history.append(listened_tracks, prompt=False, silent=True)
         listening_history.write()
 
     return listened_tracks
@@ -258,6 +270,7 @@ def queue_maintenance(
         spotify_queues=[],
         promote_source=None,
         promote_target=None,
+        side_playlist=None,
         method='Liked',
         ref_playlist=None,
         remove_from_source=True,
@@ -335,15 +348,16 @@ def queue_maintenance(
 
     if last_track is not None:
         promote_tracks_in_spotify_queue(
-            last_track,
-            promote_source,
-            promote_target,
+            last_track=last_track,
+            promote_source_name=promote_source,
+            promote_target_name=promote_target,
+            side_playlist_name=side_playlist,
             unambiguous_prefix=unambiguous_prefix,
             disk_queue=disk_queue if promote_source_level==1 else None,
             method=method,
             ref_playlist=ref_playlist,
             remove_from_source=remove_from_source,
-            add_to_listening_history=add_to_listening_history
+            add_to_listening_history=(add_to_listening_history and promote_source_level==1)
         )
 
     return

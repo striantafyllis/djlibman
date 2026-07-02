@@ -1,38 +1,35 @@
-
 from queue_workflow import *
 
-def number_ones_maintenance(
-        last_track,
-        *,
-        temp_playlist='number ones pt2',
-        main_playlist='number ones',
-        next_level_playlist='number ones L2'
-):
-    listened_tracks = promote_tracks_in_spotify_queue(
-        last_track,
-        promote_source_name=temp_playlist,
-        promote_target_name=next_level_playlist,
-        unlike=False,
-        remove_from_source=True,
-        add_to_listening_history=True
-    )
+def like_tracks_from_text_file(text_file):
+    fh = open(text_file)
+    lines = fh.readlines()
+    fh.close()
 
-    main_playlist_cont = SpotifyPlaylist(main_playlist)
-    main_playlist_cont.append(listened_tracks, prompt=False)
-    main_playlist_cont.write()
+    track_ids = []
+
+    line_no = 0
+    for line in lines:
+        line_no += 1
+
+        line = line.strip()
+        if line == '':
+            continue
+
+        # find track ID
+        m = re.search(r'[0-9A-Za-z]{20,}', line)
+        if not m:
+            raise Exception(f"Line {line_no}: can't find track ID")
+
+        track_id = m.group(0)
+        track_ids.append(track_id)
+
+    print(f'Liking {len(track_ids)} tracks...')
+
+    djlib_config.spotify.add_liked_tracks(track_ids)
+    return
 
     return
 
-def rebuild_number_ones_l2():
-    number_ones_l2 = SpotifyPlaylist('number ones L2', overwrite=True)
-    number_ones = SpotifyPlaylist('number ones')
-    liked = SpotifyLiked()
-    number_ones_liked = number_ones.get_df().loc[
-        number_ones.get_df().index.intersection(
-            liked.get_df().index, sort=False)]
-    number_ones_l2.set_df(number_ones_liked)
-    number_ones_l2.write()
-    return
 
 def queue_maintenance_prog(last_track=None, **kwargs):
     queue_maintenance(
@@ -42,6 +39,10 @@ def queue_maintenance_prog(last_track=None, **kwargs):
         **kwargs
     )
 
+def replenish_spotify_queue_prog(target_size=200):
+    return replenish_spotify_queue(playlist_name='prog L1', queue_name='prog_queue',
+                                   target_size=target_size)
+
 def queue_maintenance_salsa(last_track=None, **kwargs):
     return queue_maintenance(
         last_track=last_track,
@@ -49,10 +50,6 @@ def queue_maintenance_salsa(last_track=None, **kwargs):
         spotify_queues=['salsa L1', 'salsa L2', 'salsa L3', 'salsa L4', 'salsa non playable'],
         **kwargs
     )
-
-def replenish_spotify_queue_prog(target_size=200):
-    return replenish_spotify_queue(playlist_name='prog L1', queue_name='prog_queue',
-                                   target_size=target_size)
 
 def replenish_spotify_queue_salsa(target_size=200):
     return replenish_spotify_queue(playlist_name='salsa L1', queue_name='salsa_queue',
@@ -62,7 +59,19 @@ def salsa_playlist():
     create_spotify_playlist_from_rekordbox_playlist('Salsa DJ Library', ['managed', 'Salsa AB'])
     return
 
-def _form_l2_playlist(playlist_names, l2_playlist_name):
+
+
+def queue_maintenance_songs(last_track=None, **kwargs):
+    return queue_maintenance(
+        last_track=last_track,
+        side_playlist='songs side pocket',
+        disk_queue=None,
+        spotify_queues=['songs L1', 'songs L2', 'songs L3', 'songs L4'],
+        **kwargs
+    )
+
+
+def _reform_l2_playlist(playlist_names, l2_playlist_name):
     liked_idx = SpotifyLiked().get_df().index
 
     l2_playlist = SpotifyPlaylist(l2_playlist_name)
@@ -87,8 +96,6 @@ def _form_l2_playlist(playlist_names, l2_playlist_name):
 def manage_lockwood():
     spotify_playlists = djlib_config.spotify.get_playlists()
 
-    lockwood_playlists = [name for name in spotify_playlists.name if name.startswith('Lockwood')]
-
     lockwood_beethoven_playlists =  [
         name
         for name in spotify_playlists.name
@@ -106,7 +113,7 @@ def manage_lockwood():
     lockwood_beethoven_playlists.sort()
     lockwood_others_playlists.sort()
 
-    _form_l2_playlist(lockwood_beethoven_playlists, 'Lockwood Beethoven L2')
-    _form_l2_playlist(lockwood_others_playlists, 'Lockwood Others L2')
+    _reform_l2_playlist(lockwood_beethoven_playlists, 'Lockwood Beethoven L2')
+    _reform_l2_playlist(lockwood_others_playlists, 'Lockwood Others L2')
 
     return

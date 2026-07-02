@@ -240,16 +240,16 @@ class ListeningHistory(Doc):
         df = df.assign(added_at=pd.Timestamp.utcnow())
         return df
 
-    def append(self, other, prompt=None):
-        super(ListeningHistory, self).append(other, prompt)
+    def append(self, other, prompt=None, silent=False):
+        super(ListeningHistory, self).append(other, prompt=prompt, silent=silent)
 
         self._track_signatures = None
         return
 
-    def remove(self, other, prompt=None, force=False):
+    def remove(self, other, prompt=None, force=False, silent=False):
         if not force:
             raise ValueError('Why remove from listening history?')
-        super(ListeningHistory, self).remove(other, prompt)
+        super(ListeningHistory, self).remove(other, prompt=prompt, silent=silent)
 
     def _ensure_track_signatures(self):
         self._ensure_df()

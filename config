@@ -1,1 +1,76 @@
-/Users/spyros/Music/djlib/config
+
+[general]
+backups = 2
+default_dir = /Users/spyros/Music/djlib/
+logfile = /Users/spyros/python/djlibman/djlibman.log
+loglevel = DEBUG
+pandas.display.max_columns = 30
+pandas.display.max_rows = 20
+pandas.display.width = 400
+pandas.display.max_colwidth = 200
+
+[rekordbox]
+rekordbox_xml = /Users/spyros/Music/djlib/rekordbox.xml
+
+[google]
+credentials = /Users/spyros/google_credentials_music_library_management.json
+cached_token_file = google_cached_token.json
+
+[spotify]
+client_id = $SPOTIPY_CLIENT_ID
+client_secret = $SPOTIPY_CLIENT_SECRET
+redirect_uri = https://localhost:8080
+cached_token_file = spotify_cached_token.json
+
+[soundcloud]
+client_id = $SOUNDCLOUD_CLIENT_ID
+client_secret = $SOUNDCLOUD_CLIENT_SECRET
+redirect_uri = https://localhost:8080
+cached_token_file = soundcloud_cached_token.json
+
+[spotify_discography]
+discography_cache_dir = /Users/spyros/Music/djlib/discography_cache/
+artist_albums_ttl_days = 7
+
+[docs.djlib]
+# type = excel
+type = google_sheet
+# path = /Users/spyros/Music/djlib/djlib.xlsx
+path = DJ Library
+sheet = Main Library
+header = 0
+index_column = rekordbox_id
+list_columns = ['Flavors', 'Instruments', 'Protosets']
+boolean_columns  = ['Danceable', 'Ambient', 'Song', 'Vocalizing', 'Distorted Vocals']
+datetime_columns = ['Date Added']
+datetime_format = %%Y-%%m-%%d
+
+
+[docs.new_tracks_scratch]
+type = excel
+path = /Users/spyros/Music/djlib/djlib.xlsx
+sheet = New Tracks
+header = 0
+list_columns = ['Playlists', 'Flavors', 'Instruments']
+boolean_columns  = ['Melody', 'Fast Melody', 'Slow Melody', 'Vocalizing', 'Distorted Vocals']
+
+[docs.listening_history]
+type = csv
+path = /Users/spyros/Music/djlib/listening_history.csv
+header = 0
+datetime_columns = ['release_date', 'added_at']
+
+[docs.rekordbox_to_spotify]
+type = csv
+path = /Users/spyros/Music/djlib/rekordbox_to_spotify.csv
+header = 0
+index_column = rekordbox_id
+datetime_columns = ['release_date', 'added_at']
+
+[docs.test_csv]
+type = csv
+path = /Users/spyros/Music/djlib/test.csv
+header = 0
+index_column = id
+datetime_columns = ['added_at']
+

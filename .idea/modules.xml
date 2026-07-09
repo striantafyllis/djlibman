@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/djlibman.iml" filepath="$PROJECT_DIR$/.idea/djlibman.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../spyroslib/.idea/spyroslib.iml" filepath="$PROJECT_DIR$/../spyroslib/.idea/spyroslib.iml" />
     </modules>
   </component>
 </project>

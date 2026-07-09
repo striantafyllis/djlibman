@@ -369,7 +369,7 @@ def add_to_queue(tracks):
     if isinstance(tracks, str):
         tracks = SpotifyPlaylist(tracks)
     elif isinstance(tracks, pd.DataFrame):
-        tracks = Wrapper(tracks)
+        tracks = ct.Wrapper(tracks)
 
     print(f'Attempting to add {len(tracks)} tracks to the disk queue...')
 

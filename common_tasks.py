@@ -64,7 +64,7 @@ def salsa_playlist():
 def queue_maintenance_songs(last_track=None, **kwargs):
     return queue_maintenance(
         last_track=last_track,
-        side_playlist='songs side pocket',
+        # side_playlist='songs side pocket',
         disk_queue=None,
         spotify_queues=['songs L1', 'songs L2', 'songs L3', 'songs L4'],
         **kwargs

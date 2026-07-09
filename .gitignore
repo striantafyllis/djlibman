@@ -8,6 +8,6 @@ code_examples/grammar/*.tokens
 code_examples/grammar/*.py
 /buffer
 /djlibman.log
-/data/*
+/data
 
 /soundcloud_cached_token.json

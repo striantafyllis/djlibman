@@ -1,6 +1,6 @@
 from typing import Union
 
-from spyroslib.containers import Container
+import spyroslib.containers
 
 from local_util import *
 from containers import *
@@ -161,7 +161,7 @@ def text_to_spotify_track(text):
     return None
 
 
-def get_track_artists(tracks: Union[Container, pd.DataFrame]):
+def get_track_artists(tracks: Union[spyroslib.containers.Container, pd.DataFrame]):
     """Forms a dataframe artist_id: artist from a tracks dataframe"""
     if isinstance(tracks, Container):
         tracks = tracks.get_df()
@@ -377,3 +377,23 @@ def get_spotify_playlists_regex(regex):
     ]
 
     return regex_playlist_names
+
+def archive_spotify_playlist(playlist_name):
+    playlist = SpotifyPlaylist(playlist_name)
+
+    csv_filename_base = os.path.join(
+        djlib_config.default_dir,
+        'spotify-archive',
+        f'{playlist_name}')
+
+    csv_filename_number = 0
+    csv_filename = f'{csv_filename_base}.csv'
+    while os.path.exists(csv_filename):
+        csv_filename_number += 1
+        csv_filename = f'{csv_filename_base} ({csv_filename_number}).csv'
+
+    playlist.to_csv(csv_filename)
+
+    djlib_config.spotify.delete_playlist(playlist_name)
+
+    return

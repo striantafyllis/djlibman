@@ -298,6 +298,17 @@ class SpotifyInterface:
         self._cache.invalidate('playlists')
         return
 
+    def delete_playlist(self, playlist_name):
+        playlist_id = self.get_playlist_id(playlist_name)
+        self._wrap_request(
+            'user_playlist_unfollow',
+            user=self.get_user_id(),
+            playlist_id=playlist_id
+        )
+        self._cache.invalidate('playlists')
+        return
+
+
     def _get_playlist_id_if_necessary(self, playlist_name_or_id):
         if is_spotify_id(playlist_name_or_id):
             return playlist_name_or_id

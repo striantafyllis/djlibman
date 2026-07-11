@@ -50,7 +50,10 @@ def init(config_file=None):
         potential_config_files = [
             os.path.join(os.environ['HOME'], '.djlib', 'config'),
             os.path.join(os.environ['HOME'], '.djlib_config'),
-            './config'
+            os.path.join(
+                os.path.dirname(os.path.realpath(__file__)),
+                'config'
+            )
         ]
 
         for potential_config_file in potential_config_files:

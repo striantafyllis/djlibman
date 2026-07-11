@@ -111,7 +111,10 @@ class SpotifyInterface:
                 self._client_secret = client_secret_file.read().strip()
 
         self._redirect_uri = config['redirect_uri']
-        self._cached_token_file = config['cached_token_file']
+        self._cached_token_file = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            config['cached_token_file']
+        )
 
         self._cache = cache.Cache()
 

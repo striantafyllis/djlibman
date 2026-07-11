@@ -5,6 +5,8 @@ from library_workflow import add_spotify_fields_to_rekordbox
 
 from spotify_util import *
 
+from spyroslib.containers import Container
+
 def sanity_check_disk_queue(disk_queue_name):
     queue = Queue(disk_queue_name)
     print(f'Queue {disk_queue_name}: {len(queue)} tracks')

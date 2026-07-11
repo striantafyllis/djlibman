@@ -58,28 +58,57 @@ def clean_title(title):
     cleaned = re.sub(r'".*?"', '', cleaned)
     return cleaned.strip()
 
+def get_core_title(title):
+    title_lower = title.lower()
+    # Medleys are checked separately but skip here if keyword is found
+    if 'medley' in title_lower:
+        return ''
+    title_clean = re.sub(r'\(.*?\)', '', title)
+    title_clean = re.sub(r'\[.*?\]', '', title_clean)
+    parts = re.split(r'\s+-\s+|\s*:\s*', title_clean)
+    core = parts[0]
+    core_lower = core.lower()
+    core_clean = re.split(r'\b(from|feat|featuring|remaster|live|mono|stereo|version|recording|tribute|original soundtrack)\b', core_lower)[0]
+    return core_clean.strip().rstrip('-').rstrip(':').strip()
+
 def titles_match(query_title, track_title):
-    # Normalize both by removing non-alphanumeric chars
-    q = re.sub(r'\W+', '', query_title.lower())
-    t = re.sub(r'\W+', '', track_title.lower())
-    
-    # Check for direct substring match
-    if q in t or t in q:
-        return True
+    track_title_lower = track_title.lower()
+    # Disqualify medleys entirely to prevent duplicates across multiple songs
+    if 'medley' in track_title_lower:
+        return False
         
-    # Simplify by removing common words to handle things like "and" vs "&"
     def simplify(s):
         s = s.lower()
         s = re.sub(r'\band\b', '', s)
         s = re.sub(r'\bthe\b', '', s)
         s = re.sub(r'\W+', '', s)
         return s
-        
+
     q_simple = simplify(query_title)
-    t_simple = simplify(track_title)
-    if q_simple in t_simple or t_simple in q_simple:
+    core_track = get_core_title(track_title)
+    if not core_track:
+        return False
+        
+    t_simple = simplify(core_track)
+    if q_simple == t_simple:
         return True
         
+    # Handle split track titles (e.g. "Get Happy/Happy Days Are Here Again")
+    if '/' in core_track:
+        parts = core_track.split('/')
+        for part in parts:
+            if simplify(part) == q_simple:
+                return True
+                
+    # Check parentheticals for alternative titles
+    parentheticals = re.findall(r'\((.*?)\)|\[(.*?)\]', track_title)
+    for p_tuple in parentheticals:
+        p_text = p_tuple[0] or p_tuple[1]
+        if p_text:
+            p_simple = simplify(p_text)
+            if q_simple == p_simple or q_simple in p_simple:
+                return True
+                
     return False
 
 def score_track(track, song_title, composer):

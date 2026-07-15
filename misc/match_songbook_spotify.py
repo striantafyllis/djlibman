@@ -198,23 +198,23 @@ def find_credible_spotify_matches(song_title, composer):
 
     # 1. Try structured track search
     query = f'track:"{cleaned_song}"'
-    tracks_df = djlib_config.spotify.search(query, limit=50)
+    tracks_df = search(query, limit=50)
     process_tracks(tracks_df)
     
     # 2. Try general search
     query = cleaned_song
-    tracks_df = djlib_config.spotify.search(query, limit=50)
+    tracks_df = search(query, limit=50)
     process_tracks(tracks_df)
         
     # 3. Try composer-specific fallback searches
     comp_term = get_composer_search_term(composer)
     if comp_term:
         fallback_query = f'track:"{cleaned_song}" {comp_term}'
-        fallback_df = djlib_config.spotify.search(fallback_query, limit=50)
+        fallback_df = search(fallback_query, limit=50)
         process_tracks(fallback_df)
         
         fallback_query = f'{cleaned_song} {comp_term}'
-        fallback_df = djlib_config.spotify.search(fallback_query, limit=50)
+        fallback_df = search(fallback_query, limit=50)
         process_tracks(fallback_df)
         
     # Sort matches by score in descending order

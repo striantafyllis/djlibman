@@ -112,7 +112,7 @@ def text_to_spotify_track(text):
     search_string = format_track_for_search(text2)
 
     print(f'Searching for track: {text} with search string: {search_string}')
-    spotify_tracks = djlib_config.spotify.search(search_string)
+    spotify_tracks = search(search_string)
 
     if len(spotify_tracks) == 0:
         print('    No search results from Spotify!')
@@ -368,7 +368,7 @@ def like_spotify_playlist(spotify_playlist_name):
     return
 
 def get_spotify_playlists_regex(regex):
-    all_playlist_names = djlib_config.spotify.get_playlists()
+    all_playlist_names = get_playlists()
 
     regex_playlist_names = [
         playlist
@@ -394,6 +394,6 @@ def archive_spotify_playlist(playlist_name):
 
     playlist.to_csv(csv_filename)
 
-    djlib_config.spotify.delete_playlist(playlist_name)
+    delete_playlist(playlist_name)
 
     return

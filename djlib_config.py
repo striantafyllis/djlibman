@@ -8,6 +8,7 @@ import logging
 import pandas as pd
 
 import rekordbox_interface
+import spotify_interface_old
 import spotify_interface
 import soundcloud_interface
 

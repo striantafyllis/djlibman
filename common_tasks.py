@@ -25,7 +25,7 @@ def like_tracks_from_text_file(text_file):
 
     print(f'Liking {len(track_ids)} tracks...')
 
-    djlib_config.spotify.add_liked_tracks(track_ids)
+    add_liked_tracks(track_ids)
     return
 
     return
@@ -70,6 +70,14 @@ def queue_maintenance_songs(last_track=None, **kwargs):
         **kwargs
     )
 
+def queue_maintenance_great_american_songbook(last_track=None, **kwargs):
+    return queue_maintenance(
+        last_track=last_track,
+        disk_queue=None,
+        spotify_queues=['Great American Songbook L1', 'Great American Songbook L2'],
+        **kwargs
+    )
+
 great_american_songbook_csv = '/Users/spyros/Music/djlib/Great American Songbook with Spotify IDs.csv'
 
 def great_american_songbook_to_songs_queue(use_listening_history=True):
@@ -105,7 +113,7 @@ def great_american_songbook_to_songs_queue(use_listening_history=True):
 
     print(f'Adding {len(great_american_songs_max_pop)} songs to queue...')
 
-    queue = SpotifyPlaylist('songs L1')
+    queue = SpotifyPlaylist('Great American Songbook L1')
 
     queue.append(great_american_songs_max_pop)
 
@@ -113,3 +121,4 @@ def great_american_songbook_to_songs_queue(use_listening_history=True):
 
     queue.write()
     return
+

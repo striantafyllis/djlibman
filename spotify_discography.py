@@ -157,7 +157,7 @@ class _SpotifyDiscography:
 
         print(f'Fetching albums for artist: {artist_id} {artist_name}...', end='')
 
-        artist_albums = djlib_config.spotify.get_artist_albums(artist_id)
+        artist_albums = get_artist_albums(artist_id)
 
         if force:
             print(f' {len(artist_albums)} fetched; replacing {len(artist_albums_doc)} existing albums')
@@ -287,7 +287,7 @@ class _SpotifyDiscography:
 
         print(f'Fetching tracks for album: {album_id} {album_name}...', end='')
 
-        album_tracks = djlib_config.spotify.get_album_tracks(album_id)
+        album_tracks = get_album_tracks(album_id)
 
         album_tracks_doc.set_df(album_tracks)
         album_tracks_doc.write()

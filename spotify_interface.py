@@ -2,6 +2,7 @@ import time
 import logging
 import json
 import base64
+import hashlib
 import os
 import os.path
 import re
@@ -79,6 +80,15 @@ def _postprocess_albums(results):
     return projection
 
 
+def _generate_code_verifier(length: int = 128) -> str:
+    possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    return ''.join(random.choices(possible, k=length))
+
+def _generate_code_challenge(code_verifier: str) -> str:
+    digest = hashlib.sha256(code_verifier.encode('utf-8')).digest()
+    return base64.urlsafe_b64encode(digest).decode('utf-8').rstrip('=')
+
+
 class SpotifyInterface:
     def __init__(self, config):
         self._client_id = config['client_id']
@@ -92,7 +102,10 @@ class SpotifyInterface:
             with open(client_secret_loc) as client_secret_file:
                 self._client_secret = client_secret_file.read().strip()
 
-        self._redirect_uri = config['redirect_uri']
+        self._redirect_uri = config.get('redirect_uri')
+        if self._redirect_uri.startswith('$'):
+            self._redirect_uri = os.environ.get(self._redirect_uri[1:])
+
         self._cached_token_file = os.path.join(
             os.path.dirname(os.path.realpath(__file__)),
             config['cached_token_file']
@@ -121,9 +134,12 @@ class SpotifyInterface:
         if self._refresh_token is not None:
             try:
                 self._refresh_token_workflow()
+                return
             except Exception as e:
                 logger.debug('Refreshing Spotify access token failed: %s', str(e))
-                self._authorization_workflow()
+
+        self._authorization_workflow()
+        return
 
     def _read_access_token_file(self):
         with open(self._cached_token_file) as token_fh:
@@ -149,13 +165,17 @@ class SpotifyInterface:
 
     def _authorization_workflow(self):
         state = ''.join(random.choices('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=10))
+        code_verifier = _generate_code_verifier(128)
+        code_challenge = _generate_code_challenge(code_verifier)
 
         options = {
             'client_id': self._client_id,
             'response_type': 'code',
             'redirect_uri': self._redirect_uri,
             'scope': ' '.join(_SCOPES),
-            'state': state
+            'state': state,
+            'code_challenge_method': 'S256',
+            'code_challenge': code_challenge
         }
 
         authorize_url = f'https://accounts.spotify.com/authorize?{urlencode(options)}'
@@ -179,7 +199,9 @@ class SpotifyInterface:
         post_data = {
             'grant_type': 'authorization_code',
             'code': response_code,
-            'redirect_uri': self._redirect_uri
+            'redirect_uri': self._redirect_uri,
+            'client_id': self._client_id,
+            'code_verifier': code_verifier
         }
 
         auth_header = base64.b64encode(f"{self._client_id}:{self._client_secret}".encode()).decode()

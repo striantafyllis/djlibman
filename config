@@ -17,9 +17,9 @@ credentials = /Users/spyros/google_credentials_music_library_management.json
 cached_token_file = google_cached_token.json
 
 [spotify]
-client_id = $SPOTIPY_CLIENT_ID
-client_secret = $SPOTIPY_CLIENT_SECRET
-redirect_uri = https://localhost:8080
+client_id = $SPOTIFY_CLIENT_ID
+client_secret = $SPOTIFY_CLIENT_SECRET
+redirect_uri = $SPOTIFY_REDIRECT_URI
 cached_token_file = spotify_cached_token.json
 
 [soundcloud]

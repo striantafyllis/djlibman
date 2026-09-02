@@ -70,13 +70,30 @@ def queue_maintenance_songs(last_track=None, **kwargs):
         **kwargs
     )
 
-def queue_maintenance_great_american_songbook(last_track=None, **kwargs):
+def queue_maintenance_gas(last_track=None, **kwargs):
     return queue_maintenance(
         last_track=last_track,
         disk_queue=None,
-        spotify_queues=['Great American Songbook L1', 'Great American Songbook L2'],
+        spotify_queues=[
+            'GAS L1',
+            'GAS L2',
+            'GAS L3'
+        ],
         **kwargs
     )
+
+def queue_maintenance_classical(last_track=None, **kwargs):
+    return queue_maintenance(
+        last_track=last_track,
+        disk_queue=None,
+        spotify_queues=[
+            'Classical L1',
+            'Classical L2',
+            'Classical L3'
+        ],
+        **kwargs
+    )
+
 
 great_american_songbook_csv = '/Users/spyros/Music/djlib/Great American Songbook with Spotify IDs.csv'
 

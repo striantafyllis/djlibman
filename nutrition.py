@@ -1,5 +1,6 @@
 
 import sys
+import time
 
 import pandas as pd
 import numpy as np
@@ -12,6 +13,17 @@ def issue_error(error_message, continue_on_error=False):
     else:
         raise Exception(error_message)
 
+handled_columns = [
+    'Name',
+    'Quantity',
+    'Unit',
+    'Calories',
+    'Fat',
+    'Carbs',
+    'Fiber',
+    'Sugar',
+    'Protein'
+]
 
 unit_conversion_table = {
     'lb': { 'oz': 16, 'g': 453.592 },
@@ -19,7 +31,8 @@ unit_conversion_table = {
     'pint': { 'floz': 19.2152, 'pints': 1 },
     'tbsp': { 'tsp': 3, 'ml': 14.7868 },
     'cups': { 'cup': 1, 'floz': 8 },
-    'pcs': { 'pc': 1 }
+    'pcs': { 'pc': 1 },
+    'scoops': { 'scoop': 1 },
 }
 
 def _complete_unit_conversion_table():
@@ -88,6 +101,9 @@ class Nutrition:
         sheets = self.google.get_sheets_in_file(id=google_sheet_id)
 
         for sheet in sheets:
+            if sheet.endswith('#'):
+                continue
+
             self._ingest_sheet(
                 google_sheet_name,
                 google_sheet_id,
@@ -104,7 +120,7 @@ class Nutrition:
         sheets = self.google.get_sheets_in_file(id=google_sheet_id)
 
         for sheet in sheets:
-            if not sheet.endswith('*'):
+            if not sheet.endswith('*') and not sheet.endswith('#'):
                 self._fill_in_sheet(google_sheet_name,
                                     sheet,
                                     google_sheet_id,
@@ -220,7 +236,7 @@ class Nutrition:
             values = {
                 key: value
                 for key, value in row.iloc[3:].items()
-                if not pd.isna(value)
+                if not pd.isna(value) and key in handled_columns
             }
 
             if is_source_entry:
@@ -431,7 +447,7 @@ class Nutrition:
                 # fix an annoying problem...
                 if isinstance(value, float) and not isinstance(value, int):
                     if not np.issubdtype(contents[key].dtype.type, np.float64):
-                        contents[key] = contents[key].astype(pd.Float64Dtype(), copy=False)
+                        contents[key] = contents[key].astype(pd.Float64Dtype())
 
                 col_idx = contents.columns.get_loc(key)
 
@@ -468,5 +484,8 @@ def main():
     return
 
 if __name__ == '__main__':
+    start = time.time()
     main()
+    end = time.time()
+    print(f'Time elapsed: {end - start:.2f} seconds')
     sys.exit(0)

@@ -133,7 +133,8 @@ def init(config_file=None):
             for field in section.keys():
                 if field in ['type']:
                     continue
-                if field in ['path', 'index_column', 'sheet', 'datetime_format']:
+                if field in ['path', 'title', 'index_column', 'sheet',
+                             'datetime_format']:
                     kwargs[field] = section[field]
                 elif field in ['header', 'backups']:
                     kwargs[field] = section.getint(field)
@@ -153,7 +154,13 @@ def _add_doc(name, type, **kwargs):
     global docs
     global _backups
 
-    if 'backups' not in kwargs:
+    if type == 'google_sheet':
+        # Google keeps its own version history, so a Google sheet has no
+        # backups and its backend does not accept the argument.
+        if 'backups' in kwargs:
+            raise Exception(
+                f'Doc {name}: backups are not supported for Google sheets')
+    elif 'backups' not in kwargs:
         kwargs['backups'] = _backups
 
     # Creating the Doc is what puts it in the Doc cache; every later
@@ -171,6 +178,6 @@ def _add_doc(name, type, **kwargs):
 def delete_backups():
     global docs
 
-    for doc in ct.get_cached_docs():
-        doc.delete_backups()
+    for backend in ct.get_cached_backends():
+        backend.delete_backups()
     return

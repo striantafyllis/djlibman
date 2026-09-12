@@ -156,7 +156,9 @@ def _add_doc(name, type, **kwargs):
     if 'backups' not in kwargs:
         kwargs['backups'] = _backups
 
-    ct.Doc.add_global_doc(
+    # Creating the Doc is what puts it in the Doc cache; every later
+    # Doc(name) finds it there.
+    ct.Doc(
         name=name,
         type=type,
         google_intf=google,
@@ -169,6 +171,6 @@ def _add_doc(name, type, **kwargs):
 def delete_backups():
     global docs
 
-    for doc in ct.get_global_docs():
+    for doc in ct.get_cached_docs():
         doc.delete_backups()
     return

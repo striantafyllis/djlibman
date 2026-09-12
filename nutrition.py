@@ -5,7 +5,7 @@ import time
 import pandas as pd
 import numpy as np
 
-from spyroslib import google_interface
+from spyroslib import google_backend
 
 def issue_error(error_message, continue_on_error=False):
     if continue_on_error:
@@ -84,7 +84,7 @@ class Nutrition:
         self.compound_foods = {}
         self.continue_on_error = continue_on_error
 
-        self.google = google_interface.GoogleInterface(
+        self.google = google_backend.GoogleInterface(
             {
                 'credentials': google_credentials,
                 'cached_token_file': google_cached_token_file
@@ -133,12 +133,11 @@ class Nutrition:
             sheet,
             google_sheet_id=None,
             continue_on_error=False):
-        doc = google_interface.GoogleSheet(
+        doc = google_backend.GoogleSheet(
             google_interface=self.google,
-            path=google_sheet_name,
+            title=google_sheet_name,
             sheet=sheet,
             id=google_sheet_id,
-            backups=0,
             header=0,
         )
 

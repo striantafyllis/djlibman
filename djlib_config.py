@@ -12,7 +12,7 @@ import spotify_interface_old
 import spotify_interface
 import soundcloud_interface
 
-from spyroslib import google_interface
+from spyroslib import google_backend
 from spyroslib import containers as ct
 
 default_dir = None
@@ -102,7 +102,7 @@ def init(config_file=None):
             rekordbox = rekordbox_interface.RekordboxInterface(rekordbox_xml, rekordbox_backups)
 
         elif section.name == 'google':
-            google = google_interface.GoogleInterface(section)
+            google = google_backend.GoogleInterface(section)
 
         elif section.name == 'soundcloud':
             soundcloud = soundcloud_interface.SoundcloudInterface(section)

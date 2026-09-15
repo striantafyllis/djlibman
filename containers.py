@@ -96,13 +96,13 @@ class SpotifyPlaylist(ct.Container):
             index_name='spotify_id')
         return
 
-    def _check_existence(self):
+    def _exists_impl(self):
         return djlib_config.spotify.playlist_exists(self._playlist_name)
 
-    def _read(self, force=False):
+    def _read_impl(self, force=False):
         return djlib_config.spotify.get_playlist_tracks(self._playlist_name)
 
-    def _write_back(self, df):
+    def _write_impl(self, df):
         if not self._exists:
             djlib_config.spotify.create_playlist(self._playlist_name)
         djlib_config.spotify.replace_tracks_in_playlist(self._playlist_name, df)
@@ -116,13 +116,13 @@ class SpotifyLiked(ct.Container):
             index_name='spotify_id')
         return
 
-    def _check_existence(self):
+    def _exists_impl(self):
         return True
 
-    def _read(self, force=False):
+    def _read_impl(self, force=False):
         return djlib_config.spotify.get_liked_tracks()
 
-    def _write_back(self, df):
+    def _write_impl(self, df):
         liked_tracks = djlib_config.spotify.get_liked_tracks()
 
         tracks_to_add = df.index.difference(liked_tracks.index, sort=False)
@@ -151,10 +151,10 @@ class RekordboxCollection(ct.Container):
         )
         return
 
-    def _check_existence(self):
+    def _exists_impl(self):
         return True
 
-    def _read(self, force=False):
+    def _read_impl(self, force=False):
         return djlib_config.rekordbox.get_collection()
 
 
@@ -167,13 +167,13 @@ class RekordboxPlaylist(ct.Container):
             index_name='rekordbox_id')
         return
 
-    def _check_existence(self):
+    def _exists_impl(self):
         return djlib_config.rekordbox.playlist_exists(self._playlist_name)
 
-    def _read(self, force=False):
+    def _read_impl(self, force=False):
         return djlib_config.rekordbox.get_playlist_tracks(self._playlist_name)
 
-    def _write_back(self, df, write_thru=True):
+    def _write_impl(self, df, write_thru=True):
         djlib_config.rekordbox.create_playlist(self._playlist_name, df, overwrite=True)
         if write_thru:
             djlib_config.rekordbox.write()
@@ -225,10 +225,6 @@ class ListeningHistory(Doc):
         )
 
         self._track_signatures = None
-
-    def _rvalue_check(self, operation):
-        raise ValueError(
-            'ListeningHistory should not be added to or removed from other containers')
 
     def _preprocess_before_append(self, df: pd.DataFrame):
         df = df.assign(added_at=pd.Timestamp.utcnow())

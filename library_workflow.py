@@ -17,10 +17,7 @@ def add_spotify_fields_to_rekordbox(rekordbox_tracks: pd.DataFrame, *, drop_miss
     rekordbox_to_spotify_df = rekordbox_to_spotify_df[rekordbox_to_spotify_columns]
 
     if drop_missing_ids:
-        rekordbox_to_spotify_df = dataframe_filter(
-            rekordbox_to_spotify_df,
-            lambda track: not pd.isna(track['spotify_id'])
-        )
+        rekordbox_to_spotify_df = rekordbox_to_spotify_df.dropna(subset=['spotify_id'])
 
     if rekordbox_tracks.index.name != 'rekordbox_id':
         raise ValueError('Argument is not indexed by rekordbox_id')
@@ -40,10 +37,7 @@ def add_rekordbox_fields_to_spotify(spotify_tracks: pd.DataFrame, *, drop_missin
     rekordbox_to_spotify_df = rekordbox_to_spotify.get_df()
 
     if drop_missing_ids:
-        rekordbox_to_spotify_df = dataframe_filter(
-            rekordbox_to_spotify_df,
-            lambda track: not pd.isna(track['spotify_id'])
-        )
+        rekordbox_to_spotify_df = rekordbox_to_spotify_df.dropna(subset=['spotify_id'])
 
     rekordbox_to_spotify_df.set_index('spotify_id', inplace=True, drop=True)
 
@@ -199,8 +193,8 @@ def djlib_maintenance():
         missing_from_djlib = main_library.get_df().loc[rb_tracks_missing_from_djlib, djlib_auto_columns]
 
         # filter out local edits
-        missing_from_djlib = dataframe_filter(missing_from_djlib,
-                                              lambda track: not track['Title'].endswith(' - EDIT'))
+        missing_from_djlib = missing_from_djlib[
+            ~missing_from_djlib['Title'].str.endswith(' - EDIT')]
 
         print(f'{len(missing_from_djlib)} Rekordbox Main Library tracks are missing from djlib')
         pretty_print_tracks(missing_from_djlib, indent=' '*4, enum=True)
@@ -223,8 +217,8 @@ def rekordbox_to_spotify_maintenance(rekordbox_main_playlist='Main Library'):
     unmapped_rekordbox_tracks = main_library.get_difference(rekordbox_to_spotify)
 
     # filter out local edits
-    unmapped_rekordbox_tracks = dataframe_filter(unmapped_rekordbox_tracks,
-                                  lambda track: not track['Title'].endswith(' - EDIT'))
+    unmapped_rekordbox_tracks = unmapped_rekordbox_tracks[
+        ~unmapped_rekordbox_tracks['Title'].str.endswith(' - EDIT')]
 
     if len(unmapped_rekordbox_tracks) == 0:
         print('All Rekordbox main playlist tracks have Spotify mappings')

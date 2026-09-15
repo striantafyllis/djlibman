@@ -1,4 +1,6 @@
 
+import random
+
 import classification
 import spotify_discography
 from library_workflow import add_spotify_fields_to_rekordbox

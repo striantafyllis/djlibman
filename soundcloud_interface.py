@@ -1,5 +1,7 @@
 
 import time
+import random
+import string
 import logging
 import configparser
 import pkce
@@ -84,7 +86,7 @@ class SoundcloudInterface:
         return
 
     def _authorization_workflow(self):
-        state = random_string(10)
+        state = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
 
         code_verifier = pkce.generate_code_verifier(length=128)
         code_challenge = pkce.get_code_challenge(code_verifier)

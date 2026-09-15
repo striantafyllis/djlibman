@@ -66,11 +66,3 @@ path = /Users/spyros/Music/djlib/rekordbox_to_spotify.csv
 header = 0
 index_column = rekordbox_id
 datetime_columns = ['release_date', 'added_at']
-
-[docs.test_csv]
-type = csv
-path = /Users/spyros/Music/djlib/test.csv
-header = 0
-index_column = id
-datetime_columns = ['added_at']
-

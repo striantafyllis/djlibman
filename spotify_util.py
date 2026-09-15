@@ -1,4 +1,5 @@
 from typing import Union
+import random
 
 import spyroslib.containers
 
@@ -64,7 +65,8 @@ def artist_name_condition(name_condition, mode='or'):
     if mode not in ['and', 'or']:
         raise Exception("Invalid mode '%s'" % mode)
 
-    return lambda row: list_condition(lambda el: name_condition(el['name']))(row.artists)
+    combine = any if mode == 'or' else all
+    return lambda row: combine(name_condition(a['name']) for a in row.artists)
 
 
 def artist_stats(tracks, count_cutoff=10):
@@ -288,7 +290,9 @@ def text_file_to_spotify_playlist(text_file, target_playlist_name='tmp queue'):
     else:
         target_playlist = SpotifyPlaylist(target_playlist_name)
 
-    lines = read_lines_from_file(text_file)
+    # one entry per line; '#' starts a comment, blank lines are skipped
+    with open(text_file) as fh:
+        lines = [line for line in (l.split('#')[0].strip() for l in fh) if line]
 
     print(f'Looking for {len(lines)} lines of text in Spotify' +
           (f'; adding to playlist {target_playlist_name}'
@@ -305,7 +309,8 @@ def text_file_to_spotify_playlist(text_file, target_playlist_name='tmp queue'):
             spotify_track['added_at'] = pd.Timestamp.now()
 
             if len(target_playlist.get_df()) == 0:
-                target_playlist.set_df(series_to_dataframe(spotify_track))
+                target_playlist.set_df(
+                    pd.DataFrame([spotify_track]).set_index('spotify_id', drop=False))
             else:
                 target_playlist.get_df().loc[spotify_track['spotify_id']] = spotify_track
 

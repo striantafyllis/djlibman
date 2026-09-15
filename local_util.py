@@ -1,7 +1,21 @@
 
 import sys
+import re
+import difflib
+
+import pandas as pd
+import unidecode
 
 from spyroslib.general_utils import *
+
+
+def get_attrib_or_fail(series, attrib_possible_names):
+    for attrib in attrib_possible_names:
+        if attrib in series and not pd.isna(series[attrib]):
+            return series[attrib]
+    raise Exception(f'None of the attributes {attrib_possible_names} are '
+                    f'present in series {series}')
+
 
 def format_track(track, id=True, extra_attribs=[]):
     if isinstance(extra_attribs, str):
@@ -55,6 +69,83 @@ def get_track_signature(track):
     return tuple(artist_names + [name])
 
 
+def string_to_sorted_tokens(s, asciify=False):
+    words = s.split()
+
+    if asciify:
+        words = [unidecode.unidecode(w) for w in words]
+
+    return ' '.join(sorted(set(words)))
+
+
+def fuzzy_one_to_one_mapping(sequences1, sequences2, cutoff_ratio=0.6,
+                             tokenwise=False,
+                             asciify=False):
+    """Creates a one-to-one mapping between two string lists using fuzzy text matching.
+    Only pairings with a match ratio of at least cutoff_ratio are considered.
+    It is assumed that both sequences are relatively short and contain relatively short strings.
+    Returns:
+        {
+           pairs: [ { index1: <index into sequences1>,
+                      index2: <index into sequences2>,
+                      ratio: <match ratio>
+                      },
+                      ...
+           unmatched_indices1: [ indices into sequences1 ... ],
+           unmatched_indices2: [ indices into sequences2 ...]
+        }
+    """
+
+    if tokenwise:
+        sequences1 = [string_to_sorted_tokens(s, asciify=asciify) for s in sequences1]
+        sequences2 = [string_to_sorted_tokens(s, asciify=asciify) for s in sequences2]
+
+    # using dict instead of set to preserve the order
+    unmatched_indices1 = { index: None for index in range(len(sequences1))}
+    unmatched_indices2 = { index: None for index in range(len(sequences2))}
+
+    sequence_matcher = difflib.SequenceMatcher()
+
+    all_pairs = []
+
+    for index1 in range(len(sequences1)):
+        for index2 in range(len(sequences2)):
+            sequence_matcher.set_seqs(sequences1[index1], sequences2[index2])
+            ratio = sequence_matcher.ratio()
+            if ratio < cutoff_ratio:
+                continue
+
+            all_pairs.append( {
+                'index1': index1,
+                'index2': index2,
+                'ratio': ratio
+            })
+
+    all_pairs.sort(key=lambda x: x['ratio'], reverse=True)
+
+    result = []
+
+    for pair in all_pairs:
+        if len(unmatched_indices1) == 0:
+            break
+        if len(unmatched_indices2) == 0:
+            break
+
+        if pair['index1'] not in unmatched_indices1:
+            continue
+        if pair['index2'] not in unmatched_indices2:
+            continue
+
+        del unmatched_indices1[pair['index1']]
+        del unmatched_indices2[pair['index2']]
+
+        result.append(pair)
+
+    return {
+        'pairs': result,
+        'unmatched_indices1': unmatched_indices1,
+        'unmatched_indices2': unmatched_indices2
+    }
 
 
 def pretty_print_tracks(tracks, indent='', enum=False, ids=True, extra_attribs=[]):

@@ -133,7 +133,7 @@ def init(config_file=None):
             for field in section.keys():
                 if field in ['type']:
                     continue
-                if field in ['path', 'title', 'index_column', 'sheet',
+                if field in ['path', 'title', 'index_name', 'sheet',
                              'datetime_format']:
                     kwargs[field] = section[field]
                 elif field in ['header', 'backups']:

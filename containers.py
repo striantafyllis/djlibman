@@ -92,11 +92,9 @@ class SpotifyPlaylist(ct.Container):
         self._playlist_name = name
         super(SpotifyPlaylist, self).__init__(
             f"Spotify playlist {name}",
-            modify=modify, create=create, overwrite=overwrite)
+            modify=modify, create=create, overwrite=overwrite,
+            index_name='spotify_id')
         return
-
-    def _get_index_name(self):
-        return 'spotify_id'
 
     def _check_existence(self):
         return djlib_config.spotify.playlist_exists(self._playlist_name)
@@ -112,11 +110,11 @@ class SpotifyPlaylist(ct.Container):
 
 class SpotifyLiked(ct.Container):
     def __init__(self):
-        super(SpotifyLiked, self).__init__('Spotify Liked Tracks', modify=True, create=False, overwrite=False)
+        super(SpotifyLiked, self).__init__(
+            'Spotify Liked Tracks',
+            modify=True, create=False, overwrite=False,
+            index_name='spotify_id')
         return
-
-    def _get_index_name(self):
-        return 'spotify_id'
 
     def _check_existence(self):
         return True
@@ -148,12 +146,10 @@ class RekordboxCollection(ct.Container):
             create=False,
             modify=False,
             overwrite=False,
+            index_name='rekordbox_id',
             prompt=False
         )
         return
-
-    def _get_index_name(self):
-        return 'rekordbox_id'
 
     def _check_existence(self):
         return True
@@ -167,11 +163,9 @@ class RekordboxPlaylist(ct.Container):
         self._playlist_name = name
         super(RekordboxPlaylist, self).__init__(
             f"Rekordbox playlist {name}",
-            modify=modify, create=create, overwrite=overwrite)
+            modify=modify, create=create, overwrite=overwrite,
+            index_name='rekordbox_id')
         return
-
-    def _get_index_name(self):
-        return 'rekordbox_id'
 
     def _check_existence(self):
         return djlib_config.rekordbox.playlist_exists(self._playlist_name)

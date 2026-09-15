@@ -3,11 +3,9 @@ import logging
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
-import pandas as pd
-import numpy as np
 import requests
 
-from spyroslib import cache
+import cache
 from local_util import *
 
 logger = logging.getLogger(__name__)

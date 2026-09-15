@@ -107,7 +107,7 @@ def create_spotify_tracks():
                                 path=os.path.join(djlib_config.discography_cache_dir,
                                                   album_tracks_fn),
                                 type='csv',
-                                index_column='spotify_id',
+                                index_name='spotify_id',
                                 datetime_columns=['release_date', 'added_at'])
 
         print(f'{len(album_tracks_doc)} tracks')
@@ -151,7 +151,7 @@ def _get_artist_tracks_doc(artist_id: str, artist_name: str):
         name=f'artist tracks {artist_id} {artist_name}',
         path=os.path.join(artist_tracks_dir, artist_tracks_file),
         type='csv',
-        index_column='spotify_id',
+        index_name='spotify_id',
         datetime_columns=['release_date', 'added_at'],
         backups=0,
         create=new_file,
@@ -218,7 +218,7 @@ def create_artist_tracks():
                                 path=os.path.join(djlib_config.discography_cache_dir,
                                                   album_tracks_fn),
                                 type='csv',
-                                index_column='spotify_id',
+                                index_name='spotify_id',
                                 datetime_columns=['release_date', 'added_at'])
 
         _album_to_artist_tracks(album_tracks_doc)

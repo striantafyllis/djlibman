@@ -101,10 +101,10 @@ class _SpotifyDiscography:
             new_file = False
 
         if doc_type.endswith('albums'):
-            index_column = 'album_id'
+            index_name = 'album_id'
             datetime_columns = ['release_date']
         elif doc_type.endswith('tracks'):
-            index_column = 'spotify_id'
+            index_name = 'spotify_id'
             datetime_columns = ['release_date', 'added_at']
         else:
             assert False
@@ -113,7 +113,7 @@ class _SpotifyDiscography:
             name=f'{doc_type} {id} {name}',
             path=os.path.join(doc_dir, doc_file),
             type='csv',
-            index_column=index_column,
+            index_name=index_name,
             datetime_columns=datetime_columns,
             backups=0,
             create=new_file,

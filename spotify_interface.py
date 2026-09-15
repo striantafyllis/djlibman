@@ -3,19 +3,13 @@ import logging
 import json
 import base64
 import hashlib
-import os
 import os.path
-import re
 import random
-import sys
 import webbrowser
 from urllib.parse import urlencode, urlparse, parse_qs
 import requests
 
-import pandas as pd
-import numpy as np
-
-from spyroslib import cache
+import cache
 from local_util import *
 
 logger = logging.getLogger(__name__)

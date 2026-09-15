@@ -101,7 +101,7 @@ def great_american_songbook_to_songs_queue(use_listening_history=True):
     great_american_songbook = Doc(
         name='Great American Songbook',
         path=great_american_songbook_csv,
-        index_column='spotify_id'
+        index_name='spotify_id'
     )
 
     great_american_songs = great_american_songbook.get_df()

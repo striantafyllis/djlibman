@@ -39,7 +39,7 @@ type = google_sheet
 title = DJ Library
 sheet = Main Library
 header = 0
-index_column = rekordbox_id
+index_name = rekordbox_id
 list_columns = ['Flavors', 'Instruments', 'Protosets']
 boolean_columns  = ['Danceable', 'Ambient', 'Song', 'Vocalizing', 'Distorted Vocals']
 datetime_columns = ['Date Added']
@@ -58,11 +58,12 @@ boolean_columns  = ['Melody', 'Fast Melody', 'Slow Melody', 'Vocalizing', 'Disto
 type = csv
 path = /Users/spyros/Music/djlib/listening_history.csv
 header = 0
+index_name = spotify_id
 datetime_columns = ['release_date', 'added_at']
 
 [docs.rekordbox_to_spotify]
 type = csv
 path = /Users/spyros/Music/djlib/rekordbox_to_spotify.csv
 header = 0
-index_column = rekordbox_id
+index_name = rekordbox_id
 datetime_columns = ['release_date', 'added_at']

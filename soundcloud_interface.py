@@ -1,5 +1,3 @@
-
-import time
 import random
 import string
 import logging
@@ -10,12 +8,8 @@ import webbrowser
 import requests
 import json
 
-
-import pandas as pd
-import numpy as np
-
 from local_util import *
-from spyroslib import cache
+import cache
 
 logger = logging.getLogger(__name__)
 

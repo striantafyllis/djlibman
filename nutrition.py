@@ -98,7 +98,7 @@ class Nutrition:
             issue_error(f"Google sheet '{google_sheet_name}' does not exist",
                         continue_on_error=self.continue_on_error)
 
-        sheets = self.google.get_sheets_in_file(id=google_sheet_id)
+        sheets = self.google.get_sheets_in_doc(id=google_sheet_id)
 
         for sheet in sheets:
             if sheet.endswith('#'):
@@ -117,7 +117,7 @@ class Nutrition:
             issue_error(f"Google sheet '{google_sheet_name}' does not exist",
                         continue_on_error=self.continue_on_error)
 
-        sheets = self.google.get_sheets_in_file(id=google_sheet_id)
+        sheets = self.google.get_sheets_in_doc(id=google_sheet_id)
 
         for sheet in sheets:
             if not sheet.endswith('*') and not sheet.endswith('#'):

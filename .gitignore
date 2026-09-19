@@ -3,5 +3,6 @@
 /buffer
 /djlibman.log
 /data
-/__pycache__
+__pycache__/
 /soundcloud_cached_token.json
+.DS_Store

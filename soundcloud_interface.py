@@ -8,7 +8,7 @@ import webbrowser
 import requests
 import json
 
-from local_util import *
+from local_utils import *
 import cache
 
 logger = logging.getLogger(__name__)

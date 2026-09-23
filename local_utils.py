@@ -2,11 +2,51 @@
 import sys
 import re
 import difflib
+import inspect
 
 import pandas as pd
 import unidecode
 
 from spyroslib.general_utils import *
+
+
+def project(table, projection):
+    if isinstance(table, list):
+        return [project(row, projection) for row in table]
+
+    if isinstance(table, dict):
+        row = table
+
+        result_dict = {}
+
+        if isinstance(projection, dict):
+            for key, value_func in projection.items():
+                if value_func is None:
+                    value = row[key]
+                elif isinstance(value_func, str):
+                    value = row[value_func]
+                elif inspect.isclass(value_func):
+                    value = value_func(row[key])
+                elif isinstance(value_func, tuple) and len(value_func) == 2:
+                    type_conv, row_key = value_func
+                    value = type_conv(row[row_key])
+                elif callable(value_func):
+                    value = value_func(row)
+                elif isinstance(value_func, dict) or isinstance(value_func, list):
+                    value = project(row[key], value_func)
+                else:
+                    value = value_func
+
+                result_dict[key] = value
+
+        elif isinstance(projection, list):
+            result_dict = {key: row[key] for key in projection}
+        else:
+            raise ValueError(f"Invalid project argument: '{projection}'")
+
+        return result_dict
+
+    raise ValueError(f'Invalid project value type: {type(table)}')
 
 
 def get_attrib_or_fail(series, attrib_possible_names):

@@ -11,7 +11,7 @@ from library_workflow import add_spotify_fields_to_rekordbox
 from spotify_util import get_track_artists, add_artist_track_counts
 from classification import filter_tracks
 
-from local_util import *
+from local_utils import *
 
 def get_A_producers(run_name, *flavors):
     djlib = ct.Doc('djlib')

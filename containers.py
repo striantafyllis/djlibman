@@ -6,7 +6,7 @@ import numpy as np
 import spyroslib.containers as ct
 import djlib_config
 
-from local_util import *
+from local_utils import *
 
 def translate_spotify_id_to_rekordbox(spotify_df: pd.DataFrame) -> pd.DataFrame:
     """Converts a dataframe indexed by spotify_id to one indexed by rekordbox_id"""

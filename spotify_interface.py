@@ -10,7 +10,7 @@ from urllib.parse import urlencode, urlparse, parse_qs
 import requests
 
 import cache
-from local_util import *
+from local_utils import *
 
 logger = logging.getLogger(__name__)
 

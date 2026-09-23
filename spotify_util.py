@@ -3,7 +3,7 @@ import random
 
 import spyroslib.containers
 
-from local_util import *
+from local_utils import *
 from containers import *
 
 def format_track_for_search(track):
